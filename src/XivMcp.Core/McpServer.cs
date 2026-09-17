@@ -37,6 +37,12 @@ public sealed class McpServerOptions
     public TimeSpan SessionIdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
 
     public int ActivityCapacity { get; set; } = 500;
+
+    /// <summary>Interval between SSE keep-alive comments on idle streams.</summary>
+    public TimeSpan SseKeepAliveInterval { get; set; } = TimeSpan.FromSeconds(15);
+
+    /// <summary>Maximum items per page for tools/list, resources/list, resources/templates/list and prompts/list.</summary>
+    public int ListPageSize { get; set; } = 250;
 }
 
 /// <summary>

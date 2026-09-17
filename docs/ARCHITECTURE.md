@@ -1,0 +1,152 @@
+# Architecture
+
+> The plugin has not been loaded in the game yet. This describes the implemented design; runtime
+> behaviour in game is unverified.
+
+## Projects
+
+| Project | Output | Depends on | Role |
+| --- | --- | --- | --- |
+| `src/XivMcp.Core` | `XivMcp.Core.dll` (net10.0) | BCL only | MCP protocol + Streamable HTTP transport on `TcpListener`, attribute-driven registry, sessions, activity feed. No Dalamud, no ASP.NET Core (Dalamud's runtime ships neither). |
+| `src/XivMcp.Plugin` | `XivMcp.dll` (Dalamud.NET.Sdk 15) | Core, Dalamud API 15 | Plugin shell (config, services, windows, IPC, DTR) and every tool provider. |
+| `src/XivMcp.Umbra` | Umbra widget plugin | Umbra, IPC contract | Toolbar widget that talks to the plugin only over Dalamud IPC. |
+| `src/Shared/IpcContract.cs` | compiled into Plugin and Umbra | — | IPC gate names and JSON payload shapes. |
+
+Frozen contracts (additive changes only): `Core/Abstractions/Attributes.cs`, `Core/Abstractions/Contracts.cs`,
+the public surface of `Core/McpServer.cs`, and `Shared/IpcContract.cs`.
+
+## Plugin shell
+
+```
+Plugin (IDalamudPlugin)
+ ├─ Configuration                 pluginConfigs/XivMcp.json (token generated on first run)
+ ├─ DalamudGameThread : IGameThread   IFramework.RunOnTick / inline when already on the framework thread
+ ├─ ConfirmationService           pending Action/Chat approvals (TaskCompletionSource per call)
+ ├─ HostState : IHostState        tiers, categories, IsLoggedIn; fail-closed confirmation gate
+ ├─ NotifierProxy : IMcpNotifier  handed to providers; forwards to the server, never throws
+ ├─ AgentBoard                    agent progress posts (post_status / window / IPC / ffxiv://agents)
+ ├─ ServerHost                    one McpServer for the plugin lifetime; providers; start/stop/restart
+ ├─ WindowSystem: MainWindow (Status/Agents/Activity/Tools/Settings), ConfirmWindow
+ ├─ IpcProvider                   IpcContract gates + throttled Changed
+ └─ DtrEntry                      "MCP ● n" server info bar entry
+```
+
+`Plugin.cs` builds these in order, registers `/xivmcp`, `OpenMainUi`/`OpenConfigUi` and the Draw
+handler, and starts the server if autostart is on. If the constructor throws it disposes whatever it
+already created, because Dalamud does not call `Dispose` on a failed load.
+
+### Server lifetime
+
+`ServerHost` creates a single `McpServer` and keeps it for the whole plugin lifetime, so providers and
+the notifier survive restarts. Start/stop/restart are serialized with a semaphore and run on the
+thread pool. Before each start the host copies configuration into `McpServer.Options` (host, port,
+token, allowed origins, call timeout, instructions). Failures to start, including bind errors, go to
+`ServerHost.LastError` and appear in the window, `/xivmcp status` and the DTR tooltip. Nothing is
+thrown into Dalamud.
+
+After a settings change, `ServerHost.ApplyConfigAsync()`:
+- restarts a running server if the endpoint, token, origins or timeouts changed;
+- sends `tools/list_changed`, `prompts/list_changed` and `resources/list_changed` if tiers or
+  categories changed, so connected clients re-list.
+
+Safety check: `StartCoreAsync` refuses to listen on a non-loopback host unless a bearer token is
+required.
+
+### Provider discovery and DI
+
+`ServerHost.LoadProviders(typeof(Plugin).Assembly, scopedObjects...)` finds every non-abstract class
+marked `[McpProvider]` and, **for each one on its own**:
+
+1. constructs it with `IDalamudPluginInterface.CreateAsync<T>(scopedObjects)`, called through
+   reflection because the type is only known at runtime;
+2. calls `McpServer.RegisterProvider(instance)`.
+
+A failure at either step is logged and recorded as a `ProviderInfo` error (Status and Tools tabs,
+`get_server_info`). The other providers still load. The shell calls `RegisterProvider` once per
+instance rather than `RegisterProviders(assembly, factory)`, which would let one bad provider abort the
+whole loop.
+
+How Dalamud's IoC resolves constructor parameters (checked by decompiling `Dalamud.IoC.Internal.ServiceContainer`
+for API 15):
+- Dalamud services (`IClientState`, `IChatGui`, `IPluginLog`, ...) come from the container. Plugin-scoped
+  services are created once per plugin scope.
+- Otherwise the first scoped object whose runtime type is assignable to the parameter type is used.
+  `IDalamudPluginInterface` is always appended.
+- The constructor runs on a `LongRunning` thread-pool thread, **not** the framework thread. Provider
+  constructors must not touch game memory; subscribing to events is fine.
+
+Scoped objects the shell passes: `Configuration`, `DalamudGameThread` (as `IGameThread`),
+`NotifierProxy` (as `IMcpNotifier`), `AgentBoard`, `ServerHost`, `HostState`, `ConfirmationService`.
+
+On unload, providers implementing `IAsyncDisposable`/`IDisposable` are disposed in reverse load order,
+after the server has stopped.
+
+### Threading
+
+| Work | Thread |
+| --- | --- |
+| HTTP accept/read, JSON-RPC dispatch | thread pool (Core) |
+| Tools with `GameThread = true` | framework thread via `IGameThread.InvokeAsync` → `IFramework.RunOnTick` (inline if already on it; cancellable while queued) |
+| `ActivityRecorded` | thread pool; `ServerHost` only counts, logs and re-raises |
+| ImGui windows, confirmation resolve, IPC `Changed`, DTR updates, `ServerHost.Tick` (1 Hz) | framework thread |
+
+Configuration is written only from the framework thread (UI). Collections are replaced rather than
+modified in place, so server threads always read a consistent reference.
+
+### Confirmation of Action/Chat calls
+
+Intended flow: the server awaits the host before running an Action/Chat tool, and
+`ConfirmationService.RequestAsync` adds a pending entry with a `TaskCompletionSource<bool>`.
+`ConfirmWindow` draws Approve/Deny with a countdown, and the Draw loop calls `Resolve` on the framework
+thread, which completes the server-side await. Timeout, client cancellation, `Deny all` and plugin
+unload all resolve to *denied*. The server's call timeout is raised to at least the confirmation
+timeout + 15 s.
+
+**Gap:** the frozen Core contract has no per-call hook for this, only the synchronous
+`IHostState.IsPermitted(tier)`. The proposed additive Core contract:
+
+```csharp
+namespace XivMcp.Core;
+
+/// Optionally implemented by an IHostState. The server awaits it (off the game thread) after the
+/// permission/login checks and before invoking any tool whose Permission >= Action; false => isError
+/// "Denied by the player in game".
+public interface IToolCallApprover
+{
+    Task<bool> ApproveToolCallAsync(string toolName, ToolPermission permission, string? clientName,
+        string? argumentsJson, CancellationToken cancellationToken);
+}
+```
+
+`HostState.ApproveToolCallAsync` already has this exact signature. Until `HostState` implements the
+interface (detected by name at startup), `IsPermitted(Action|Chat)` returns false whenever confirmation
+is enabled, so enabling confirmation never leaves calls unconfirmed.
+
+### Unload / hot reload
+
+`Plugin.Dispose` removes the command, UI handlers and windows, denies pending confirmations, then
+disposes (in reverse order) the DTR entry, the IPC provider (unregisters every gate), `ServerHost`
+(stops the listener and waits at most 5 s so the port is freed for the reloaded instance, disposes the
+server and the providers) and `ConfirmationService`.
+
+## IPC (plugin ↔ Umbra)
+
+Gates from `IpcContract` with their type parameters (a subscriber must use the same ones):
+
+| Gate | Provider type | Payload |
+| --- | --- | --- |
+| `XivMcp.ApiVersion` | `<int>` func | `IpcContract.Version` |
+| `XivMcp.GetStatus` | `<string>` func | `{running, endpoint, activeSessions, totalRequests, failedRequests, lastError, connectedClients[], permissions{read,ui,action,chat}, agents, confirmActions}`. `permissions` holds the effective values (fail-closed applied). |
+| `XivMcp.GetActivity` | `<int, string>` func | newest N (clamped 1..500) activity entries |
+| `XivMcp.GetAgentBoard` | `<string>` func | `[{agent, status, state, progress, detail, clientName, updatedAt}]`, newest first |
+| `XivMcp.SetRunning` | `<bool, bool>` func | starts/stops (waits ≤300 ms), returns the running state |
+| `XivMcp.ToggleWindow` | `<object>` action | toggles the main window |
+| `XivMcp.Changed` | `<object>` message | no arguments; sent from the framework thread, coalesced to ≤ 4 Hz, on server state, activity or board changes |
+
+## Agent board
+
+`AgentBoard` keeps at most 64 posts, keyed by agent name (case-insensitive). Agent names are capped at
+64 characters, status at 200 and detail at 2000; progress is clamped to 0..1. Posts expire after the
+configured idle time (default 120 min). `AgentBoardProvider` exposes `post_status` (Ui), `list_status`
+(Read), `clear_status` (Ui) and the `ffxiv://agents` resource. It sends `resources/updated` on every
+change and a Dalamud notification when a post moves into `done`/`failed` (configurable).

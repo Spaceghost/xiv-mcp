@@ -1,0 +1,128 @@
+using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
+using XivMcp.Core;
+using XivMcp.Plugin.Services;
+
+namespace XivMcp.Plugin.Providers.Meta;
+
+public sealed record PermissionTiersDto(
+    bool Read,
+    bool Ui,
+    bool Action,
+    bool Chat,
+    bool ConfirmActions,
+    string? Note);
+
+public sealed record CategoryInfoDto(string Name, bool Enabled, int Tools, int FailedProviders);
+
+public sealed record ServerInfoDto(
+    string Name,
+    string Version,
+    string Endpoint,
+    string Transport,
+    bool Running,
+    DateTimeOffset? StartedAt,
+    int ActiveSessions,
+    IReadOnlyList<string> ConnectedClients,
+    string? YourClient,
+    string? YourSessionId,
+    PermissionTiersDto Permissions,
+    int RegisteredTools,
+    int AvailableTools,
+    IReadOnlyList<CategoryInfoDto> Categories,
+    string DalamudVersion,
+    string? GameVersion,
+    string ClientLanguage,
+    bool LoggedIn);
+
+/// <summary>Self-description of the server so an agent can plan around what the player enabled.</summary>
+[McpProvider("meta")]
+public sealed class ServerInfoProvider
+{
+    private readonly ServerHost host;
+    private readonly Configuration config;
+    private readonly IDalamudPluginInterface pluginInterface;
+    private readonly IDataManager data;
+    private readonly IClientState clientState;
+
+    public ServerInfoProvider(ServerHost host, Configuration config, IDalamudPluginInterface pluginInterface, IDataManager data, IClientState clientState)
+    {
+        this.host = host;
+        this.config = config;
+        this.pluginInterface = pluginInterface;
+        this.data = data;
+        this.clientState = clientState;
+    }
+
+    [McpTool("get_server_info",
+        Title = "Server info, enabled tiers and categories",
+        Description =
+            "Describes this XivMcp server: plugin version, endpoint, running state, connected clients, which permission " +
+            "tiers are currently allowed (read, ui, action, chat — and whether Action/Chat calls need in-game approval), " +
+            "each tool category with its enabled flag and tool count, Dalamud and game versions, client language and " +
+            "whether a character is logged in. Call this first to learn what you can do before planning; a tier or " +
+            "category that is off means its tools are unavailable until the player enables them in /xivmcp settings.",
+        GameThread = false,
+        RequiresLogin = false)]
+    public async Task<ServerInfoDto> GetServerInfo(ToolContext ctx)
+    {
+        var loggedIn = await ctx.Game.InvokeAsync(() => clientState.IsLoggedIn, ctx.CancellationToken).ConfigureAwait(false);
+        var status = host.Status;
+        var hostState = host.HostState;
+        var tools = host.ListTools();
+        var providers = host.Providers;
+
+        string? note = null;
+        if (hostState.ConfirmationFailClosed && (config.AllowAction || config.AllowChat))
+            note = "Action/Chat are enabled but blocked: in-game confirmation is on and this build cannot enforce it yet.";
+
+        var permissions = new PermissionTiersDto(
+            hostState.IsPermitted(ToolPermission.Read),
+            hostState.IsPermitted(ToolPermission.Ui),
+            hostState.IsPermitted(ToolPermission.Action),
+            hostState.IsPermitted(ToolPermission.Chat),
+            config.ConfirmActions,
+            note);
+
+        var categories = host.Categories
+            .Select(c => new CategoryInfoDto(
+                c,
+                config.IsCategoryEnabled(c),
+                tools.Count(t => string.Equals(t.Category, c, StringComparison.OrdinalIgnoreCase)),
+                providers.Count(p => !p.Loaded && string.Equals(p.Category, c, StringComparison.OrdinalIgnoreCase))))
+            .ToArray();
+
+        var available = tools.Count(t => hostState.IsPermitted(t.Permission) && config.IsCategoryEnabled(t.Category));
+
+        string? gameVersion = null;
+        try
+        {
+            if (data.GameData.Repositories.TryGetValue("ffxiv", out var repo))
+                gameVersion = repo.Version;
+        }
+        catch
+        {
+            // Version file unreadable: report null rather than fail the call.
+        }
+
+        return new ServerInfoDto(
+            "xiv-mcp",
+            host.PluginVersion,
+            host.Endpoint,
+            "streamable-http",
+            host.IsRunning,
+            host.StartedAt,
+            status.ActiveSessions,
+            status.ConnectedClients,
+            ctx.ClientName,
+            ctx.SessionId,
+            permissions,
+            tools.Count,
+            available,
+            categories,
+            pluginInterface.GetDalamudVersion().Version.ToString(),
+            gameVersion,
+            clientState.ClientLanguage.ToString(),
+            loggedIn);
+    }
+}
