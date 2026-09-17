@@ -1,6 +1,11 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/XivMcp.Core/XivMcp.Core.csproj" />
+    <Project Path="src/XivMcp.DevHost/XivMcp.DevHost.csproj" />
     <Project Path="src/XivMcp.Plugin/XivMcp.Plugin.csproj" />
+    <Project Path="src/XivMcp.Umbra/XivMcp.Umbra.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/XivMcp.Core.Tests/XivMcp.Core.Tests.csproj" />
   </Folder>
 </Solution>
