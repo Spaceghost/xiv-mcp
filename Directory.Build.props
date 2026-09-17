@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    Build outputs live outside the source tree (~/xiv-mcp-build by default).
+    Set XIVMCP_ARTIFACTS to give a concurrent build its own bin/obj tree.
+  -->
+  <PropertyGroup>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath Condition="'$(XIVMCP_ARTIFACTS)' != ''">$(XIVMCP_ARTIFACTS)</ArtifactsPath>
+    <ArtifactsPath Condition="'$(ArtifactsPath)' == ''">$(MSBuildThisFileDirectory)../xiv-mcp-build/artifacts</ArtifactsPath>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+</Project>
