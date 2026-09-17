@@ -1,0 +1,11 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <AssemblyName>XivMcp</AssemblyName>
+    <RootNamespace>XivMcp.Plugin</RootNamespace>
+    <Version>0.1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XivMcp.Core\XivMcp.Core.csproj" />
+    <Compile Include="..\Shared\IpcContract.cs" Link="Shared\IpcContract.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/XivMcp.Core/XivMcp.Core.csproj" />
+    <Project Path="src/XivMcp.Plugin/XivMcp.Plugin.csproj" />
+  </Folder>
+</Solution>
