@@ -17,7 +17,7 @@ file is replaced with defaults, which also generates a new token.
 | `BearerToken` | random | 256-bit random value, unpadded base64url (43 chars), generated on first run. Clients send `Authorization: Bearer <token>`. Never logged; masked in the UI until revealed. **Regenerate token…** replaces it. | immediately (restart) |
 | `RequireToken` | `true` | When off, requests need no token. Any local program can then call every enabled tool. | immediately (restart) |
 | `AllowedOrigins` | `[]` | Extra `Origin` values accepted for browser requests (DNS-rebinding defence). Loopback origins are always accepted; requests without `Origin` are not affected. One per line in the UI. | Apply |
-| `CallTimeoutSeconds` | `30` (5–600) | Upper bound for one tool/resource/prompt call. With confirmation on, the effective timeout is at least `ConfirmTimeoutSeconds + 15`. | Apply |
+| `CallTimeoutSeconds` | `30` (5–600) | Upper bound for one tool/resource/prompt call. For Action/Chat calls it starts after in-game approval. | Apply (no restart) |
 
 "Apply" means the **Apply** / **Apply and restart** button under Server settings. Host, port, timeout
 and origins are edited as a draft so typing does not restart the server on every keystroke.
@@ -30,12 +30,13 @@ and origins are edited as a draft so typing does not restart the server on every
 | `AllowUi` | `true` | Local-only visible effects (echo, toasts, map flags, windows, agent board). |
 | `AllowAction` | `false` | Changes local client state (target, gearset, teleport, slash commands). |
 | `AllowChat` | `false` | Text other players can see. |
-| `ConfirmActions` | `true` | Ask in game before every Action/Chat call. **Current limitation:** the server hook this needs is not in the Core contract yet, so while this is on, Action and Chat stay blocked (fail closed). See [ARCHITECTURE.md](ARCHITECTURE.md#confirmation-of-actionchat-calls). |
-| `ConfirmTimeoutSeconds` | `20` (5–300; UI slider 5–120) | Seconds before a pending confirmation is denied automatically. |
+| `ConfirmActions` | `true` | Ask in game before every Action/Chat call (Allow / Deny / Allow this tool for 10 min). Off: Action/Chat follow their tier toggles directly. See [ARCHITECTURE.md](ARCHITECTURE.md#confirmation-of-actionchat-calls). Unverified in game. |
+| `ConfirmTimeoutSeconds` | `20` (5–300; UI slider 5–120) | Seconds before a pending confirmation is denied automatically (the client gets "not confirmed in game within N s"). |
 | `DisabledCategories` | `[]` | Provider categories that are switched off (e.g. `"chat"`). Their tools, resources and prompts are hidden and rejected. |
 
 Tier and category changes take effect immediately. Connected clients receive `tools/list_changed`,
-`prompts/list_changed` and `resources/list_changed`.
+`prompts/list_changed` and `resources/list_changed`, and temporary "allow for 10 min" grants are revoked. Resources
+follow the Read tier as well as their category. Grants are kept in memory only (never written to this file).
 
 ## Providers and interface
 

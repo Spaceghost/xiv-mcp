@@ -197,6 +197,12 @@ public sealed partial class McpServer
             return true;
         }
 
+        if (!HasWellFormedStrings(request.Body))
+        {
+            await SendJsonErrorAsync(connection, request, 400, null, JsonRpcCodes.ParseError, "Parse error: a string contains an unpaired UTF-16 surrogate escape", headers).ConfigureAwait(false);
+            return true;
+        }
+
         var sessionId = request.Headers.Get("Mcp-Session-Id");
 
         if (body is JsonArray batch)
@@ -515,6 +521,33 @@ public sealed partial class McpServer
 
         await responder.CompleteAsync(response, status).ConfigureAwait(false);
         return responder.KeepAlive;
+    }
+
+    /// <summary>
+    /// JSON allows <c>\ud800</c> escapes that do not form a valid UTF-16 pair; System.Text.Json then throws when such a
+    /// string is read. Reject them up front so every later string read is safe.
+    /// </summary>
+    internal static bool HasWellFormedStrings(ReadOnlySpan<byte> json)
+    {
+        var reader = new Utf8JsonReader(json, new JsonReaderOptions { MaxDepth = 64, CommentHandling = JsonCommentHandling.Disallow });
+        try
+        {
+            while (reader.Read())
+            {
+                if (reader.TokenType is JsonTokenType.String or JsonTokenType.PropertyName && reader.ValueIsEscaped)
+                    _ = reader.GetString();
+            }
+
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     internal static bool TryDecodeHeaderValue(string value, out string decoded)

@@ -105,10 +105,83 @@ internal static class TypeShapes
     }
 }
 
+/// <summary>State for generating one root schema: types being expanded and the <c>$defs</c> collected for recursion.</summary>
+internal sealed class SchemaContext
+{
+    public HashSet<Type> Visiting { get; } = [];
+
+    /// <summary>Types that referred back to themselves while being expanded; their schema lives in <see cref="Defs"/>.</summary>
+    public HashSet<Type> Recursive { get; } = [];
+
+    public JsonObject Defs { get; } = new();
+}
+
 /// <summary>JSON Schema (draft 2020-12 vocabulary, no $schema keyword) for C# parameters and return types.</summary>
 internal static class SchemaGenerator
 {
     private const int MaxDepth = 12;
+
+    /// <summary>
+    /// Schema for values that may be any JSON (<c>object</c>, <c>JsonNode</c>, <c>JsonElement</c>). Spelled as an
+    /// explicit anyOf instead of <c>{}</c> so strict schema linters (and clients that require a type) accept it.
+    /// </summary>
+    public static JsonObject AnyJson() => new()
+    {
+        ["description"] = "Any JSON value.",
+        ["anyOf"] = new JsonArray(
+            new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
+            new JsonObject { ["type"] = "array" },
+            new JsonObject { ["type"] = "string" },
+            new JsonObject { ["type"] = "number" },
+            new JsonObject { ["type"] = "boolean" },
+            new JsonObject { ["type"] = "null" }),
+    };
+
+    /// <summary>Stable <c>$defs</c> key for a type: namespace-qualified, generic arguments spelled out, JSON-pointer safe.</summary>
+    public static string DefName(Type type)
+    {
+        var sb = new System.Text.StringBuilder();
+        if (!string.IsNullOrEmpty(type.Namespace))
+            sb.Append(type.Namespace).Append('.');
+        AppendTypeName(sb, type);
+        var chars = sb.ToString().Select(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '-' ? c : '_').ToArray();
+        return new string(chars);
+    }
+
+    private static System.Text.StringBuilder AppendTypeName(System.Text.StringBuilder sb, Type type)
+    {
+        if (type.IsNested && type.DeclaringType is { IsGenericTypeDefinition: false } declaring)
+            AppendTypeName(sb, declaring).Append('.');
+        var name = type.Name;
+        var tick = name.IndexOf('`');
+        sb.Append(tick >= 0 ? name[..tick] : name);
+        if (type.IsGenericType)
+        {
+            sb.Append("Of");
+            foreach (var argument in type.GetGenericArguments())
+                AppendTypeName(sb.Append('_'), argument);
+        }
+
+        return sb;
+    }
+
+    private static void AttachDefs(JsonObject schema, JsonObject? defs)
+    {
+        if (defs is null || defs.Count == 0)
+            return;
+        var target = schema["$defs"] as JsonObject;
+        if (target is null)
+        {
+            target = new JsonObject();
+            schema["$defs"] = target;
+        }
+
+        foreach (var (name, value) in defs)
+        {
+            if (!target.ContainsKey(name) && value is not null)
+                target[name] = value.DeepClone();
+        }
+    }
 
     public static JsonObject BuildInputSchema(IReadOnlyList<ParameterBinding> parameters)
     {
@@ -127,13 +200,23 @@ internal static class SchemaGenerator
         if (required.Count > 0)
             schema["required"] = required;
         schema["additionalProperties"] = false;
+        foreach (var p in parameters)
+        {
+            if (p.Kind == ParameterKind.Argument)
+                AttachDefs(schema, p.SchemaDefs);
+        }
+
         return schema;
     }
 
     /// <summary>Schema for one bindable parameter, including [McpParam] metadata and the C# default.</summary>
     public static JsonObject ForParameter(ParameterBinding p)
     {
-        var schema = ForType(p.ValueType, forOutput: false, new HashSet<Type>(), 0);
+        var context = new SchemaContext();
+        var schema = ForType(p.ValueType, forOutput: false, context, 0);
+        if (schema.ContainsKey("$ref") && context.Defs[DefName(p.ValueType)] is JsonObject definition)
+            schema = definition.DeepClone().AsObject(); // inline the recursive root; nested references use $defs
+        p.SchemaDefs = context.Defs.Count > 0 ? context.Defs : null;
         var attr = p.Attribute;
         if (attr is not null && !string.IsNullOrWhiteSpace(attr.Description))
             schema.Insert(0, "description", attr.Description);
@@ -181,9 +264,22 @@ internal static class SchemaGenerator
         if (valueType == typeof(void) || valueType == typeof(ToolResult))
             return null;
 
-        var inner = ForType(valueType, forOutput: true, new HashSet<Type>(), 0);
+        var context = new SchemaContext();
+        var inner = ForType(valueType, forOutput: true, context, 0);
         if (TypeShapes.SerializesAsObject(valueType) && !nullable)
+        {
+            if (inner.ContainsKey("$ref"))
+            {
+                // A recursive root type: inline its definition at the root (outputSchema must be type object).
+                var name = DefName(valueType);
+                var root = context.Defs[name]!.DeepClone().AsObject();
+                AttachDefs(root, context.Defs);
+                return root;
+            }
+
+            AttachDefs(inner, context.Defs);
             return inner;
+        }
 
         wrap = true;
         var schema = new JsonObject
@@ -193,11 +289,13 @@ internal static class SchemaGenerator
         };
         if (!nullable)
             schema["required"] = new JsonArray("result");
+        AttachDefs(schema, context.Defs);
         return schema;
     }
 
-    public static JsonObject ForType(Type type, bool forOutput, HashSet<Type> visiting, int depth)
+    public static JsonObject ForType(Type type, bool forOutput, SchemaContext context, int depth)
     {
+        var visiting = context.Visiting;
         type = TypeShapes.UnwrapNullable(type);
 
         if (type == typeof(string))
@@ -247,10 +345,28 @@ internal static class SchemaGenerator
         if (type == typeof(JsonArray))
             return new JsonObject { ["type"] = "array" };
         if (TypeShapes.IsJsonAny(type))
-            return new JsonObject();
+            return AnyJson();
 
-        if (depth >= MaxDepth || visiting.Contains(type))
-            return new JsonObject();
+        var isDictionary = TypeShapes.GetDictionaryValueType(type) is not null;
+        var isEnumerable = !isDictionary && TypeShapes.GetEnumerableElementType(type) is not null;
+        if (visiting.Contains(type))
+        {
+            if (isDictionary || isEnumerable)
+                return new JsonObject { ["type"] = isDictionary ? "object" : "array" };
+
+            // Self-reference (directly or through members/collections): point at the shared definition.
+            context.Recursive.Add(type);
+            return new JsonObject { ["$ref"] = "#/$defs/" + DefName(type) };
+        }
+
+        if (depth >= MaxDepth)
+        {
+            return new JsonObject
+            {
+                ["type"] = isEnumerable ? "array" : "object",
+                ["description"] = "Nested too deeply to describe here.",
+            };
+        }
 
         if (TypeShapes.GetDictionaryValueType(type) is { } valueType)
         {
@@ -258,7 +374,7 @@ internal static class SchemaGenerator
             var s = new JsonObject
             {
                 ["type"] = "object",
-                ["additionalProperties"] = ForType(valueType, forOutput, visiting, depth + 1),
+                ["additionalProperties"] = ForType(valueType, forOutput, context, depth + 1),
             };
             visiting.Remove(type);
             return s;
@@ -267,7 +383,7 @@ internal static class SchemaGenerator
         if (TypeShapes.GetEnumerableElementType(type) is { } element)
         {
             visiting.Add(type);
-            var s = new JsonObject { ["type"] = "array", ["items"] = ForType(element, forOutput, visiting, depth + 1) };
+            var s = new JsonObject { ["type"] = "array", ["items"] = ForType(element, forOutput, context, depth + 1) };
             visiting.Remove(type);
             return s;
         }
@@ -279,11 +395,11 @@ internal static class SchemaGenerator
         }
         catch (Exception)
         {
-            return new JsonObject();
+            return AnyJson();
         }
 
         if (info.Kind != JsonTypeInfoKind.Object)
-            return new JsonObject();
+            return AnyJson();
 
         visiting.Add(type);
         var properties = new JsonObject();
@@ -294,7 +410,7 @@ internal static class SchemaGenerator
                 continue;
 
             var member = prop.AttributeProvider as MemberInfo;
-            var propSchema = ForType(prop.PropertyType, forOutput, visiting, depth + 1);
+            var propSchema = ForType(prop.PropertyType, forOutput, context, depth + 1);
             var description = member?.GetCustomAttribute<DescriptionAttribute>()?.Description;
             if (!string.IsNullOrWhiteSpace(description))
                 propSchema.Insert(0, "description", description);
@@ -317,6 +433,14 @@ internal static class SchemaGenerator
         var schema = new JsonObject { ["type"] = "object", ["properties"] = properties };
         if (required.Count > 0)
             schema["required"] = required;
+
+        if (context.Recursive.Contains(type))
+        {
+            var name = DefName(type);
+            context.Defs[name] = schema;
+            return new JsonObject { ["$ref"] = "#/$defs/" + name };
+        }
+
         return schema;
     }
 

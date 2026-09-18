@@ -27,8 +27,8 @@ public sealed partial class MainWindow
             ImGui.TextColored(on ? TierColor(tier) : ImGuiColors.DalamudGrey3, $"{tier} {(on ? "on" : "off")}");
         }
 
-        if (hostState.ConfirmationFailClosed && (config.AllowAction || config.AllowChat))
-            ImGui.TextColored(ImGuiColors.DalamudOrange, "Action/Chat are blocked: confirmation is on but this build cannot enforce it yet (see Settings).");
+        if (config.ConfirmActions && (config.AllowAction || config.AllowChat))
+            ImGui.TextDisabled("Action/Chat calls ask for your approval first (Settings → Permissions).");
 
         ImGui.TextDisabled($"{toolsCache.Count} tools registered. Toggle tiers and categories in Settings.");
         ImGui.Separator();

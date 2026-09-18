@@ -171,6 +171,9 @@ public sealed partial class McpServer
 
     private bool IsToolVisible(ToolDescriptor tool) => CategoryEnabled(tool.Category) && Permitted(tool.Permission);
 
+    /// <summary>Resources and resource templates expose game data, so they follow the Read tier as well as their category.</summary>
+    private bool IsResourceVisible(MemberDescriptor member) => CategoryEnabled(member.Category) && Permitted(ToolPermission.Read);
+
     private static string PermissionLabel(ToolPermission p) => p switch
     {
         ToolPermission.Read => "Read",
@@ -266,6 +269,7 @@ public sealed partial class McpServer
         CancellationToken = token,
         SessionId = scope.Session?.Id,
         ClientName = scope.ClientName,
+        ProtocolVersion = scope.ProtocolVersion,
         ReportProgress = scope.ProgressToken is null
             ? static (_, _, _) => Task.CompletedTask
             : (progress, total, message) =>
@@ -327,7 +331,9 @@ public sealed partial class McpServer
         }
 
         var timeout = Options.CallTimeout > TimeSpan.Zero ? Options.CallTimeout : TimeSpan.FromSeconds(30);
-        using var timeoutCts = new CancellationTokenSource(timeout);
+
+        // The call timeout starts only once the call may run: time spent waiting for in-game approval does not count.
+        using var timeoutCts = new CancellationTokenSource();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(scope.CancellationToken, timeoutCts.Token);
         var context = CreateContext(scope, linked.Token);
 
@@ -338,6 +344,15 @@ public sealed partial class McpServer
             return ToolError(scope,
                 $"Invalid arguments for tool '{name}': {string.Join("; ", errors)}. Expected arguments: {tool.Signature}.");
         }
+
+        if (tool.Permission >= ToolPermission.Action && Approver is { } approver)
+        {
+            var denial = await ApproveAsync(scope, tool, approver, arguments).ConfigureAwait(false);
+            if (denial is not null)
+                return denial;
+        }
+
+        timeoutCts.CancelAfter(timeout);
 
         object? value;
         try
@@ -374,6 +389,59 @@ public sealed partial class McpServer
         {
             LogSink($"tool '{name}' result could not be serialized", ex);
             return ToolError(scope, $"Tool '{name}' produced a result that could not be serialized ({ex.Message}).");
+        }
+    }
+
+    /// <summary>
+    /// Asks <see cref="Approver"/> whether an Action/Chat call may run. Returns null when approved, otherwise the
+    /// isError result to send. Checks login first so the player is never asked about a call that cannot run.
+    /// </summary>
+    private async Task<JsonObject?> ApproveAsync(RequestScope scope, ToolDescriptor tool, IToolCallApprover approver, JsonObject? arguments)
+    {
+        var name = tool.Name;
+        var approvalTimeout = Options.ApprovalTimeout > TimeSpan.Zero ? Options.ApprovalTimeout : TimeSpan.FromSeconds(30);
+        using var approvalCts = new CancellationTokenSource(approvalTimeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(scope.CancellationToken, approvalCts.Token);
+        var notConfirmed = $"Tool '{name}' was not run: it was not confirmed in game within {approvalTimeout.TotalSeconds:0.#} s. " +
+                           "The player must click Allow in the xiv-mcp confirmation window; ask them before retrying.";
+
+        try
+        {
+            if (tool.RequiresLogin)
+            {
+                var loggedIn = GameThread.IsOnGameThread
+                    ? HostState.IsLoggedIn
+                    : await GameThread.InvokeAsync(() => HostState.IsLoggedIn, linked.Token).WaitAsync(linked.Token).ConfigureAwait(false);
+                if (!loggedIn)
+                    return ToolError(scope, $"Tool '{name}' requires a logged-in character, and no character is logged in right now. Ask the user to log in, then retry.");
+            }
+
+            var argumentsJson = arguments?.ToJsonString(McpJson.Options);
+            var approved = await Task.Run(() => approver.ApproveToolCallAsync(name, tool.Permission, scope.ClientName, argumentsJson, linked.Token), linked.Token)
+                .WaitAsync(linked.Token)
+                .ConfigureAwait(false);
+            if (approved)
+                return null;
+            return approvalCts.IsCancellationRequested
+                ? ToolError(scope, notConfirmed)
+                : ToolError(scope, $"Tool '{name}' was not run: denied in game by the player. Do not retry unless the player asks you to.");
+        }
+        catch (OperationCanceledException) when (scope.CancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (approvalCts.IsCancellationRequested)
+        {
+            return ToolError(scope, notConfirmed);
+        }
+        catch (TimeoutException)
+        {
+            return ToolError(scope, notConfirmed);
+        }
+        catch (Exception ex)
+        {
+            LogSink($"approval for tool '{name}' failed", ex);
+            return ToolError(scope, $"Tool '{name}' was not run: the in-game confirmation failed ({ex.GetType().Name}). Denied for safety.");
         }
     }
 
@@ -499,7 +567,7 @@ public sealed partial class McpServer
 
     private JsonObject HandleResourcesList(RequestScope scope)
     {
-        var visible = _registry.Snapshot.Resources.Where(r => CategoryEnabled(r.Category)).ToArray();
+        var visible = _registry.Snapshot.Resources.Where(IsResourceVisible).ToArray();
         return Page(scope.Params, visible, "resources", r =>
         {
             var json = new JsonObject { ["uri"] = r.Uri, ["name"] = r.Name };
@@ -512,7 +580,7 @@ public sealed partial class McpServer
 
     private JsonObject HandleTemplatesList(RequestScope scope)
     {
-        var visible = _registry.Snapshot.Templates.Where(r => CategoryEnabled(r.Category)).ToArray();
+        var visible = _registry.Snapshot.Templates.Where(IsResourceVisible).ToArray();
         return Page(scope.Params, visible, "resourceTemplates", r =>
         {
             var json = new JsonObject { ["uriTemplate"] = r.Template.Template, ["name"] = r.Name };
@@ -563,6 +631,8 @@ public sealed partial class McpServer
             throw ResourceError(scope, uri, $"Resource not found: {uri}");
         if (!CategoryEnabled(member.Category))
             throw ResourceError(scope, uri, $"Resource {uri} is unavailable: the '{member.Category}' category is disabled in the xiv-mcp plugin settings");
+        if (!Permitted(ToolPermission.Read))
+            throw ResourceError(scope, uri, $"Resource {uri} is unavailable: the 'Read' permission tier is disabled in the xiv-mcp plugin settings");
 
         var timeout = Options.CallTimeout > TimeSpan.Zero ? Options.CallTimeout : TimeSpan.FromSeconds(30);
         using var timeoutCts = new CancellationTokenSource(timeout);
@@ -779,10 +849,10 @@ public sealed partial class McpServer
             {
                 var uri = JsonRpc.RequireString(reference, "uri");
                 scope.Target = uri + "." + argumentName;
-                var template = snapshot.Templates.FirstOrDefault(t => t.Template.Template == uri && CategoryEnabled(t.Category));
+                var template = snapshot.Templates.FirstOrDefault(t => t.Template.Template == uri && IsResourceVisible(t));
                 if (template is null)
                 {
-                    if (snapshot.ResourcesByUri.ContainsKey(uri))
+                    if (snapshot.ResourcesByUri.TryGetValue(uri, out var fixedResource) && IsResourceVisible(fixedResource))
                         return CompletionJson([], argumentValue);
                     throw new McpProtocolException(JsonRpcCodes.InvalidParams, $"Unknown resource template: '{uri}'");
                 }

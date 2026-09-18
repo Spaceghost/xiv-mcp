@@ -73,9 +73,15 @@ public sealed partial class MainWindow : Window
             return;
         try
         {
-            if (ImGui.BeginChild($"##tab-{id}", Vector2.Zero, false))
-                body();
-            ImGui.EndChild();
+            try
+            {
+                if (ImGui.BeginChild($"##tab-{id}", Vector2.Zero, false))
+                    body();
+            }
+            finally
+            {
+                ImGui.EndChild();
+            }
         }
         finally
         {

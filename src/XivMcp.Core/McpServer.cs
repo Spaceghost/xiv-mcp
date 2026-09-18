@@ -41,6 +41,12 @@ public sealed class McpServerOptions
     /// <summary>Interval between SSE keep-alive comments on idle streams.</summary>
     public TimeSpan SseKeepAliveInterval { get; set; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// How long a call waits for <see cref="McpServer.Approver"/> before it fails with "Not confirmed in game". Not
+    /// counted against <see cref="CallTimeout"/>, which starts once the call is approved.
+    /// </summary>
+    public TimeSpan ApprovalTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>Maximum items per page for tools/list, resources/list, resources/templates/list and prompts/list.</summary>
     public int ListPageSize { get; set; } = 250;
 }
@@ -65,6 +71,12 @@ public sealed partial class McpServer : IAsyncDisposable
     public IGameThread GameThread { get; }
 
     public IHostState HostState { get; }
+
+    /// <summary>
+    /// Optional in-game confirmation for Action and Chat tools. Null (default) runs them directly once their tier is
+    /// permitted. May be set or cleared at any time; each call reads it once.
+    /// </summary>
+    public IToolCallApprover? Approver { get; set; }
 
     internal Action<string, Exception?> LogSink { get; }
 

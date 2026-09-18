@@ -26,6 +26,7 @@ public sealed class ServerHost : IDisposable
     private readonly IPluginLog log;
     private readonly Configuration config;
     private readonly NotifierProxy notifier;
+    private readonly ConfirmationService confirmations;
     private readonly SemaphoreSlim lifecycle = new(1, 1);
     private readonly List<ProviderInfo> providers = [];
     private readonly DateTimeOffset loadedAt = DateTimeOffset.UtcNow;
@@ -45,18 +46,20 @@ public sealed class ServerHost : IDisposable
         Configuration config,
         IGameThread gameThread,
         HostState hostState,
-        NotifierProxy notifier)
+        NotifierProxy notifier,
+        ConfirmationService confirmations)
     {
         this.pluginInterface = pluginInterface;
         this.log = log;
         this.config = config;
         this.notifier = notifier;
+        this.confirmations = confirmations;
         HostState = hostState;
 
         PluginVersion = typeof(ServerHost).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         var options = new McpServerOptions();
         ApplyOptions(options);
-        Server = new McpServer(options, gameThread, hostState, OnServerLog);
+        Server = new McpServer(options, gameThread, hostState, OnServerLog) { Approver = confirmations };
         Server.ActivityRecorded += OnActivityRecorded;
         notifier.Attach(Server);
         status = SafeGetStatus();
@@ -66,6 +69,8 @@ public sealed class ServerHost : IDisposable
     public McpServer Server { get; }
 
     public HostState HostState { get; }
+
+    public ConfirmationService Confirmations => confirmations;
 
     public string PluginVersion { get; }
 
@@ -213,10 +218,17 @@ public sealed class ServerHost : IDisposable
     /// </summary>
     public Task ApplyConfigAsync()
     {
+        // Live options (no restart needed).
+        Server.Options.ApprovalTimeout = TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds);
+        Server.Options.CallTimeout = TimeSpan.FromSeconds(config.CallTimeoutSeconds);
+
         var permissions = PermissionFingerprint();
         if (permissions != permissionFingerprint)
         {
             permissionFingerprint = permissions;
+
+            // A grant was given under the old settings; ask again under the new ones.
+            confirmations.RevokeGrants();
             notifier.AllListsChanged();
             RaiseStateChanged();
         }
@@ -318,11 +330,9 @@ public sealed class ServerHost : IDisposable
         options.ServerVersion = PluginVersion;
         options.Instructions = ServerInstructions;
 
-        // A call awaiting in-game confirmation must not be cut off by the server's call timeout.
-        var seconds = config.CallTimeoutSeconds;
-        if (config.ConfirmActions)
-            seconds = Math.Max(seconds, config.ConfirmTimeoutSeconds + 15);
-        options.CallTimeout = TimeSpan.FromSeconds(seconds);
+        // The call timeout starts after in-game approval, which has its own timeout.
+        options.CallTimeout = TimeSpan.FromSeconds(config.CallTimeoutSeconds);
+        options.ApprovalTimeout = TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds);
     }
 
     private string EndpointFingerprint() => string.Join(
@@ -330,10 +340,7 @@ public sealed class ServerHost : IDisposable
         config.Host.Trim(),
         config.Port,
         config.RequireToken ? config.BearerToken : "",
-        string.Join(',', config.AllowedOrigins),
-        config.CallTimeoutSeconds,
-        config.ConfirmActions,
-        config.ConfirmTimeoutSeconds);
+        string.Join(',', config.AllowedOrigins));
 
     private string PermissionFingerprint() => string.Join(
         '',
@@ -350,7 +357,8 @@ public sealed class ServerHost : IDisposable
         "Ui (local-only visible effects such as echo messages, toasts and map flags), Action (changes the local client: " +
         "targeting, gearsets, teleport, slash commands) and Chat (text other players can see). Disabled tiers and " +
         "categories are hidden from tools/list; call get_server_info to see what is enabled. Action and Chat calls may " +
-        "wait for the player to approve them in game and fail if denied. Many tools need a logged-in character and " +
+        "wait for the player to approve them in game and fail if denied or not confirmed in time; do not retry a denied " +
+        "call unless the player asks. Many tools need a logged-in character and " +
         "report a clear error otherwise. For multi-step work, call post_status with a short agent name to show your " +
         "progress in the player's game UI, and finish with state done or failed. Never send Chat-tier text the player " +
         "did not ask for.";

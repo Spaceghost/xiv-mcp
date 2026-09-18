@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Host-side tests for XivMcp.Plugin code that needs no running game: pure helpers (chat text rules, command
+    classification, map maths), the confirmation service, IPC payloads (against the Umbra widget's parser) and
+    provider validation paths that throw before touching game memory.
+    Dalamud's assemblies are referenced from DalamudLibPath (the same XIVLauncher dev hooks the plugin builds against)
+    and resolved from there at run time (see DalamudAssemblyResolver). Nothing here loads or talks to the game.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>XivMcp.Plugin.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591;xUnit1051</NoWarn>
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == '' And '$(DALAMUD_HOME)' != ''">$(DALAMUD_HOME)/</DalamudLibPath>
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == '' And '$(OS)' != 'Windows_NT'">$(HOME)/.xlcore/dalamud/Hooks/dev/</DalamudLibPath>
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == '' And '$(OS)' == 'Windows_NT'">$(APPDATA)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XivMcp.Plugin\XivMcp.Plugin.csproj" />
+    <ProjectReference Include="..\..\src\XivMcp.Core\XivMcp.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Dalamud"><HintPath>$(DalamudLibPath)Dalamud.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Lumina"><HintPath>$(DalamudLibPath)Lumina.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Lumina.Excel"><HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Umbra widget's parser and formatter have no Dalamud/Umbra types; compile them here to test the IPC contract end to end. -->
+    <Compile Include="..\..\src\XivMcp.Umbra\IpcPayloads.cs" Link="Umbra\IpcPayloads.cs" />
+    <Compile Include="..\..\src\XivMcp.Umbra\McpFormat.cs" Link="Umbra\McpFormat.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>DalamudLibPath</_Parameter1>
+      <_Parameter2>$(DalamudLibPath)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

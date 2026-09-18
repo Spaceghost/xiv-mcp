@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
@@ -23,11 +21,6 @@ namespace XivMcp.Plugin.Ipc;
 public sealed class IpcProvider : IDisposable
 {
     private static readonly TimeSpan ChangedInterval = TimeSpan.FromMilliseconds(250);
-
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-    };
 
     private readonly IFramework framework;
     private readonly IPluginLog log;
@@ -108,71 +101,26 @@ public sealed class IpcProvider : IDisposable
         }
     }
 
-    internal string StatusJson()
-    {
-        var status = host.Status;
-        return JsonSerializer.Serialize(
-            new
-            {
-                running = host.IsRunning,
-                endpoint = host.Endpoint,
-                activeSessions = status.ActiveSessions,
-                totalRequests = status.TotalRequests,
-                failedRequests = status.FailedRequests,
-                lastError = host.LastError ?? status.LastError,
-                connectedClients = status.ConnectedClients,
-                permissions = new
-                {
-                    read = host.HostState.IsPermitted(ToolPermission.Read),
-                    ui = host.HostState.IsPermitted(ToolPermission.Ui),
-                    action = host.HostState.IsPermitted(ToolPermission.Action),
-                    chat = host.HostState.IsPermitted(ToolPermission.Chat),
-                },
-                agents = board.Count,
-                confirmActions = config.ConfirmActions,
-            },
-            Json);
-    }
+    internal string StatusJson() => IpcJson.Status(
+        host.IsRunning,
+        host.Endpoint,
+        host.Status,
+        host.LastError,
+        host.HostState,
+        board.Count,
+        config.ConfirmActions);
 
-    internal string ActivityJson(int max)
-    {
-        var entries = host.GetActivity(Math.Clamp(max, 1, 500));
-        return JsonSerializer.Serialize(
-            entries.Select(e => new
-            {
-                timestamp = e.Timestamp,
-                sessionId = e.SessionId,
-                clientName = e.ClientName,
-                method = e.Method,
-                target = e.Target,
-                success = e.Success,
-                error = e.Error,
-                durationMs = e.DurationMs,
-            }),
-            Json);
-    }
+    internal string ActivityJson(int max) => IpcJson.Activity(host.GetActivity(Math.Clamp(max, 1, 500)));
 
-    internal string BoardJson() => JsonSerializer.Serialize(
-        board.Snapshot().Select(p => new
-        {
-            agent = p.Agent,
-            status = p.Status,
-            state = p.StateName,
-            progress = p.Progress,
-            detail = p.Detail,
-            clientName = p.ClientName,
-            updatedAt = p.UpdatedAt,
-        }),
-        Json);
+    internal string BoardJson() => IpcJson.Board(board.Snapshot());
 
     private bool SetRunning(bool run)
     {
         try
         {
-            var task = run ? host.StartAsync() : host.StopAsync();
-
-            // Subscribers call from the framework thread: wait briefly for the bind result, never long.
-            task.Wait(TimeSpan.FromMilliseconds(300));
+            // Subscribers call from the framework thread: never block it. The transition runs on the thread pool and
+            // XivMcp.Changed fires when it completes; the return value is the state at the time of the call.
+            _ = run ? host.StartAsync() : host.StopAsync();
         }
         catch (Exception ex)
         {

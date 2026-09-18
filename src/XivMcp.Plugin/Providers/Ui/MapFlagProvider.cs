@@ -2,6 +2,7 @@ using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Lumina.Excel.Sheets;
 using XivMcp.Core;
+using XivMcp.Plugin.Util;
 using AgentMapType = FFXIVClientStructs.FFXIV.Client.UI.Agent.MapType;
 
 namespace XivMcp.Plugin.Providers.Ui;
@@ -93,8 +94,8 @@ public sealed unsafe class MapFlagProvider
             var max = 41f / (sizeFactor / 100f) + 1.5f;
             if (!float.IsFinite(mx) || !float.IsFinite(my) || mx < 0.5f || my < 0.5f || mx > max || my > max)
                 throw new McpToolException($"Map coordinates ({mx}, {my}) are outside this map (valid range about 1 to {max - 0.5f:0.#}).");
-            wx = MapToWorld(mx, sizeFactor, map.OffsetX);
-            wz = MapToWorld(my, sizeFactor, map.OffsetY);
+            wx = GameMath.MapToWorldCoordinate(mx, sizeFactor, map.OffsetX);
+            wz = GameMath.MapToWorldCoordinate(my, sizeFactor, map.OffsetY);
         }
         else
         {
@@ -102,8 +103,8 @@ public sealed unsafe class MapFlagProvider
             wz = worldZ!.Value;
             if (!float.IsFinite(wx) || !float.IsFinite(wz) || Math.Abs(wx) > 5000 || Math.Abs(wz) > 5000)
                 throw new McpToolException($"World coordinates ({wx}, {wz}) are not a valid position.");
-            mx = WorldToMap(wx, sizeFactor, map.OffsetX);
-            my = WorldToMap(wz, sizeFactor, map.OffsetY);
+            mx = GameMath.WorldToMapCoordinate(wx, sizeFactor, map.OffsetX);
+            my = GameMath.WorldToMapCoordinate(wz, sizeFactor, map.OffsetY);
         }
 
         var agent = AgentMap.Instance();
@@ -129,20 +130,6 @@ public sealed unsafe class MapFlagProvider
             MathF.Round(wx, 2),
             MathF.Round(wz, 2),
             openMap);
-    }
-
-    // Same maths as Dalamud's MapLinkPayload (scale = SizeFactor / 100):
-    // map = 41 / scale * ((world + offset) * scale + 1024) / 2048 + 1
-    internal static float WorldToMap(float world, ushort sizeFactor, short offset)
-    {
-        var scale = sizeFactor / 100f;
-        return 41f / scale * (((world + offset) * scale + 1024f) / 2048f) + 1f;
-    }
-
-    internal static float MapToWorld(float map, ushort sizeFactor, short offset)
-    {
-        var scale = sizeFactor / 100f;
-        return ((map - 1f) * scale / 41f * 2048f - 1024f) / scale - offset;
     }
 
     public sealed record MapFlagResult(

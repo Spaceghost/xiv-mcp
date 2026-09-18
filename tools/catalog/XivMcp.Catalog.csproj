@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Reflects the built plugin (XivMcp.dll) without the game:
+      readme  regenerate the README tool/resource/prompt catalog from the [Mcp*] attributes
+      serve   list-only MCP host with the plugin's real tool list (for schema linting, e.g. MCP Inspector strict mode)
+    Dalamud assemblies are resolved from DalamudLibPath at run time; no provider constructor or tool body ever runs.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>XivMcp.Catalog</RootNamespace>
+    <AssemblyName>xiv-mcp-catalog</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XivMcp.Core\XivMcp.Core.csproj" />
+  </ItemGroup>
+</Project>

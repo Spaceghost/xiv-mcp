@@ -54,11 +54,11 @@ public sealed class Plugin : IDalamudPlugin
 
             var gameThread = new DalamudGameThread(framework);
             confirmations = Track(new ConfirmationService(config));
-            var hostState = new HostState(config, clientState, objectTable, framework, confirmations);
+            var hostState = new HostState(config, clientState, objectTable, framework);
             var notifier = new NotifierProxy(log);
             var board = new AgentBoard(config);
 
-            host = Track(new ServerHost(pluginInterface, log, config, gameThread, hostState, notifier));
+            host = Track(new ServerHost(pluginInterface, log, config, gameThread, hostState, notifier, confirmations));
 
             // Scoped objects providers may request in their constructors (besides Dalamud services).
             host.LoadProviders(typeof(Plugin).Assembly, config, gameThread, notifier, board, host, hostState, confirmations);

@@ -7,5 +7,6 @@
   <ItemGroup>
     <ProjectReference Include="..\XivMcp.Core\XivMcp.Core.csproj" />
     <Compile Include="..\Shared\IpcContract.cs" Link="Shared\IpcContract.cs" />
+    <InternalsVisibleTo Include="XivMcp.Plugin.Tests" />
   </ItemGroup>
 </Project>

@@ -39,6 +39,9 @@ internal sealed class ParameterBinding
     public string[]? EnumValues { get; init; }
 
     public JsonObject? Schema { get; set; }
+
+    /// <summary>Named subschemas that <see cref="Schema"/> references as <c>#/$defs/&lt;name&gt;</c> (recursive types), or null.</summary>
+    public JsonObject? SchemaDefs { get; set; }
 }
 
 internal static class ArgumentBinder

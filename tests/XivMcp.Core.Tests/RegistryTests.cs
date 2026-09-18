@@ -87,7 +87,10 @@ public class RegistryTests
         Assert.Equal("""{"type":"integer","minimum":0}""", p["big"]!.ToJsonString());
         Assert.Equal("""{"type":"object","additionalProperties":{"type":"number"}}""", p["scores"]!.ToJsonString());
         Assert.Equal("array", p["many"]!["type"]!.GetValue<string>());
-        Assert.Equal("""{}""", p["self"]!.ToJsonString()); // recursion is cut
+        // Recursion goes through $defs: the root is inlined and also defined for the self-reference.
+        const string outerDef = "XivMcp.Core.Tests.RegistryTests.Outer";
+        Assert.Equal("""{"$ref":"#/$defs/XivMcp.Core.Tests.RegistryTests.Outer"}""", p["self"]!.ToJsonString());
+        Assert.Equal(schema["properties"]!.ToJsonString(), schema["$defs"]![outerDef]!["properties"]!.ToJsonString());
         Assert.Equal(["colour", "id", "at", "big"], schema["required"]!.AsArray().Select(r => r!.GetValue<string>()));
         Assert.Equal(["count"], p["inner"]!["required"]!.AsArray().Select(r => r!.GetValue<string>()));
     }
@@ -111,7 +114,7 @@ public class RegistryTests
     [InlineData("t_valuetask", false, """{"type":"object","properties":{"count":{"type":"integer"},"label":{"type":"string"}},"required":["count"]}""")]
     [InlineData("t_nullable_record", true, """{"type":"object","properties":{"result":{"type":"object","properties":{"count":{"type":"integer"},"label":{"type":"string"}},"required":["count"]}}}""")]
     [InlineData("t_dict", false, """{"type":"object","additionalProperties":{"type":"integer"}}""")]
-    [InlineData("t_node", true, """{"type":"object","properties":{"result":{}},"required":["result"]}""")]
+    [InlineData("t_node", true, """{"type":"object","properties":{"result":{"description":"Any JSON value.","anyOf":[{"type":"object","additionalProperties":true},{"type":"array"},{"type":"string"},{"type":"number"},{"type":"boolean"},{"type":"null"}]}},"required":["result"]}""")]
     public void OutputWrapping(string name, bool wrap, string expected)
     {
         var tool = Describe<WrapProvider>(name);

@@ -65,6 +65,7 @@ public sealed class FooProvider : IDisposable
 - Plugin extras: `XivMcp.Core.IGameThread`, `XivMcp.Core.IMcpNotifier`, `XivMcp.Plugin.Configuration`.
   The shell also exposes `AgentBoard`, `ServerHost`, `HostState` and `ConfirmationService` (used by
   Meta providers).
+- `ToolContext.ProtocolVersion` is the MCP revision the call is served under.
 - The constructor runs on a thread-pool thread, **not** the framework thread. Do not read game memory
   there.
 - Providers live for the plugin's lifetime. Implement `IDisposable` (or `IAsyncDisposable`) to
@@ -126,6 +127,13 @@ instead of a neighbouring one, and what the common failure means.
 ```sh
 XIVMCP_ARTIFACTS=/tmp/xivmcp-art/<you> ~/.dotnet/dotnet build src/XivMcp.Plugin/XivMcp.Plugin.csproj -c Release
 ```
+
+Host-side tests that need no game go in `tests/XivMcp.Plugin.Tests` (it references the plugin and resolves Dalamud's
+assemblies from the dev hooks; see `ChatSendProviderTests` for validation paths exercised with interface fakes). After
+adding or renaming tools, regenerate the README catalog with
+`dotnet run --project tools/catalog -c Release -- readme --write README.md`, and lint the real schemas with
+`dotnet run --project tools/catalog -c Release -- serve --port 41812` plus
+`npx -y @modelcontextprotocol/inspector --cli http://127.0.0.1:41812/mcp --transport http --method tools/list --strict`.
 
 Look up exact API 15 member names with `~/xiv-mcp-build/tools/decompile <Full.Type.Name> <Assembly>`
 instead of guessing. In game, the **Tools** tab lists what registered, with each tool's tier and

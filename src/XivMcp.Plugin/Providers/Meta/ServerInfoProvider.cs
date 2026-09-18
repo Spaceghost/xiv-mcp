@@ -33,7 +33,8 @@ public sealed record ServerInfoDto(
     string DalamudVersion,
     string? GameVersion,
     string ClientLanguage,
-    bool LoggedIn);
+    bool LoggedIn,
+    string? ProtocolVersion);
 
 /// <summary>Self-description of the server so an agent can plan around what the player enabled.</summary>
 [McpProvider("meta")]
@@ -59,8 +60,8 @@ public sealed class ServerInfoProvider
         Description =
             "Describes this XivMcp server: plugin version, endpoint, running state, connected clients, which permission " +
             "tiers are currently allowed (read, ui, action, chat — and whether Action/Chat calls need in-game approval), " +
-            "each tool category with its enabled flag and tool count, Dalamud and game versions, client language and " +
-            "whether a character is logged in. Call this first to learn what you can do before planning; a tier or " +
+            "each tool category with its enabled flag and tool count, Dalamud and game versions, client language, " +
+            "whether a character is logged in and the MCP protocolVersion negotiated for this call. Call this first to learn what you can do before planning; a tier or " +
             "category that is off means its tools are unavailable until the player enables them in /xivmcp settings.",
         GameThread = false,
         RequiresLogin = false)]
@@ -73,8 +74,8 @@ public sealed class ServerInfoProvider
         var providers = host.Providers;
 
         string? note = null;
-        if (hostState.ConfirmationFailClosed && (config.AllowAction || config.AllowChat))
-            note = "Action/Chat are enabled but blocked: in-game confirmation is on and this build cannot enforce it yet.";
+        if (config.ConfirmActions && (config.AllowAction || config.AllowChat))
+            note = $"Each Action/Chat call waits up to {config.ConfirmTimeoutSeconds} s for the player to click Allow in game; a denied or unanswered call returns an error and did not run.";
 
         var permissions = new PermissionTiersDto(
             hostState.IsPermitted(ToolPermission.Read),
@@ -123,6 +124,7 @@ public sealed class ServerInfoProvider
             pluginInterface.GetDalamudVersion().Version.ToString(),
             gameVersion,
             clientState.ClientLanguage.ToString(),
-            loggedIn);
+            loggedIn,
+            ctx.ProtocolVersion);
     }
 }

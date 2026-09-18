@@ -102,7 +102,7 @@ public sealed record ItemDetail(
     int DyeCount,
     int MateriaSlots,
     bool AdvancedMeldingPermitted,
-    uint VendorBuyPrice,
+    uint? VendorBuyPrice,
     uint VendorSellPrice,
     bool Desynthesizable,
     bool AetherialReducible,
