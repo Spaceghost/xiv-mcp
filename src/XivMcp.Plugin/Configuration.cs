@@ -1,7 +1,10 @@
 using System.Net;
 using System.Security.Cryptography;
 using Dalamud.Configuration;
+using System.Text.RegularExpressions;
 using Dalamud.Plugin;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using XivMcp.Core;
 
 namespace XivMcp.Plugin;
@@ -31,7 +34,11 @@ public enum ActivityLogLevel
 [Serializable]
 public sealed class Configuration : IPluginConfiguration
 {
-    public const int CurrentVersion = 1;
+    /// <summary>
+    /// 1: initial schema (also wrote the computed HostIsLoopback/EndpointUrl by mistake).
+    /// 2: computed properties are no longer written; values unchanged.
+    /// </summary>
+    public const int CurrentVersion = 2;
 
     public const string DefaultHost = "127.0.0.1";
 
@@ -145,8 +152,10 @@ public sealed class Configuration : IPluginConfiguration
         return IPAddress.TryParse(host.Trim('[', ']'), out var ip) && IPAddress.IsLoopback(ip);
     }
 
+    [JsonIgnore]
     public bool HostIsLoopback => IsLoopbackHost(Host);
 
+    [JsonIgnore]
     public string EndpointUrl
     {
         get
@@ -164,23 +173,91 @@ public sealed class Configuration : IPluginConfiguration
         return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
-    /// <summary>Loads (or creates) the configuration, migrates it, and fills invariants.</summary>
+    /// <summary>
+    /// Loads (or creates) the configuration, migrates it, and fills invariants. A file Dalamud cannot
+    /// deserialize is backed up and every readable value (above all BearerToken) is recovered from it,
+    /// so an existing token is never silently replaced.
+    /// </summary>
     public static Configuration Load(IDalamudPluginInterface pluginInterface)
     {
-        Configuration config;
+        Configuration? config = null;
+        var dirty = false;
         try
         {
-            config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            config = pluginInterface.GetPluginConfig() as Configuration;
         }
         catch
         {
-            // A corrupt file must not stop the plugin loading; the old token is lost in that case.
-            config = new Configuration();
+            // Handled below: recover from the raw file.
         }
 
-        var dirty = config.Normalize();
+        if (config == null)
+        {
+            var file = pluginInterface.ConfigFile;
+            string? text = null;
+            try
+            {
+                if (file.Exists && file.Length > 0)
+                    text = File.ReadAllText(file.FullName);
+            }
+            catch
+            {
+                // Unreadable: start from defaults.
+            }
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                try
+                {
+                    File.Copy(file.FullName, $"{file.FullName}.unreadable-{DateTime.UtcNow:yyyyMMddHHmmss}", overwrite: false);
+                }
+                catch
+                {
+                    // The backup is a courtesy; recovery below does not depend on it.
+                }
+            }
+
+            config = text == null ? new Configuration() : Recover(text);
+            dirty = true;
+        }
+
+        dirty |= config.Normalize();
         if (dirty)
             pluginInterface.SavePluginConfig(config);
+        return config;
+    }
+
+    /// <summary>
+    /// Best-effort read of a damaged config: ignores type annotations and per-member errors, and
+    /// falls back to pulling the token out of text that is not valid JSON at all.
+    /// </summary>
+    public static Configuration Recover(string text)
+    {
+        try
+        {
+            var settings = new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.None,
+                MetadataPropertyHandling = MetadataPropertyHandling.Ignore,
+                ObjectCreationHandling = ObjectCreationHandling.Replace,
+                Error = (_, e) => e.ErrorContext.Handled = true,
+            };
+            if (JToken.Parse(text) is JObject)
+            {
+                var recovered = JsonConvert.DeserializeObject<Configuration>(text, settings);
+                if (recovered != null)
+                    return recovered;
+            }
+        }
+        catch
+        {
+            // Not JSON (e.g. truncated): fall through.
+        }
+
+        var config = new Configuration();
+        var match = Regex.Match(text, "\"BearerToken\"\\s*:\\s*\"([A-Za-z0-9_\\-]{16,})\"");
+        if (match.Success)
+            config.BearerToken = match.Groups[1].Value;
         return config;
     }
 
@@ -188,9 +265,13 @@ public sealed class Configuration : IPluginConfiguration
     public bool Normalize()
     {
         var changed = false;
-        if (Version < CurrentVersion)
+
+        // Migrations. Never touch BearerToken or the permission tiers here.
+        if (Version < 2)
         {
-            Version = CurrentVersion;
+            // v1 -> v2: nothing to transform; the computed properties v1 wrote are ignored on load
+            // and disappear from the file on this save.
+            Version = 2;
             changed = true;
         }
 
@@ -199,10 +280,16 @@ public sealed class Configuration : IPluginConfiguration
             BearerToken = GenerateToken();
             changed = true;
         }
-
-        if (string.IsNullOrWhiteSpace(Host))
+        else if (BearerToken != BearerToken.Trim())
         {
-            Host = DefaultHost;
+            BearerToken = BearerToken.Trim();
+            changed = true;
+        }
+
+        var host = string.IsNullOrWhiteSpace(Host) ? DefaultHost : Host.Trim();
+        if (host != Host)
+        {
+            Host = host;
             changed = true;
         }
 
@@ -212,9 +299,28 @@ public sealed class Configuration : IPluginConfiguration
         changed |= Clamp(ChatBufferSize, 50, 5000, v => ChatBufferSize = v);
         changed |= Clamp(AgentBoardExpiryMinutes, 0, 7 * 24 * 60, v => AgentBoardExpiryMinutes = v);
 
-        AllowedOrigins ??= [];
-        DisabledCategories ??= [];
+        if (!Enum.IsDefined(ActivityLogLevel))
+        {
+            ActivityLogLevel = ActivityLogLevel.Failures;
+            changed = true;
+        }
+
+        changed |= CleanList(AllowedOrigins, v => AllowedOrigins = v);
+        changed |= CleanList(DisabledCategories, v => DisabledCategories = v);
         return changed;
+    }
+
+    private static bool CleanList(List<string>? list, Action<List<string>> set)
+    {
+        var clean = (list ?? [])
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (list != null && clean.SequenceEqual(list, StringComparer.Ordinal))
+            return false;
+        set(clean);
+        return true;
     }
 
     private static bool Clamp(int value, int min, int max, Action<int> set)
