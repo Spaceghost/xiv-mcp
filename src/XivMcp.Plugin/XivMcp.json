@@ -1,5 +1,5 @@
 {
-  "Author": "jack",
+  "Author": "xiv-mcp contributors",
   "Name": "XivMcp",
   "Punchline": "Model Context Protocol server for FINAL FANTASY XIV.",
   "Description": "Exposes game state, game data and opt-in actions to MCP clients over loopback Streamable HTTP. Optional Umbra toolbar widget.",

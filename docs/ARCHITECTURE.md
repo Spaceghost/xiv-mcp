@@ -21,8 +21,8 @@ the public surface of `Core/McpServer.cs`, and `Shared/IpcContract.cs`.
 Plugin (IDalamudPlugin)
  ├─ Configuration                 pluginConfigs/XivMcp.json (token generated on first run)
  ├─ DalamudGameThread : IGameThread   IFramework.RunOnTick / inline when already on the framework thread
- ├─ ConfirmationService           pending Action/Chat approvals (TaskCompletionSource per call)
- ├─ HostState : IHostState        tiers, categories, IsLoggedIn; fail-closed confirmation gate
+ ├─ ConfirmationService : IToolCallApprover   in-game Allow/Deny for Action/Chat calls; 10-minute grants
+ ├─ HostState : IHostState        tiers, categories, IsLoggedIn
  ├─ NotifierProxy : IMcpNotifier  handed to providers; forwards to the server, never throws
  ├─ AgentBoard                    agent progress posts (post_status / window / IPC / ffxiv://agents)
  ├─ ServerHost                    one McpServer for the plugin lifetime; providers; start/stop/restart
@@ -45,9 +45,10 @@ token, allowed origins, call timeout, instructions). Failures to start, includin
 thrown into Dalamud.
 
 After a settings change, `ServerHost.ApplyConfigAsync()`:
-- restarts a running server if the endpoint, token, origins or timeouts changed;
-- sends `tools/list_changed`, `prompts/list_changed` and `resources/list_changed` if tiers or
-  categories changed, so connected clients re-list.
+- updates the call timeout and the approval timeout in place (no restart);
+- restarts a running server if the host, port, token or origins changed;
+- sends `tools/list_changed`, `prompts/list_changed` and `resources/list_changed` and revokes temporary
+  confirmation grants if tiers, categories or the confirmation toggle changed, so connected clients re-list.
 
 Safety check: `StartCoreAsync` refuses to listen on a non-loopback host unless a bearer token is
 required.
@@ -95,32 +96,29 @@ modified in place, so server threads always read a consistent reference.
 
 ### Confirmation of Action/Chat calls
 
-Intended flow: the server awaits the host before running an Action/Chat tool, and
-`ConfirmationService.RequestAsync` adds a pending entry with a `TaskCompletionSource<bool>`.
-`ConfirmWindow` draws Approve/Deny with a countdown, and the Draw loop calls `Resolve` on the framework
-thread, which completes the server-side await. Timeout, client cancellation, `Deny all` and plugin
-unload all resolve to *denied*. The server's call timeout is raised to at least the confirmation
-timeout + 15 s.
+`ServerHost` sets `McpServer.Approver` to the `ConfirmationService` (Core contract `IToolCallApprover`, see
+[PROTOCOL.md](PROTOCOL.md)). For every Action/Chat tool call that passed the category, tier, argument and login
+checks, the server awaits `ApproveToolCallAsync` on the thread pool:
 
-**Gap:** the frozen Core contract has no per-call hook for this, only the synchronous
-`IHostState.IsPermitted(tier)`. The proposed additive Core contract:
+1. Read/Ui calls, and every call while *Ask me before every Action/Chat call* is off, pass immediately.
+2. `execute_command` lines are classified with `ChatCommands` (NFKC-folded, format characters removed, split at any
+   Unicode whitespace; English spellings plus every TextCommand spelling in all four client languages). Chat commands
+   are confirmed and granted as **Chat**. Lines the tool itself refuses (blocked, automation, chat while the Chat tier
+   is off) are not shown to the player.
+3. An unexpired grant for the same tool, tier and client-reported name passes.
+4. Otherwise a `PendingConfirmation` (tool, declared and effective tier, client name, arguments pretty-printed with
+   format/bidi/line-separator characters shown as `\uXXXX`, at most 4000 characters) is queued. `ConfirmWindow` draws it
+   on the framework thread with **Allow**, **Deny**, **Allow this tool for 10 min** and an auto-deny countdown, and
+   the Draw loop calls `Resolve`, which completes the server-side await.
 
-```csharp
-namespace XivMcp.Core;
+The server enforces `ApprovalTimeout` (= *Auto-deny after (s)*) through the token; the service has a fallback
+timeout 2 s later that throws `TimeoutException`. Client cancellation, server stop, `Deny all` and plugin unload
+deny. The call timeout starts after approval. Grants are dropped when permissions, categories or the confirmation
+toggle change, from Settings (*Revoke all*), and on unload.
 
-/// Optionally implemented by an IHostState. The server awaits it (off the game thread) after the
-/// permission/login checks and before invoking any tool whose Permission >= Action; false => isError
-/// "Denied by the player in game".
-public interface IToolCallApprover
-{
-    Task<bool> ApproveToolCallAsync(string toolName, ToolPermission permission, string? clientName,
-        string? argumentsJson, CancellationToken cancellationToken);
-}
-```
-
-`HostState.ApproveToolCallAsync` already has this exact signature. Until `HostState` implements the
-interface (detected by name at startup), `IsPermitted(Action|Chat)` returns false whenever confirmation
-is enabled, so enabling confirmation never leaves calls unconfirmed.
+**Unverified in game:** the confirmation window, its buttons and the grant list have not been drawn or clicked inside
+FINAL FANTASY XIV. The Core hook is covered by `tests/XivMcp.Core.Tests/ApprovalTests.cs` and the service logic by
+`tests/XivMcp.Plugin.Tests/ConfirmationServiceTests.cs`.
 
 ### Unload / hot reload
 
@@ -136,10 +134,10 @@ Gates from `IpcContract` with their type parameters (a subscriber must use the s
 | Gate | Provider type | Payload |
 | --- | --- | --- |
 | `XivMcp.ApiVersion` | `<int>` func | `IpcContract.Version` |
-| `XivMcp.GetStatus` | `<string>` func | `{running, endpoint, activeSessions, totalRequests, failedRequests, lastError, connectedClients[], permissions{read,ui,action,chat}, agents, confirmActions}`. `permissions` holds the effective values (fail-closed applied). |
+| `XivMcp.GetStatus` | `<string>` func | `{running, endpoint, activeSessions, totalRequests, failedRequests, lastError, connectedClients[], permissions{read,ui,action,chat}, agents, confirmActions}`. `permissions` holds the tier toggles. |
 | `XivMcp.GetActivity` | `<int, string>` func | newest N (clamped 1..500) activity entries |
 | `XivMcp.GetAgentBoard` | `<string>` func | `[{agent, status, state, progress, detail, clientName, updatedAt}]`, newest first |
-| `XivMcp.SetRunning` | `<bool, bool>` func | starts/stops (waits ≤300 ms), returns the running state |
+| `XivMcp.SetRunning` | `<bool, bool>` func | starts/stops on the thread pool without blocking the caller; returns the running state at call time (`Changed` follows when the transition finishes) |
 | `XivMcp.ToggleWindow` | `<object>` action | toggles the main window |
 | `XivMcp.Changed` | `<object>` message | no arguments; sent from the framework thread, coalesced to ≤ 4 Hz, on server state, activity or board changes |
 

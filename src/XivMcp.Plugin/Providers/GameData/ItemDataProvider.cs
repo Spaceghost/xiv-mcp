@@ -103,7 +103,7 @@ public sealed class ItemDataProvider
         Title = "Get item details",
         Description =
             "Full game-data record for one item id: name, description, icon, UI and market categories, item level, equip level and jobs, equip slots, " +
-            "rarity, stack size, flags (unique, untradable, marketable, HQ-able, collectable, glamour, dyeable, materia slots), vendor buy/sell price, " +
+            "rarity, stack size, flags (unique, untradable, marketable, HQ-able, collectable, glamour, dyeable, materia slots), vendor buy price (only when a gil shop sells it) and sell price, " +
             "desynthesis/aetherial reduction flags, weapon/armor base stats and bonus stats (with HQ values), " +
             "gil vendors (NPC, shop, zone and map X/Y; first 10), currency exchanges (shop, costs such as tomestones or scrips; first 10), " +
             "recipes that craft it, recipes that use it (first 25 with total), and gathering sources (level, stars, zones). " +
@@ -148,7 +148,7 @@ public sealed class ItemDataProvider
             row.DyeCount,
             row.MateriaSlotCount,
             row.IsAdvancedMeldingPermitted,
-            row.PriceMid,
+            vendorTotal > 0 ? row.PriceMid : null,
             row.PriceLow,
             row.Desynth > 0,
             row.AetherialReduce > 0,

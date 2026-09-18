@@ -1,7 +1,10 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Dalamud.Game;
 using Dalamud.Game.Command;
 using Dalamud.Plugin.Services;
+using Lumina.Excel;
+using Lumina.Excel.Sheets;
 using XivMcp.Core;
 
 namespace XivMcp.Plugin.Providers.Chat;
@@ -12,34 +15,58 @@ public sealed partial class ChatSendProvider
 {
     private const int MaxEchoLength = 1000;
 
-    /// <summary>Commands that end the session or restart/kill the game or Dalamud; never allowed.</summary>
-    private static readonly HashSet<string> BlockedCommands = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "/logout", "/shutdown", "/quit", "/exit",
-        "/xlkill", "/xlrestart", "/xlbranch", "/xllanguage", "/xltogglemultimonitor", "/xlbgmset",
-    };
-
-    /// <summary>Combat actions and movement: automation of these is out of scope for xiv-mcp.</summary>
-    private static readonly HashSet<string> AutomationCommands = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "/ac", "/action", "/blueaction", "/blac", "/pvpaction", "/pvpac", "/generalaction", "/gaction",
-        "/petaction", "/pac", "/buddyaction", "/bac", "/craftaction", "/mountaction",
-        "/automove", "/follow", "/lockon", "/facetarget", "/facecamera",
-    };
-
-    /// <summary>Commands whose output other players can read; they additionally need the Chat tier.</summary>
-    private static readonly HashSet<string> ChatCommands = BuildChatCommands();
-
     private readonly ICommandManager commandManager;
     private readonly IChatGui chatGui;
     private readonly Configuration configuration;
     private readonly ChatRateLimiter rateLimiter = new();
 
-    public ChatSendProvider(ICommandManager commandManager, IChatGui chatGui, Configuration configuration)
+    public ChatSendProvider(ICommandManager commandManager, IChatGui chatGui, Configuration configuration, IDataManager dataManager, IPluginLog log)
     {
         this.commandManager = commandManager;
         this.chatGui = chatGui;
         this.configuration = configuration;
+        LoadLocalizedCommandSpellings(dataManager, log);
+    }
+
+    /// <summary>
+    /// The game accepts each text command under its English and localized spellings (TextCommand: Command,
+    /// ShortCommand, Alias, ShortAlias). Teach the classifier every spelling of the chat, blocked and automation
+    /// commands in all four client languages. Lumina only; no game memory.
+    /// </summary>
+    private static void LoadLocalizedCommandSpellings(IDataManager dataManager, IPluginLog log)
+    {
+        try
+        {
+            var rows = new Dictionary<uint, List<string>>();
+            foreach (var language in Enum.GetValues<ClientLanguage>())
+            {
+                ExcelSheet<TextCommand> sheet;
+                try
+                {
+                    sheet = dataManager.GetExcelSheet<TextCommand>(language);
+                }
+                catch (Exception)
+                {
+                    continue; // language data not installed
+                }
+
+                foreach (var row in sheet)
+                {
+                    if (!rows.TryGetValue(row.RowId, out var spellings))
+                        rows[row.RowId] = spellings = [];
+                    spellings.Add(row.Command.ExtractText());
+                    spellings.Add(row.ShortCommand.ExtractText());
+                    spellings.Add(row.Alias.ExtractText());
+                    spellings.Add(row.ShortAlias.ExtractText());
+                }
+            }
+
+            ChatCommands.AddAliases(rows.Values);
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "xiv-mcp: localized text command spellings unavailable; using the English command list only");
+        }
     }
 
     /// <summary>Chat channels send_chat can post to.</summary>
@@ -86,8 +113,8 @@ public sealed partial class ChatSendProvider
         [McpParam("The message text (single line, no leading '/').")] string message,
         [McpParam("Only for channel=tell: recipient as \"Firstname Lastname@World\" (or \"Firstname Lastname\" for the same world).")] string? tellTarget = null)
     {
-        var text = ChatInput.CleanSingleLine(message, "message");
-        if (text.StartsWith('/'))
+        var text = ChatText.CleanSingleLine(message, "message");
+        if (text.StartsWith('/') || ChatCommands.Normalize(text).StartsWith('/'))
             throw new McpToolException("The message cannot start with '/'. send_chat adds the channel command itself; use execute_command for slash commands.");
 
         string prefix;
@@ -108,7 +135,7 @@ public sealed partial class ChatSendProvider
         }
 
         var line = $"{prefix} {text}";
-        ChatInput.EnsureByteLimit(line);
+        ChatText.EnsureByteLimit(line);
         rateLimiter.EnsureAllowed();
         ChatInput.Submit(line);
         rateLimiter.Record();
@@ -153,30 +180,30 @@ public sealed partial class ChatSendProvider
             "Runs one slash command as if the user typed it into the chat box, e.g. \"/gearset change 3\", \"/hudlayout 2\", \"/xlplugins\" or another installed plugin's command. " +
             "Registered Dalamud plugin commands are dispatched through Dalamud (handledBy=\"plugin\"); everything else goes to the game's command parser (handledBy=\"game\"). " +
             "The game does not return a result: unknown commands or failures show up as error lines in chat, so follow up with read_chat channels [\"system\"] when it matters. " +
-            "Commands that post text others can see (/say /s /party /p /alliance /fc /linkshell1-8 /l1-8 /cwlinkshell1-8 /cwl1-8 /yell /shout /tell /reply /emote /em /beginner /pvpteam /random /dice) additionally require the Chat permission tier and share send_chat's rate limit — prefer send_chat for messages. " +
+            "Commands that post text others can see (/say /s /party /p /alliance /fc /linkshell1-8 /l1-8 /cwlinkshell1-8 /cwl1-8 /yell /shout /tell /reply /emote /em /beginner /pvpteam /random /dice) additionally require the Chat permission tier and share send_chat's rate limit — prefer send_chat for messages. Detection ignores case, full-width characters and invisible characters and knows the localized spellings of those commands; commands registered by other plugins are not classified. " +
             "Blocked outright: /logout /shutdown /quit /exit, Dalamud kill/restart/branch/language commands, xiv-mcp's own commands, and action/movement commands (/ac /action /blueaction /pvpaction /generalaction /petaction /automove /follow /lockon /facetarget) — combat and movement automation is out of scope. Must be a single line starting with '/', at most 500 UTF-8 bytes.",
         Permission = ToolPermission.Action, Destructive = true, Idempotent = false)]
     public ExecuteCommandResult ExecuteCommand([McpParam("The full command line, starting with '/'.")] string command)
     {
-        var line = ChatInput.CleanSingleLine(command, "command");
-        if (!line.StartsWith('/') || line.Length < 2 || char.IsWhiteSpace(line[1]))
+        var line = ChatText.CleanSingleLine(command, "command");
+        var token = ChatCommands.CommandToken(line);
+        if (!line.StartsWith('/') || token.Length < 2)
             throw new McpToolException("command must start with '/' followed by the command name, e.g. \"/gearset change 1\". To send plain text use send_chat.");
-        ChatInput.EnsureByteLimit(line);
+        ChatText.EnsureByteLimit(line);
 
-        var spaceIndex = line.IndexOf(' ');
-        var token = (spaceIndex < 0 ? line : line[..spaceIndex]).ToLowerInvariant();
-
-        if (BlockedCommands.Contains(token))
-            throw new McpToolException($"{token} is blocked for MCP clients (it would log out, close or restart the game or change Dalamud itself). Ask the user to run it manually.");
-
-        if (AutomationCommands.Contains(token))
-            throw new McpToolException($"{token} triggers combat actions or movement; xiv-mcp does not automate those. Ask the user to do it themselves.");
+        switch (ChatCommands.Classify(line))
+        {
+            case CommandKind.Blocked:
+                throw new McpToolException($"{token} is blocked for MCP clients (it would log out, close or restart the game or change Dalamud itself). Ask the user to run it manually.");
+            case CommandKind.Automation:
+                throw new McpToolException($"{token} triggers combat actions or movement; xiv-mcp does not automate those. Ask the user to do it themselves.");
+        }
 
         var pluginCommand = FindPluginCommand(token);
         if (pluginCommand is { } info && IsOwnCommand(info))
             throw new McpToolException($"{token} belongs to xiv-mcp itself and cannot be invoked by an MCP client (it could change the server's own permissions). Ask the user to use it directly.");
 
-        var isChat = ChatCommands.Contains(token);
+        var isChat = ChatCommands.Classify(line) == CommandKind.Chat;
         if (isChat)
         {
             if (!configuration.IsPermitted(ToolPermission.Chat))
@@ -214,7 +241,7 @@ public sealed partial class ChatSendProvider
             return exact;
         foreach (var (name, info) in commands)
         {
-            if (string.Equals(name, token, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(ChatCommands.Normalize(name), token, StringComparison.Ordinal))
                 return info;
         }
 
@@ -252,27 +279,6 @@ public sealed partial class ChatSendProvider
     {
         var name = channel.ToString();
         return char.ToLowerInvariant(name[0]) + name[1..];
-    }
-
-    private static HashSet<string> BuildChatCommands()
-    {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "/s", "/say", "/p", "/party", "/a", "/alliance", "/fc", "/freecompany",
-            "/l", "/linkshell", "/cwl", "/cwlinkshell",
-            "/y", "/yell", "/sh", "/shout", "/t", "/tell", "/r", "/reply",
-            "/em", "/emote", "/beginner", "/novice", "/n", "/nn", "/pvpteam", "/pt",
-            "/random", "/dice",
-        };
-        for (var i = 1; i <= 8; i++)
-        {
-            set.Add($"/l{i}");
-            set.Add($"/linkshell{i}");
-            set.Add($"/cwl{i}");
-            set.Add($"/cwlinkshell{i}");
-        }
-
-        return set;
     }
 
     [GeneratedRegex(@"^[A-Za-z][A-Za-z'\-]{0,14} [A-Za-z][A-Za-z'\-]{0,14}(@[A-Za-z]{2,20})?$", RegexOptions.CultureInvariant)]

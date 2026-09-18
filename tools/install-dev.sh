@@ -54,8 +54,9 @@ cat >&2 <<EOF
 
 Built: $dll
 
-In game: /xlsettings -> Experimental -> Dev Plugin Locations, add the path below,
-save, then enable "XivMcp" under Dev Tools -> Installed Dev Plugins (/xlplugins).
-After rebuilding, reload the dev plugin from /xlplugins (or enable its auto-reload option).
+In game, once: /xlsettings -> Experimental -> Dev Plugin Locations, add the path below,
+"Save and close". Dev plugins are added disabled: in /xlplugins -> Dev Tools ->
+Installed Dev Plugins, enable "XivMcp" and tick "Start on boot".
+After rebuilding, reload XivMcp from /xlplugins (or tick its "Automatic reloading").
 EOF
 printf '%s\n' "$windows_path"

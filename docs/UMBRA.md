@@ -81,7 +81,8 @@ Both widgets open the same popup. Its sections can be switched on and off per wi
 the "Popup" category:
 
 - **Header:** state dot, `MCP Server · Running`, endpoint (or the problem text), and a
-  **Start/Stop** button (`SetRunning`).
+  **Start/Stop** button (`SetRunning`; the plugin starts or stops the server in the background and does not block
+  the framework thread, so the state flips on the next `Changed`).
 - **Server details:** sessions, requests and failures, last error, connected clients, enabled
   permission tiers.
 - **Agents:** newest first, up to N (default 8, maximum 20). Each row shows a state-coloured bar

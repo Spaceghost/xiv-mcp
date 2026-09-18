@@ -46,7 +46,9 @@ public sealed unsafe class GearsetProvider
             list.Add(Describe(module, i, ref entry));
         }
 
-        return new GearsetListResult(list, module->CurrentGearsetIndex >= 0 ? module->CurrentGearsetIndex + 1 : null);
+        // The game stores 0xFF (255) when no gear set is equipped, so only report indexes of real sets.
+        var current = module->CurrentGearsetIndex;
+        return new GearsetListResult(list, current >= 0 && current < MaxGearsets && module->IsValidGearset(current) ? current + 1 : null);
     }
 
     [McpTool("equip_gearset",

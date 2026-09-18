@@ -47,6 +47,24 @@ public interface IMcpNotifier
     void Log(McpLogLevel level, string logger, object? data);
 }
 
+/// <summary>
+/// Optional per-call approval for Action and Chat tools (see <see cref="McpServer.Approver"/>). The server awaits it
+/// on a thread-pool thread, never on the game thread, after the category, permission-tier, argument and login checks
+/// and before invoking any tool whose <see cref="McpToolAttribute.Permission"/> is <see cref="ToolPermission.Action"/>
+/// or <see cref="ToolPermission.Chat"/>. Return false to deny (the client gets an isError result "Denied in game by the
+/// player"). Throw <see cref="TimeoutException"/> (or let the cancellation token fire) when nobody
+/// answered in time. Any other exception denies the call.
+/// </summary>
+public interface IToolCallApprover
+{
+    /// <param name="toolName">Registered tool name.</param>
+    /// <param name="permission">The tool's declared tier (Action or Chat).</param>
+    /// <param name="clientName">Client-reported name and version, if any (not authenticated).</param>
+    /// <param name="argumentsJson">The call's arguments object as compact JSON, or null when none were sent.</param>
+    /// <param name="cancellationToken">Fires on client cancellation, server stop, or the approval timeout.</param>
+    Task<bool> ApproveToolCallAsync(string toolName, ToolPermission permission, string? clientName, string? argumentsJson, CancellationToken cancellationToken);
+}
+
 public enum McpLogLevel { Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency }
 
 /// <summary>Per-call context injected when a tool/resource/prompt method declares it.</summary>
@@ -63,6 +81,9 @@ public sealed class ToolContext
 
     /// <summary>clientInfo.name from initialize, if known.</summary>
     public string? ClientName { get; init; }
+
+    /// <summary>MCP protocol revision this call is served under (negotiated for sessions, per request for 2026-07-28).</summary>
+    public string? ProtocolVersion { get; init; }
 
     /// <summary>
     /// Sends notifications/progress when the request carried _meta.progressToken; otherwise no-op.

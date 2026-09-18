@@ -147,16 +147,18 @@ public sealed partial class MainWindow
         if (ImGui.IsItemDeactivatedAfterEdit())
             SaveConfig();
 
-        var hostState = host.HostState;
-        if (config.ConfirmActions && !hostState.ConfirmationHookActive)
-        {
-            ImGui.TextColored(
-                ImGuiColors.DalamudOrange,
-                "This build's server cannot pause calls for confirmation yet, so Action and Chat tools stay blocked while this option is on.");
-        }
-        else if (!config.ConfirmActions && (config.AllowAction || config.AllowChat))
-        {
+        if (!config.ConfirmActions && (config.AllowAction || config.AllowChat))
             ImGui.TextColored(ImGuiColors.DalamudOrange, "Action/Chat calls run without asking you.");
+
+        var grants = host.Confirmations.Grants();
+        if (grants.Count > 0)
+        {
+            ImGui.TextUnformatted($"Temporary approvals ({grants.Count}):");
+            var now = DateTimeOffset.UtcNow;
+            foreach (var grant in grants)
+                ImGui.TextDisabled($"  {grant.ToolName} [{grant.Tier}] from {grant.ClientName ?? "(unnamed client)"} — {Math.Max(0, (int)Math.Ceiling((grant.Expires - now).TotalMinutes))} min left");
+            if (ImGui.SmallButton("Revoke all##grants"))
+                host.Confirmations.RevokeGrants();
         }
     }
 

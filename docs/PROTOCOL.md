@@ -9,7 +9,7 @@ session-based revisions 2025-11-25, 2025-06-18 and 2025-03-26 on the same endpoi
 The Core has no third-party runtime dependencies (BCL only: `TcpListener`/`Socket`,
 `System.Text.Json`, `System.Threading.Channels`). It does not use `HttpListener`/http.sys or ASP.NET Core.
 
-Evidence standard: everything below is covered by `tests/XivMcp.Core.Tests` (149 xunit tests),
+Evidence standard: everything below is covered by `tests/XivMcp.Core.Tests` (163 xunit tests),
 `tools/conformance/run.py` against `src/XivMcp.DevHost`, and MCP Inspector CLI 2.7.0 runs in the
 `legacy`, `auto` and `modern` protocol eras (direct HTTP and through `tools/stdio-bridge`). None of it was
 observed inside the game under Wine; see [Not verified](#not-verified).
@@ -89,6 +89,7 @@ Rejections at gates 1, 2 and 4 are recorded in the activity feed as failed `http
 | POST, `Content-Type` not `application/json` | `415` |
 | POST, `Accept` admits neither `application/json` nor `text/event-stream` (a missing `Accept` admits both) | `406` |
 | POST, invalid JSON | `400`, `-32700`, no id |
+| POST, a string or property name with an unpaired UTF-16 surrogate escape (`"\ud800"`) | `400`, `-32700`, no id |
 | POST, not a JSON-RPC message (wrong `jsonrpc`, bad id type, …) | `400`, `-32600` |
 | POST notification or client response in a legacy session | `202`, empty body |
 | POST notification, no session | `202` (ignored) |
@@ -254,11 +255,18 @@ URI or template (deterministic).
   - `float`/`double`/`decimal` → number.
   - Enums → `{type: string, enum: [camelCase names]}`, honoring `[JsonStringEnumMemberName]`.
   - `Guid` → uuid; `DateTime(Offset)` → date-time; `DateOnly` → date; `TimeOnly` → time; `Uri` → uri;
-    `byte[]` → base64 string; `JsonObject` → object; `JsonNode`/`object` → `{}`.
+    `byte[]` → base64 string; `JsonObject` → object; `JsonNode`/`JsonElement`/`object` →
+    `{"description":"Any JSON value.","anyOf":[{"type":"object",…},{"type":"array"},{"type":"string"},{"type":"number"},{"type":"boolean"},{"type":"null"}]}`
+    (never a bare `{}`).
   - Arrays and `IEnumerable<T>` → `{type: array, items}`; dictionaries → object with
     `additionalProperties`.
   - Records and classes → object with properties from the `McpJson.Options` contract and
-    `[Description]` text. Recursion is cut to `{}` at depth 12.
+    `[Description]` text. A type that refers back to itself (directly, through another record, or through a
+    collection) is emitted once under the root schema's `$defs` (key: namespace-qualified type name) and referenced as
+    `{"$ref":"#/$defs/<name>"}`; a recursive parameter or output root is also inlined at its position. Nesting deeper
+    than 12 levels is described as `{"type":"object"|"array","description":"Nested too deeply…"}`.
+  - MCP Inspector CLI 2.7.0 `--method tools/list --strict` reports 0 errors and 0 warnings for the DevHost and for the
+    plugin's real tool list served by `tools/catalog serve` (list only; nothing callable).
   - `[McpParam]` adds `description`, `enum` (for arrays, applied to items), and
     `minimum`/`maximum`, which override type ranges. A C# default becomes `default`.
   - Required = no default value and not nullable (`T?` or a nullable reference type).
@@ -279,6 +287,14 @@ URI or template (deterministic).
     Task is awaited afterwards, off-thread.
   - `GameThread = false`: `IsLoggedIn` is checked via `InvokeAsync` (skipped if `RequiresLogin` is
     false), then the method runs on the thread pool.
+  - **Approval** (`McpServer.Approver`, an `IToolCallApprover`, optional): for tools whose `Permission` is
+    `Action` or `Chat`, after the category, tier and argument checks and a login pre-check (so nobody is asked about
+    a call that cannot run), the server awaits `ApproveToolCallAsync(toolName, permission, clientName,
+    argumentsJson, token)` on the thread pool. `false` → `isError` "…was not run: denied in game by the player…";
+    no answer within `McpServerOptions.ApprovalTimeout` (default 30 s; the token fires) or a `TimeoutException` →
+    `isError` "…not confirmed in game within N s…"; any other exception → `isError` "…Denied for safety" and a log
+    entry. Client cancellation or server stop cancels the wait. `CallTimeout` starts only after approval. This
+    applies to every path that reaches `tools/call`: 2026-07-28 requests, legacy sessions and 2025-03-26 batches.
   - Every call is bounded by `CallTimeout` (default 30 s) and cancelled by client cancellation or
     server stop. The timeout is also passed to `InvokeAsync`, so a queued frame callback that has not
     started is dropped.
@@ -292,8 +308,11 @@ URI or template (deterministic).
   - Returns anything else (primitives, strings, arrays, lists, `JsonNode`, and nullable object types):
     wrapped. `outputSchema = {type: object, properties: {result: <schema>}, required: [result]}`
     (not required when nullable), `structuredContent = {"result": value}`.
-  - The text block mirrors `structuredContent` as compact JSON. Exception: a `string` return uses the
-    raw string.
+  - The text block mirrors `structuredContent` as compact JSON written with
+    `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`, so non-ASCII text (Japanese names, `・`) and `<`, `>`, `&`, `'`
+    stay readable instead of `\uXXXX`; quotes, backslashes and control characters are still escaped, so the text
+    is valid JSON. The JSON-RPC envelope uses the same encoder: every string stays valid JSON and raw line breaks
+    never appear inside an SSE `data:` line. Exception: a `string` return uses the raw string.
   - Content blocks map `text`, `image`/`audio` (`data`, `mimeType`), `resource_link` (`uri`, `name`,
     `mimeType`; `ContentBlock.Text` → `description`) and `resource`
     (`{uri, mimeType, text | blob}`).
@@ -312,6 +331,9 @@ URI or template (deterministic).
 - Templates use RFC 6570 level 1 `{var}` (one segment: no `/`, `?` or `#`) plus `{+var}` (rest of the
   URI). Values are percent-decoded and bound to parameters by name, with the same conversions as tool
   arguments. Other operators throw at registration.
+- Resources and templates follow the **Read tier** in addition to their category: with Read disabled,
+  `resources/list` and `resources/templates/list` are empty, `resources/read` fails like a disabled category, and
+  `completion/complete` rejects `ref/resource`. Prompts (text only) follow their category.
 - `resources/read`: exact static URI first, then templates in order. Timeout, threading and login rules
   are the same as for tools (`RequiresLogin` defaults: resources true, templates false). Return values:
   - `string` → `text` with the attribute's `MimeType`.
@@ -359,7 +381,9 @@ URI or template (deterministic).
     `SessionIdleTimeout`.
   - `ConnectedClients` lists `"name version"` for both.
   - `LastError` is the most recent failed request.
-- Additive public API beyond the frozen contract: `McpJson.Options` / `McpJson.IndentedOptions`,
+- Additive public API beyond the frozen contract: `IToolCallApprover`, `McpServer.Approver`,
+  `McpServerOptions.ApprovalTimeout`, `ToolContext.ProtocolVersion` (the revision the call is served under:
+  negotiated for sessions, `2026-07-28` for stateless requests), `McpJson.Options` / `McpJson.IndentedOptions`,
   `McpServer.ListeningPort`, `McpServer.IsRunning`, `McpServerOptions.SseKeepAliveInterval`,
   `McpServerOptions.ListPageSize`. Options are read at `StartAsync` for binding, token, origins and
   path, and live for everything else.

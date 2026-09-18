@@ -38,6 +38,16 @@ public static class GameMath
         return 41f / scale * ((((worldValue + offset) * scale) + 1024f) / 2048f) + 1f;
     }
 
+    /// <summary>
+    /// Inverse of <see cref="WorldToMapCoordinate"/>: in-game map coordinate → world axis value (X or Z). Same formula
+    /// as Dalamud's MapLinkPayload.ConvertMapCoordinateToRawPosition, without its 1/1000 integer raw units.
+    /// </summary>
+    public static float MapToWorldCoordinate(float mapValue, ushort sizeFactor, short offset)
+    {
+        var scale = (sizeFactor == 0 ? 100 : sizeFactor) / 100f;
+        return (((mapValue - 1f) * scale / 41f * 2048f) - 1024f) / scale - offset;
+    }
+
     /// <summary>MapMarker texture-space position (0..2048) → map coordinate.</summary>
     public static float MarkerToMapCoordinate(float texturePosition, ushort sizeFactor)
     {
