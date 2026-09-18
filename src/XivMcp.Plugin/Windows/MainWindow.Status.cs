@@ -42,7 +42,7 @@ public sealed partial class MainWindow
         if (ImGui.BeginTable("##status-facts", 2, ImGuiTableFlags.SizingFixedFit))
         {
             Row("Endpoint", host.Endpoint);
-            Row("Autostart", config.Enabled ? "on" : "off");
+            Row("Enabled", config.Enabled ? "yes" : "no (server stays stopped on load)");
             Row("Uptime", host.StartedAt is { } started ? FormatAge(DateTimeOffset.UtcNow - started) : "—");
             Row("Sessions", status.ActiveSessions.ToString());
             Row("Requests", $"{status.TotalRequests} total, {status.FailedRequests} failed");
@@ -68,41 +68,22 @@ public sealed partial class MainWindow
         ImGui.Spacing();
         ImGui.Separator();
 
-        // ---- token
-        ImGui.TextUnformatted("Bearer token");
-        ImGui.SameLine();
-        ImGui.TextDisabled(revealToken ? config.BearerToken : "••••••••••••••••••••••••••••••••");
-        if (ImGui.SmallButton(revealToken ? "Hide##token" : "Reveal##token"))
-            revealToken = !revealToken;
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Copy token"))
-            ImGui.SetClipboardText(config.BearerToken);
-        HelpMarker("Clients send it as \"Authorization: Bearer <token>\". Regenerate it in Settings if it leaks.");
-
-        ImGui.Spacing();
-        ImGui.Separator();
-
-        // ---- client snippets
+        // ---- client setup
         ImGui.TextUnformatted("Connect a client");
-        ImGui.Spacing();
+        ImGui.SameLine();
+        if (ImGui.SmallButton(revealToken ? "Hide token##token" : "Reveal token##token"))
+            revealToken = !revealToken;
+        HelpMarker("The token stays hidden (shown and copied as <token>) until you reveal it. Regenerate it in Settings > Advanced if it leaks.");
 
-        ImGui.TextColored(ImGuiColors.DalamudViolet, "Claude Code (recommended: token read at connect time, never stored)");
-        Snippet("claude-helper", ClientSnippets.ClaudeCodeHelper(config), null);
-        ImGui.TextDisabled("Run from the xiv-mcp repository on the host. It uses a headersHelper that reads the token from pluginConfigs/XivMcp.json.");
-
+        var display = revealToken ? TokenDisplay.Real : TokenDisplay.Placeholder;
         ImGui.Spacing();
-        ImGui.TextColored(ImGuiColors.DalamudViolet, "Claude Code (static header)");
-        Snippet(
-            "claude-static",
-            ClientSnippets.ClaudeCodeStatic(config, revealToken ? TokenDisplay.Real : TokenDisplay.Masked),
-            ClientSnippets.ClaudeCodeStatic(config, TokenDisplay.Real));
+        ImGui.TextColored(ImGuiColors.DalamudViolet, "Claude Code");
+        Snippet("claude", ClientSnippets.ClaudeCode(config, display));
+        ImGui.TextDisabled("To keep the token out of Claude's config, run tools/claude-mcp-add.sh from the xiv-mcp repository instead.");
 
         ImGui.Spacing();
-        ImGui.TextColored(ImGuiColors.DalamudViolet, "Generic JSON (mcpServers)");
-        Snippet(
-            "generic-json",
-            ClientSnippets.GenericJson(config, revealToken ? TokenDisplay.Real : TokenDisplay.Masked),
-            ClientSnippets.GenericJson(config, TokenDisplay.Real));
+        ImGui.TextColored(ImGuiColors.DalamudViolet, "Other clients (mcpServers JSON)");
+        Snippet("json", ClientSnippets.GenericJson(config, display));
     }
 
     private static void Row(string label, string value)
@@ -114,15 +95,13 @@ public sealed partial class MainWindow
         ImGui.TextWrapped(value);
     }
 
-    /// <param name="shown">Text displayed (token masked).</param>
-    /// <param name="copied">Text copied; null copies <paramref name="shown"/>.</param>
-    private static void Snippet(string id, string shown, string? copied)
+    private static void Snippet(string id, string text)
     {
-        var lines = shown.Count(c => c == '\n') + 1;
+        var lines = text.Count(c => c == '\n') + 1;
         var height = ImGui.GetTextLineHeightWithSpacing() * Math.Min(lines, 12) + ImGui.GetStyle().FramePadding.Y * 2;
-        var text = shown;
-        ImGui.InputTextMultiline($"##{id}", ref text, Math.Max(text.Length + 1, 64), new Vector2(-1, height), ImGuiInputTextFlags.ReadOnly);
-        if (ImGui.SmallButton($"Copy{(copied != null ? " (with token)" : "")}##{id}"))
-            ImGui.SetClipboardText(copied ?? shown);
+        var shown = text;
+        ImGui.InputTextMultiline($"##{id}", ref shown, Math.Max(text.Length + 1, 64), new Vector2(-1, height), ImGuiInputTextFlags.ReadOnly);
+        if (ImGui.SmallButton($"Copy##{id}"))
+            ImGui.SetClipboardText(text);
     }
 }

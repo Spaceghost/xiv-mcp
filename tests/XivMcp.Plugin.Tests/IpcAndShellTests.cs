@@ -118,9 +118,9 @@ public class ShellTests
     public void SnippetsNeverShowTheTokenUnlessAskedTo()
     {
         var config = new Configuration { BearerToken = "SECRET_TOKEN_VALUE" };
-        Assert.DoesNotContain("SECRET", ClientSnippets.GenericJson(config, TokenDisplay.Masked));
-        Assert.DoesNotContain("SECRET", ClientSnippets.ClaudeCodeStatic(config, TokenDisplay.Placeholder));
-        Assert.DoesNotContain("SECRET", ClientSnippets.ClaudeCodeHelper(config));
+        Assert.DoesNotContain("SECRET", ClientSnippets.GenericJson(config, TokenDisplay.Placeholder));
+        Assert.DoesNotContain("SECRET", ClientSnippets.ClaudeCode(config, TokenDisplay.Placeholder));
+        Assert.Contains("claude mcp add --scope user --transport http ffxiv http://127.0.0.1:41800/mcp --header \"Authorization: Bearer SECRET_TOKEN_VALUE\"", ClientSnippets.ClaudeCode(config, TokenDisplay.Real));
         Assert.Contains("Bearer SECRET_TOKEN_VALUE", ClientSnippets.GenericJson(config, TokenDisplay.Real));
         Assert.DoesNotContain("Authorization", ClientSnippets.GenericJson(new Configuration { BearerToken = "S", RequireToken = false }, TokenDisplay.Real));
     }
