@@ -34,7 +34,7 @@ public sealed partial class McpServer
     /// Works whether or not the listener is running. Does not record activity (see <see cref="RecordHostActivity"/>).
     /// Throws <see cref="OperationCanceledException"/> only when <paramref name="cancellationToken"/> fires.
     /// </summary>
-    public async Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, CancellationToken cancellationToken = default)
+    public async Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, CancellationToken cancellationToken = default, string? authenticatedClient = null)
     {
         var scope = new RequestScope
         {
@@ -44,6 +44,7 @@ public sealed partial class McpServer
             Id = null,
             ClientName = clientName,
             DetachedSessionId = sessionId,
+            AuthenticatedClient = authenticatedClient,
             CancellationToken = cancellationToken,
             Outbound = NullOutbound.Instance,
             Target = toolName,

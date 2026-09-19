@@ -71,7 +71,11 @@ public interface IToolCallApprover
 /// <param name="ClientName">Client-reported name and version, if any (not authenticated).</param>
 /// <param name="SessionId">MCP session id (Mcp-Session-Id) of the calling session; null for stateless (2026-07-28) requests.</param>
 /// <param name="ArgumentsJson">The call's arguments object as compact JSON, or null when none were sent.</param>
-public sealed record ToolCallApprovalRequest(string ToolName, ToolPermission Permission, string? ClientName, string? SessionId, string? ArgumentsJson);
+/// <param name="AuthenticatedClient">Per-client token name the request authenticated with; null for the main token.</param>
+public sealed record ToolCallApprovalRequest(string ToolName, ToolPermission Permission, string? ClientName, string? SessionId, string? ArgumentsJson, string? AuthenticatedClient = null);
+
+/// <summary>A per-client bearer token: the client's name and the SHA-256 (hex) of the token.</summary>
+public sealed record ClientToken(string Name, string Sha256Hex);
 
 /// <summary>
 /// An <see cref="IToolCallApprover"/> that also wants the caller's MCP session. When <see cref="McpServer.Approver"/>
@@ -108,6 +112,12 @@ public sealed class ToolContext
 
     /// <summary>MCP protocol revision this call is served under (negotiated for sessions, per request for 2026-07-28).</summary>
     public string? ProtocolVersion { get; init; }
+
+    /// <summary>
+    /// Name of the per-client bearer token the request authenticated with (<see cref="McpServerOptions.ClientTokens"/>), or
+    /// null for the main token. Unlike <see cref="ClientName"/>, a client cannot choose this.
+    /// </summary>
+    public string? AuthenticatedClient { get; init; }
 
     /// <summary>
     /// Sends notifications/progress when the request carried _meta.progressToken; otherwise no-op.

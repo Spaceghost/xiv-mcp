@@ -19,6 +19,14 @@ public sealed class McpServerOptions
     /// <summary>Origins accepted when a request carries an Origin header (DNS-rebinding defence). Loopback origins are always accepted.</summary>
     public List<string> AllowedOrigins { get; set; } = [];
 
+    /// <summary>
+    /// Additional bearer tokens that each identify one named client (stored as SHA-256 hex, never in clear). A request
+    /// presenting one is authorized like <see cref="BearerToken"/> and carries the name as
+    /// <see cref="ToolContext.AuthenticatedClient"/> / <see cref="ToolCallApprovalRequest.AuthenticatedClient"/>. Read on
+    /// every request, so replacing the list revokes a token at once. Replace the list; do not mutate it.
+    /// </summary>
+    public IReadOnlyList<ClientToken> ClientTokens { get; set; } = [];
+
     public string ServerName { get; set; } = "xiv-mcp";
 
     public string ServerTitle { get; set; } = "FINAL FANTASY XIV (Dalamud)";
