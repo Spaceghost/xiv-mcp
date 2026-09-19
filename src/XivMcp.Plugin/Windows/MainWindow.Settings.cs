@@ -37,6 +37,8 @@ public sealed partial class MainWindow
         ImGui.Spacing();
         DrawCategorySettings();
         ImGui.Spacing();
+        DrawPolicySettings();
+        ImGui.Spacing();
         DrawAdvancedSettings();
     }
 
