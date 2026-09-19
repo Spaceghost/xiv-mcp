@@ -21,12 +21,16 @@ the public surface of `Core/McpServer.cs`, and `Shared/IpcContract.cs`.
 Plugin (IDalamudPlugin)
  ├─ Configuration                 pluginConfigs/XivMcp.json (token generated on first run)
  ├─ DalamudGameThread : IGameThread   IFramework.RunOnTick / inline when already on the framework thread
- ├─ ConfirmationService : IToolCallApprover   in-game Allow/Deny for Action/Chat calls; 10-minute grants
+ ├─ ConfirmationService : ISessionAwareToolCallApprover   in-game Allow/Deny for Action/Chat calls; 10-minute grants;
+ │                                 auto-approve rules for token-identified clients
+ ├─ ApprovalSessionService        "allow everything from this client" sessions (memory only, 1-60 min)
+ ├─ ApprovalQueue + TicketStore   deferred approval tickets (approval-tickets.json), one-at-a-time execution
+ ├─ ApprovalWiring                activity/log entries, session toasts, permission changes, 1 Hz tick
  ├─ HostState : IHostState        tiers, categories, IsLoggedIn
  ├─ NotifierProxy : IMcpNotifier  handed to providers; forwards to the server, never throws
  ├─ AgentBoard                    agent progress posts (post_status / window / IPC / ffxiv://agents)
  ├─ ServerHost                    one McpServer for the plugin lifetime; providers; start/stop/restart
- ├─ WindowSystem: MainWindow (Status/Agents/Activity/Tools/Settings), ConfirmWindow
+ ├─ WindowSystem: MainWindow (Status/Agents/Approvals/Activity/Tools/Settings), ConfirmWindow
  ├─ IpcProvider                   IpcContract gates + throttled Changed
  └─ DtrEntry                      "MCP ● n" server info bar entry
 ```
@@ -77,7 +81,8 @@ for API 15):
   constructors must not touch game memory; subscribing to events is fine.
 
 Scoped objects the shell passes: `Configuration`, `DalamudGameThread` (as `IGameThread`),
-`NotifierProxy` (as `IMcpNotifier`), `AgentBoard`, `ServerHost`, `HostState`, `ConfirmationService`.
+`NotifierProxy` (as `IMcpNotifier`), `AgentBoard`, `ServerHost`, `HostState`, `ConfirmationService`, `ApprovalQueue`,
+`ApprovalSessionService`.
 
 On unload, providers implementing `IAsyncDisposable`/`IDisposable` are disposed in reverse load order,
 after the server has stopped.
@@ -115,6 +120,11 @@ The server enforces `ApprovalTimeout` (= *Auto-deny after (s)*) through the toke
 timeout 2 s later that throws `TimeoutException`. Client cancellation, server stop, `Deny all` and plugin unload
 deny. The call timeout starts after approval. Grants are dropped when permissions, categories or the confirmation
 toggle change, from Settings (*Revoke all*), and on unload.
+
+Before the grant check, the service also consults the owner's auto-approve rules (only for a request that authenticated
+with a per-client token) and the approval sessions. The deferred approval queue, sessions, rules and the resume contract
+for clients are described in [APPROVALS.md](APPROVALS.md). Approved tickets run on a single worker on the thread pool
+through `McpServer.ExecuteApprovedToolAsync`, which dispatches game work to the framework thread like `tools/call`.
 
 **Unverified in game:** the confirmation window, its buttons and the grant list have not been drawn or clicked inside
 FINAL FANTASY XIV. The Core hook is covered by `tests/XivMcp.Core.Tests/ApprovalTests.cs` and the service logic by

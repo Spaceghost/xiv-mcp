@@ -78,7 +78,10 @@ One endpoint, `McpServerOptions.Path` (default `/mcp`; a trailing slash is toler
    case-insensitive. The comparison is constant-time over SHA-256 digests. A missing token gets `401`
    with `WWW-Authenticate: Bearer realm="xiv-mcp"`. A wrong token gets `401` with
    `…, error="invalid_token"`. OAuth discovery (`/.well-known/*`) is not implemented, so clients must
-   be configured with a static header.
+   be configured with a static header. `McpServerOptions.ClientTokens` adds per-client tokens
+   (name + SHA-256 hex, read on every request): a request presenting one is authorized the same way and
+   carries the name as `ToolContext.AuthenticatedClient` / `ToolCallApprovalRequest.AuthenticatedClient`.
+   A client token is also recognized when `BearerToken` is empty.
 
 Rejections at gates 1, 2 and 4 are recorded in the activity feed as failed `http <METHOD>` entries.
 
@@ -381,6 +384,12 @@ URI or template (deterministic).
     `SessionIdleTimeout`.
   - `ConnectedClients` lists `"name version"` for both.
   - `LastError` is the most recent failed request.
+- Deferred approvals (additive): `ISessionAwareToolCallApprover` (the approver also gets the MCP session id and the
+  token identity in a `ToolCallApprovalRequest`), `McpServer.CheckToolCall` (gates and argument binding without
+  running), `McpServer.ExecuteApprovedToolAsync` (runs an already-approved call with the same gates, login check and
+  `CallTimeout`, without asking the approver; returns the `tools/call` result object), `McpServer.RecordHostActivity`
+  (host events in the activity feed, not counted as requests), `McpServerOptions.ClientTokens`, `ClientToken`,
+  `ToolContext.AuthenticatedClient`. The plugin's use of them is described in [APPROVALS.md](APPROVALS.md).
 - Additive public API beyond the frozen contract: `IToolCallApprover`, `McpServer.Approver`,
   `McpServerOptions.ApprovalTimeout`, `ToolContext.ProtocolVersion` (the revision the call is served under:
   negotiated for sessions, `2026-07-28` for stateless requests), `McpJson.Options` / `McpJson.IndentedOptions`,
