@@ -6,6 +6,7 @@ using Dalamud.Plugin;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using XivMcp.Core;
+using XivMcp.Plugin.Services;
 
 namespace XivMcp.Plugin;
 
@@ -81,6 +82,15 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Seconds a confirmation waits before it is denied automatically.</summary>
     public int ConfirmTimeoutSeconds { get; set; } = 20;
 
+    /// <summary>Length of an "allow everything from this client" approval session, 1-60 minutes. Sessions are never saved.</summary>
+    public int ApprovalSessionMinutes { get; set; } = 5;
+
+    /// <summary>Named per-client bearer tokens (SHA-256 only). Identify a client for <see cref="AutoApproveRules"/>.</summary>
+    public List<ClientTokenEntry> ClientTokens { get; set; } = [];
+
+    /// <summary>Owner-written pre-approvals for Action/Chat calls from a token-identified client (e.g. CI).</summary>
+    public List<AutoApproveRule> AutoApproveRules { get; set; } = [];
+
     /// <summary>Provider categories switched off (everything else is on).</summary>
     public List<string> DisabledCategories { get; set; } = [];
 
@@ -155,6 +165,38 @@ public sealed class Configuration : IPluginConfiguration
             next.Add(category);
         DisabledCategories = next;
     }
+
+    /// <summary>
+    /// Creates a per-client token for <paramref name="name"/> and returns it. Only its SHA-256 is kept, so the caller must
+    /// show it now; it cannot be shown again. Throws <see cref="ArgumentException"/> for an invalid or duplicate name.
+    /// </summary>
+    public string AddClientToken(string name, DateTimeOffset now)
+    {
+        name = name.Trim();
+        if (!AutoApprovePolicy.IsValidClientName(name))
+            throw new ArgumentException($"Client names are 1-{AutoApprovePolicy.MaxClientNameLength} characters: letters, digits, '-', '_' or '.'.");
+        if (ClientTokens.Any(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException($"A token for '{name}' already exists; revoke it first.");
+        var token = GenerateToken();
+        ClientTokens = [.. ClientTokens, new ClientTokenEntry { Name = name, TokenSha256 = HashToken(token), CreatedAt = now }];
+        return token;
+    }
+
+    /// <summary>Removes the token; its client can no longer connect, and rules naming it stop matching.</summary>
+    public bool RevokeClientToken(string name)
+    {
+        var next = ClientTokens.Where(t => !string.Equals(t.Name, name, StringComparison.Ordinal)).ToList();
+        if (next.Count == ClientTokens.Count)
+            return false;
+        ClientTokens = next;
+        return true;
+    }
+
+    /// <summary>The per-client tokens as the server wants them.</summary>
+    public IReadOnlyList<ClientToken> ClientTokenHashes() =>
+        ClientTokens.Select(t => new ClientToken(t.Name, t.TokenSha256)).ToArray();
+
+    public static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
 
     /// <summary>True when <see cref="Host"/> only accepts connections from this machine.</summary>
     public static bool IsLoopbackHost(string host)
@@ -310,6 +352,7 @@ public sealed class Configuration : IPluginConfiguration
         changed |= Clamp(Port, 1, 65535, v => Port = v);
         changed |= Clamp(CallTimeoutSeconds, 5, 600, v => CallTimeoutSeconds = v);
         changed |= Clamp(ConfirmTimeoutSeconds, 5, 300, v => ConfirmTimeoutSeconds = v);
+        changed |= Clamp(ApprovalSessionMinutes, 1, 60, v => ApprovalSessionMinutes = v);
         changed |= Clamp(ChatBufferSize, 50, 5000, v => ChatBufferSize = v);
         changed |= Clamp(AgentBoardExpiryMinutes, 0, 7 * 24 * 60, v => AgentBoardExpiryMinutes = v);
 
@@ -321,6 +364,38 @@ public sealed class Configuration : IPluginConfiguration
 
         changed |= CleanList(AllowedOrigins, v => AllowedOrigins = v);
         changed |= CleanList(DisabledCategories, v => DisabledCategories = v);
+
+        // Tokens with a bad name or hash can never authenticate; drop them (and duplicates) rather than guess.
+        var tokens = (ClientTokens ?? [])
+            .Where(t => t != null && AutoApprovePolicy.IsValidClientName(t.Name) && t.TokenSha256 is { Length: 64 } h && h.All(char.IsAsciiHexDigit))
+            .DistinctBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (ClientTokens == null || tokens.Count != ClientTokens.Count)
+        {
+            ClientTokens = tokens;
+            changed = true;
+        }
+
+        // Rules: drop empty ones and prefixes that could never match; everything else stays as the owner wrote it.
+        var rules = (AutoApproveRules ?? [])
+            .Where(r => r != null && !string.IsNullOrWhiteSpace(r.Client) && !string.IsNullOrWhiteSpace(r.Tool))
+            .ToList();
+        foreach (var rule in rules)
+        {
+            var prefixes = (rule.Prefixes ?? []).Where(AutoApprovePolicy.IsValidPrefix).Distinct(StringComparer.Ordinal).ToList();
+            if (rule.Prefixes == null || !prefixes.SequenceEqual(rule.Prefixes, StringComparer.Ordinal))
+            {
+                rule.Prefixes = prefixes;
+                changed = true;
+            }
+        }
+
+        if (AutoApproveRules == null || rules.Count != AutoApproveRules.Count)
+        {
+            AutoApproveRules = rules;
+            changed = true;
+        }
+
         return changed;
     }
 

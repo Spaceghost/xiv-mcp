@@ -114,6 +114,9 @@ public sealed class ServerHost : IDisposable
     /// <summary>Raised (any thread) when running state, status counters or errors change.</summary>
     public event Action? StateChanged;
 
+    /// <summary>Raised (caller's thread) after permission tiers, categories or the confirmation toggle changed.</summary>
+    public event Action? PermissionsChanged;
+
     /// <summary>Raised (thread-pool thread) for every handled request.</summary>
     public event Action<ActivityEntry>? ActivityRecorded;
 
@@ -221,6 +224,7 @@ public sealed class ServerHost : IDisposable
         // Live options (no restart needed).
         Server.Options.ApprovalTimeout = TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds);
         Server.Options.CallTimeout = TimeSpan.FromSeconds(config.CallTimeoutSeconds);
+        Server.Options.ClientTokens = config.ClientTokenHashes();
 
         var permissions = PermissionFingerprint();
         if (permissions != permissionFingerprint)
@@ -229,6 +233,15 @@ public sealed class ServerHost : IDisposable
 
             // A grant was given under the old settings; ask again under the new ones.
             confirmations.RevokeGrants();
+            try
+            {
+                PermissionsChanged?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                log.Warning(ex, "PermissionsChanged subscriber failed");
+            }
+
             notifier.AllListsChanged();
             RaiseStateChanged();
         }
@@ -327,6 +340,7 @@ public sealed class ServerHost : IDisposable
         options.Path = "/mcp";
         options.BearerToken = config.RequireToken ? config.BearerToken : null;
         options.AllowedOrigins = config.AllowedOrigins.Where(o => !string.IsNullOrWhiteSpace(o)).Select(o => o.Trim()).ToList();
+        options.ClientTokens = config.ClientTokenHashes();
         options.ServerVersion = PluginVersion;
         options.Instructions = ServerInstructions;
 
@@ -361,7 +375,8 @@ public sealed class ServerHost : IDisposable
         "call unless the player asks. Many tools need a logged-in character and " +
         "report a clear error otherwise. For multi-step work, call post_status with a short agent name to show your " +
         "progress in the player's game UI, and finish with state done or failed. Never send Chat-tier text the player " +
-        "did not ask for.";
+        "did not ask for. If the player may be away, queue Action/Chat calls with request_action and poll get_ticket instead of " +
+        "calling them directly; the player approves tickets later.";
 
     // ---- status / activity ------------------------------------------------------------------
 

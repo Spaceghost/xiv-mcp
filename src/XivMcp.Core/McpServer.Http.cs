@@ -75,7 +75,7 @@ public sealed partial class McpServer
             return true;
         }
 
-        if (!IsAuthorized(request, out var presented))
+        if (!IsAuthorized(request, out var presented, out var tokenClient))
         {
             RecordRejection(request, started, "401", presented ? "Invalid bearer token" : "Missing bearer token");
             headers.Add(new("WWW-Authenticate", presented ? "Bearer realm=\"xiv-mcp\", error=\"invalid_token\"" : "Bearer realm=\"xiv-mcp\""));
@@ -84,6 +84,7 @@ public sealed partial class McpServer
             return true;
         }
 
+        request.AuthenticatedClient = tokenClient;
         switch (request.Method)
         {
             case "POST":
@@ -133,17 +134,47 @@ public sealed partial class McpServer
                && IsLoopbackHostName(normalized.Value.Host);
     }
 
-    private bool IsAuthorized(HttpRequest request, out bool presented)
+    private bool IsAuthorized(HttpRequest request, out bool presented, out string? tokenClient)
     {
+        tokenClient = null;
         var auth = request.Headers.Get("Authorization");
         presented = auth is not null;
+        byte[]? actual = null;
+        if (auth is not null && auth.Length >= 7 && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            actual = SHA256.HashData(Encoding.UTF8.GetBytes(auth[7..].Trim()));
+            tokenClient = ClientTokenName(actual);
+        }
+
         var expected = _tokenHash;
         if (expected is null)
             return true;
-        if (auth is null || auth.Length < 7 || !auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        if (actual is null)
             return false;
-        var actual = SHA256.HashData(Encoding.UTF8.GetBytes(auth[7..].Trim()));
-        return CryptographicOperations.FixedTimeEquals(actual, expected);
+        return tokenClient is not null || CryptographicOperations.FixedTimeEquals(actual, expected);
+    }
+
+    /// <summary>The client whose per-client token hashes to <paramref name="hash"/>, or null. Read live, so revocation is immediate.</summary>
+    private string? ClientTokenName(byte[] hash)
+    {
+        string? match = null;
+        foreach (var token in Options.ClientTokens)
+        {
+            byte[] expected;
+            try
+            {
+                expected = Convert.FromHexString(token.Sha256Hex);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            if (expected.Length == hash.Length && CryptographicOperations.FixedTimeEquals(expected, hash) && !string.IsNullOrEmpty(token.Name))
+                match = token.Name;
+        }
+
+        return match;
     }
 
     private static (bool Json, bool Sse) ParseAccept(string? accept)
@@ -377,6 +408,7 @@ public sealed partial class McpServer
                 Params = message.Params,
                 Session = session,
                 ClientName = ClientLabel(session.ClientName, session.ClientVersion),
+                AuthenticatedClient = request.AuthenticatedClient,
                 ProgressToken = ProgressTokenOf(message.Params),
                 CancellationToken = cts.Token,
                 Outbound = responder,
@@ -506,6 +538,7 @@ public sealed partial class McpServer
             Id = message.Id,
             Params = message.Params,
             ClientName = clientLabel,
+            AuthenticatedClient = request.AuthenticatedClient,
             LogLevel = logLevel,
             ProgressToken = ProgressTokenOf(message.Params),
             CancellationToken = cts.Token,
@@ -765,7 +798,7 @@ public sealed partial class McpServer
                     immediate.Add(JsonRpc.Error(message.Id, JsonRpcCodes.InvalidRequest, "Invalid Request: initialize must not be part of a batch"));
                     break;
                 default:
-                    pending.Add(DispatchBatchItemAsync(session, message));
+                    pending.Add(DispatchBatchItemAsync(session, message, request.AuthenticatedClient));
                     break;
             }
         }
@@ -790,7 +823,7 @@ public sealed partial class McpServer
         return true;
     }
 
-    private async Task<JsonObject?> DispatchBatchItemAsync(LegacySession session, JsonRpcMessage message)
+    private async Task<JsonObject?> DispatchBatchItemAsync(LegacySession session, JsonRpcMessage message, string? authenticatedClient)
     {
         var idKey = JsonRpc.IdKey(message.Id);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(session.Lifetime.Token, _serverCts.Token);
@@ -807,6 +840,7 @@ public sealed partial class McpServer
                 Params = message.Params,
                 Session = session,
                 ClientName = ClientLabel(session.ClientName, session.ClientVersion),
+                AuthenticatedClient = authenticatedClient,
                 ProgressToken = null,
                 CancellationToken = cts.Token,
                 Outbound = NullOutbound.Instance,

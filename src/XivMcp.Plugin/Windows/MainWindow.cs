@@ -57,6 +57,7 @@ public sealed partial class MainWindow : Window
 
         DrawTab(StatusTab, DrawStatusTab);
         DrawTab($"Agents ({board.Count})###Agents", DrawAgentsTab);
+        DrawTab(ApprovalsTabLabel, DrawApprovalsTab);
         DrawTab("Activity", DrawActivityTab);
         DrawTab("Tools", DrawToolsTab);
         DrawTab(SettingsTab, DrawSettingsTab);
@@ -109,6 +110,8 @@ public sealed partial class MainWindow : Window
 
         if (confirmations.HasPending)
             ImGui.TextColored(ImGuiColors.DalamudOrange, "A tool call is waiting for your approval (see the confirmation window).");
+
+        DrawApprovalSessionBanner();
     }
 
     // ---- shared helpers ------------------------------------------------------------------------

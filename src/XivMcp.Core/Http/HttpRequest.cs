@@ -77,6 +77,9 @@ internal sealed class HttpRequest
     public bool KeepAlive { get; init; }
 
     public byte[] Body { get; set; } = [];
+
+    /// <summary>Name of the per-client token this request authenticated with (see McpServerOptions.ClientTokens), or null.</summary>
+    public string? AuthenticatedClient { get; set; }
 }
 
 internal readonly record struct HttpError(int Status, string Message);

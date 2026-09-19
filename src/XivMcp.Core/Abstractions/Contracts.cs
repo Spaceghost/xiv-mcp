@@ -65,6 +65,34 @@ public interface IToolCallApprover
     Task<bool> ApproveToolCallAsync(string toolName, ToolPermission permission, string? clientName, string? argumentsJson, CancellationToken cancellationToken);
 }
 
+/// <summary>One Action/Chat call as <see cref="ISessionAwareToolCallApprover"/> sees it.</summary>
+/// <param name="ToolName">Registered tool name.</param>
+/// <param name="Permission">The tool's declared tier (Action or Chat).</param>
+/// <param name="ClientName">Client-reported name and version, if any (not authenticated).</param>
+/// <param name="SessionId">MCP session id (Mcp-Session-Id) of the calling session; null for stateless (2026-07-28) requests.</param>
+/// <param name="ArgumentsJson">The call's arguments object as compact JSON, or null when none were sent.</param>
+/// <param name="AuthenticatedClient">Per-client token name the request authenticated with; null for the main token.</param>
+public sealed record ToolCallApprovalRequest(string ToolName, ToolPermission Permission, string? ClientName, string? SessionId, string? ArgumentsJson, string? AuthenticatedClient = null);
+
+/// <summary>A per-client bearer token: the client's name and the SHA-256 (hex) of the token.</summary>
+public sealed record ClientToken(string Name, string Sha256Hex);
+
+/// <summary>
+/// An <see cref="IToolCallApprover"/> that also wants the caller's MCP session. When <see cref="McpServer.Approver"/>
+/// implements it, the server calls this overload instead of <see cref="IToolCallApprover.ApproveToolCallAsync"/>; the
+/// semantics (false denies, <see cref="TimeoutException"/> or the token means not confirmed) are the same.
+/// </summary>
+public interface ISessionAwareToolCallApprover : IToolCallApprover
+{
+    Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest request, CancellationToken cancellationToken);
+}
+
+/// <summary>Outcome of <see cref="McpServer.ExecuteApprovedToolAsync"/>.</summary>
+/// <param name="Result">A tools/call result object (content, structuredContent, isError) as a 2026-07-28 client would get it.</param>
+/// <param name="IsError">True when the tool did not run or reported an error.</param>
+/// <param name="Error">The error text when <paramref name="IsError"/> is true.</param>
+public sealed record ToolExecutionResult(JsonObject Result, bool IsError, string? Error);
+
 public enum McpLogLevel { Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency }
 
 /// <summary>Per-call context injected when a tool/resource/prompt method declares it.</summary>
@@ -84,6 +112,12 @@ public sealed class ToolContext
 
     /// <summary>MCP protocol revision this call is served under (negotiated for sessions, per request for 2026-07-28).</summary>
     public string? ProtocolVersion { get; init; }
+
+    /// <summary>
+    /// Name of the per-client bearer token the request authenticated with (<see cref="McpServerOptions.ClientTokens"/>), or
+    /// null for the main token. Unlike <see cref="ClientName"/>, a client cannot choose this.
+    /// </summary>
+    public string? AuthenticatedClient { get; init; }
 
     /// <summary>
     /// Sends notifications/progress when the request carried _meta.progressToken; otherwise no-op.
