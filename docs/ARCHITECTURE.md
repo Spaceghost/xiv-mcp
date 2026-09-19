@@ -25,8 +25,9 @@ Plugin (IDalamudPlugin)
  ├─ HostState : IHostState        tiers, categories, IsLoggedIn
  ├─ NotifierProxy : IMcpNotifier  handed to providers; forwards to the server, never throws
  ├─ AgentBoard                    agent progress posts (post_status / window / IPC / ffxiv://agents)
+ ├─ ObjectiveStore + ObjectiveTracker   custom objectives (pluginConfigs/XivMcp/objectives.json), live conditions, flags, toasts
  ├─ ServerHost                    one McpServer for the plugin lifetime; providers; start/stop/restart
- ├─ WindowSystem: MainWindow (Status/Agents/Activity/Tools/Settings), ConfirmWindow
+ ├─ WindowSystem: MainWindow (Status/Agents/Activity/Tools/Settings), ConfirmWindow, ObjectiveOverlay
  ├─ IpcProvider                   IpcContract gates + throttled Changed
  └─ DtrEntry                      "MCP ● n" server info bar entry
 ```
@@ -77,7 +78,8 @@ for API 15):
   constructors must not touch game memory; subscribing to events is fine.
 
 Scoped objects the shell passes: `Configuration`, `DalamudGameThread` (as `IGameThread`),
-`NotifierProxy` (as `IMcpNotifier`), `AgentBoard`, `ServerHost`, `HostState`, `ConfirmationService`.
+`NotifierProxy` (as `IMcpNotifier`), `AgentBoard`, `ServerHost`, `HostState`, `ConfirmationService`,
+`ObjectiveTracker`.
 
 On unload, providers implementing `IAsyncDisposable`/`IDisposable` are disposed in reverse load order,
 after the server has stopped.
@@ -148,3 +150,12 @@ Gates from `IpcContract` with their type parameters (a subscriber must use the s
 configured idle time (default 120 min). `AgentBoardProvider` exposes `post_status` (Ui), `list_status`
 (Read), `clear_status` (Ui) and the `ffxiv://agents` resource. It sends `resources/updated` on every
 change and a Dalamud notification when a post moves into `done`/`failed` (configurable).
+
+## Custom objectives
+
+`ObjectiveStore` holds up to 200 objectives in insertion order and saves them atomically to
+`pluginConfigs/XivMcp/objectives.json`. The rules are pure and host-tested (`Objectives/`: time windows, weather tables,
+next window, packs, progress). `ObjectiveTracker` snapshots zone, position and live weather on the framework thread,
+evaluates every objective once a second (and right after a change), places map flags and shows quest toasts.
+`ObjectivesProvider` exposes the tools and `ffxiv://objectives`; `ObjectiveOverlay` draws them under the Duty List,
+reading `_ToDoList` without modifying it. Why an overlay and not injected nodes: [OBJECTIVES.md](OBJECTIVES.md).
