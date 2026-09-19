@@ -124,6 +124,20 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Also list completed objectives in the overlay (greyed) until they are cleared.</summary>
     public bool ShowCompletedObjectives { get; set; }
 
+    // ---- local model (for companion plugins; XivMcp never runs it) ------------------------
+
+    /// <summary>OpenAI-compatible base URL of a local model server (e.g. http://127.0.0.1:11434/v1). "" = not configured.</summary>
+    public string LocalModelEndpoint { get; set; } = "";
+
+    /// <summary>Model id at <see cref="LocalModelEndpoint"/>. "" = not configured.</summary>
+    public string LocalModelName { get; set; } = "";
+
+    /// <summary>Optional API key for the local server. Never logged and never returned over IPC (only whether one is set).</summary>
+    public string LocalModelApiKey { get; set; } = "";
+
+    /// <summary>Other plugins may issue themselves a client token over IPC (XivMcp.ConnectClient).</summary>
+    public bool AllowIpcClientTokens { get; set; } = true;
+
     // ---- helpers (not persisted state) -------------------------------------------------------
 
     public bool IsPermitted(ToolPermission permission) => permission switch
@@ -170,7 +184,7 @@ public sealed class Configuration : IPluginConfiguration
     /// Creates a per-client token for <paramref name="name"/> and returns it. Only its SHA-256 is kept, so the caller must
     /// show it now; it cannot be shown again. Throws <see cref="ArgumentException"/> for an invalid or duplicate name.
     /// </summary>
-    public string AddClientToken(string name, DateTimeOffset now)
+    public string AddClientToken(string name, DateTimeOffset now, string? createdVia = null)
     {
         name = name.Trim();
         if (!AutoApprovePolicy.IsValidClientName(name))
@@ -178,7 +192,7 @@ public sealed class Configuration : IPluginConfiguration
         if (ClientTokens.Any(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException($"A token for '{name}' already exists; revoke it first.");
         var token = GenerateToken();
-        ClientTokens = [.. ClientTokens, new ClientTokenEntry { Name = name, TokenSha256 = HashToken(token), CreatedAt = now }];
+        ClientTokens = [.. ClientTokens, new ClientTokenEntry { Name = name, TokenSha256 = HashToken(token), CreatedAt = now, CreatedVia = createdVia }];
         return token;
     }
 
@@ -359,6 +373,28 @@ public sealed class Configuration : IPluginConfiguration
         if (!Enum.IsDefined(ActivityLogLevel))
         {
             ActivityLogLevel = ActivityLogLevel.Failures;
+            changed = true;
+        }
+
+        // Local model: an endpoint that is not an absolute http(s) URL is dropped rather than guessed at.
+        var modelEndpoint = LocalModelProbe.NormalizeEndpoint(LocalModelEndpoint) ?? "";
+        if (modelEndpoint != LocalModelEndpoint)
+        {
+            LocalModelEndpoint = modelEndpoint;
+            changed = true;
+        }
+
+        var modelName = (LocalModelName ?? "").Trim();
+        if (modelName != LocalModelName)
+        {
+            LocalModelName = modelName;
+            changed = true;
+        }
+
+        var modelKey = (LocalModelApiKey ?? "").Trim();
+        if (modelKey != LocalModelApiKey)
+        {
+            LocalModelApiKey = modelKey;
             changed = true;
         }
 
