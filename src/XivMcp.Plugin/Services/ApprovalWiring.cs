@@ -12,6 +12,7 @@ namespace XivMcp.Plugin.Services;
 public sealed class ApprovalWiring : IDisposable
 {
     private readonly ServerHost host;
+    private readonly ConfirmationService confirmations;
     private readonly ApprovalQueue queue;
     private readonly ApprovalSessionService sessions;
     private readonly INotificationManager notifications;
@@ -20,6 +21,7 @@ public sealed class ApprovalWiring : IDisposable
     public ApprovalWiring(ServerHost host, ApprovalQueue queue, ApprovalSessionService sessions, INotificationManager notifications, IPluginLog log)
     {
         this.host = host;
+        confirmations = host.Confirmations;
         this.queue = queue;
         this.sessions = sessions;
         this.notifications = notifications;
@@ -28,6 +30,7 @@ public sealed class ApprovalWiring : IDisposable
         sessions.Started += OnSessionStarted;
         sessions.Ended += OnSessionEnded;
         host.PermissionsChanged += OnPermissionsChanged;
+        confirmations.AutoApproved += OnAutoApproved;
     }
 
     /// <summary>Call about once a second from the framework update.</summary>
@@ -48,6 +51,14 @@ public sealed class ApprovalWiring : IDisposable
             else
                 log.Warning("MCP ticket {Target} from {Client} failed: {Error}", t.ActivityTarget, t.ClientName ?? "?", a.Error ?? "");
         }
+    }
+
+    private void OnAutoApproved(ToolCallApprovalRequest call, ToolPermission tier, AutoApproveMatch match)
+    {
+        // Tool, token identity and the owner-written rule that matched; never the call's arguments.
+        var target = $"{call.ToolName} [{tier}] ({match.Describe()})";
+        host.Server.RecordHostActivity(call.SessionId, call.ClientName, "policy/auto-approve", target, true, null);
+        log.Information("MCP auto-approved {Tool} for token client {Client} by {Rule}", call.ToolName, call.AuthenticatedClient ?? "?", match.Describe());
     }
 
     private void OnSessionStarted(ApprovalSession s)
@@ -96,6 +107,7 @@ public sealed class ApprovalWiring : IDisposable
     public void Dispose()
     {
         host.PermissionsChanged -= OnPermissionsChanged;
+        confirmations.AutoApproved -= OnAutoApproved;
         sessions.Started -= OnSessionStarted;
         sessions.Ended -= OnSessionEnded;
         queue.ActivityRecorded -= OnTicketActivity;

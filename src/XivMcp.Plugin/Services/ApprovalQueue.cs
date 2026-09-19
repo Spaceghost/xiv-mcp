@@ -57,13 +57,16 @@ public sealed record Ticket
 
     public string? SessionId { get; init; }
 
+    /// <summary>Per-client token name the request authenticated with (not self-reported), or null.</summary>
+    public string? AuthenticatedClient { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public DateTimeOffset? ExpiresAt { get; init; }
 
     public TicketState State { get; init; }
 
-    /// <summary>"player", "session", "grant", "confirmation off", "client" (cancel) or "system".</summary>
+    /// <summary>"player", "policy", "session", "grant", "confirmation off", "client" (cancel) or "system".</summary>
     public string? DecidedBy { get; init; }
 
     public DateTimeOffset? DecidedAt { get; init; }
@@ -94,7 +97,7 @@ public interface IToolRunner
     string? CheckToolCall(string toolName, JsonObject? arguments, out ToolPermission permission);
 
     /// <summary>Runs an approved call with the server's normal validation and call timeout.</summary>
-    Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, CancellationToken cancellationToken);
+    Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, string? authenticatedClient, CancellationToken cancellationToken);
 }
 
 /// <summary><see cref="IToolRunner"/> over the plugin's <see cref="McpServer"/>.</summary>
@@ -103,8 +106,8 @@ public sealed class ServerToolRunner(McpServer server) : IToolRunner
     public string? CheckToolCall(string toolName, JsonObject? arguments, out ToolPermission permission) =>
         server.CheckToolCall(toolName, arguments, out permission);
 
-    public Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, CancellationToken cancellationToken) =>
-        server.ExecuteApprovedToolAsync(toolName, arguments, clientName, sessionId, cancellationToken);
+    public Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, string? authenticatedClient, CancellationToken cancellationToken) =>
+        server.ExecuteApprovedToolAsync(toolName, arguments, clientName, sessionId, cancellationToken, authenticatedClient);
 }
 
 /// <summary>A ticket event for the activity feed. Carries the ticket for identity only; sinks must not log its arguments.</summary>
@@ -118,7 +121,8 @@ public sealed record TicketRequest(
     string? ResumeToken,
     int? ExpiresInSeconds,
     string? ClientName,
-    string? SessionId);
+    string? SessionId,
+    string? AuthenticatedClient = null);
 
 /// <summary>
 /// The deferred approval queue. Clients file Action/Chat calls as tickets (request_action) and get an id back at once;
@@ -280,12 +284,14 @@ public sealed class ApprovalQueue : IDisposable
             ResumeToken = resumeToken,
             ClientName = request.ClientName,
             SessionId = request.SessionId,
+            AuthenticatedClient = request.AuthenticatedClient,
             CreatedAt = now,
             ExpiresAt = request.ExpiresInSeconds is { } seconds ? now + TimeSpan.FromSeconds(seconds) : null,
             State = TicketState.Pending,
         };
 
-        if (confirmations.PassesWithoutPrompt(ticket.ToolName, tier, ticket.ClientName, ticket.SessionId, out var how))
+        var call = new ToolCallApprovalRequest(ticket.ToolName, permission, ticket.ClientName, ticket.SessionId, argumentsJson, ticket.AuthenticatedClient);
+        if (confirmations.PassesWithoutPrompt(call, tier, out var how))
             ticket = ticket with { State = TicketState.Approved, DecidedBy = how, DecidedAt = now };
 
         var owner = ticket.Owner;
@@ -524,7 +530,7 @@ public sealed class ApprovalQueue : IDisposable
             try
             {
                 var arguments = ticket.ArgumentsJson is null ? null : JsonNode.Parse(ticket.ArgumentsJson) as JsonObject;
-                result = await runner.ExecuteApprovedToolAsync(ticket.ToolName, arguments, ticket.ClientName, ticket.SessionId, disposing.Token).ConfigureAwait(false);
+                result = await runner.ExecuteApprovedToolAsync(ticket.ToolName, arguments, ticket.ClientName, ticket.SessionId, ticket.AuthenticatedClient, disposing.Token).ConfigureAwait(false);
                 error = result.IsError ? result.Error ?? "The tool reported an error." : null;
             }
             catch (OperationCanceledException) when (disposing.IsCancellationRequested)

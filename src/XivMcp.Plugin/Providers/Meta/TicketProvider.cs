@@ -75,7 +75,7 @@ public sealed class TicketProvider : IDisposable
     {
         if (string.IsNullOrWhiteSpace(tool))
             throw new McpToolException("tool must not be empty.");
-        var ticket = queue.Submit(new TicketRequest(tool.Trim(), arguments, reason, resumeToken, expiresInSeconds, ctx?.ClientName, ctx?.SessionId));
+        var ticket = queue.Submit(new TicketRequest(tool.Trim(), arguments, reason, resumeToken, expiresInSeconds, ctx?.ClientName, ctx?.SessionId, ctx?.AuthenticatedClient));
         return ToDto(ticket);
     }
 

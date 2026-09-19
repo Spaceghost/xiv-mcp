@@ -224,6 +224,7 @@ public sealed class ServerHost : IDisposable
         // Live options (no restart needed).
         Server.Options.ApprovalTimeout = TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds);
         Server.Options.CallTimeout = TimeSpan.FromSeconds(config.CallTimeoutSeconds);
+        Server.Options.ClientTokens = config.ClientTokenHashes();
 
         var permissions = PermissionFingerprint();
         if (permissions != permissionFingerprint)
@@ -339,6 +340,7 @@ public sealed class ServerHost : IDisposable
         options.Path = "/mcp";
         options.BearerToken = config.RequireToken ? config.BearerToken : null;
         options.AllowedOrigins = config.AllowedOrigins.Where(o => !string.IsNullOrWhiteSpace(o)).Select(o => o.Trim()).ToList();
+        options.ClientTokens = config.ClientTokenHashes();
         options.ServerVersion = PluginVersion;
         options.Instructions = ServerInstructions;
 
