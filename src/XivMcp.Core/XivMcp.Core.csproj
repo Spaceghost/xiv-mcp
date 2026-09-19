@@ -8,5 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="XivMcp.Core.Tests" />
+    <!-- The changelog players read in the What's new tab; CHANGELOG.md is rendered from the same file. -->
+    <EmbeddedResource Include="../../changelog.json" LogicalName="XivMcp.Core.changelog.json" />
   </ItemGroup>
 </Project>
