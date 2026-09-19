@@ -29,6 +29,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly WindowSystem windowSystem = new("XivMcp");
     private readonly MainWindow mainWindow;
     private readonly ConfirmWindow confirmWindow;
+    private readonly ApprovalWiring approvalWiring;
     private DateTime nextTick;
     private bool commandRegistered;
 
@@ -40,7 +41,8 @@ public sealed class Plugin : IDalamudPlugin
         IObjectTable objectTable,
         ICommandManager commands,
         IChatGui chat,
-        IDtrBar dtrBar)
+        IDtrBar dtrBar,
+        INotificationManager notifications)
     {
         this.pluginInterface = pluginInterface;
         this.log = log;
@@ -54,16 +56,27 @@ public sealed class Plugin : IDalamudPlugin
 
             var gameThread = new DalamudGameThread(framework);
             confirmations = Track(new ConfirmationService(config));
+            var approvalSessions = Track(new ApprovalSessionService(config));
+            confirmations.Sessions = approvalSessions;
             var hostState = new HostState(config, clientState, objectTable, framework);
             var notifier = new NotifierProxy(log);
             var board = new AgentBoard(config);
 
             host = Track(new ServerHost(pluginInterface, log, config, gameThread, hostState, notifier, confirmations));
 
+            // Deferred approvals: tickets persist next to the plugin config and run through the server once approved.
+            var ticketStore = new TicketStore(
+                Path.Combine(pluginInterface.GetPluginConfigDirectory(), TicketStore.FileName),
+                (message, ex) => log.Warning(ex, "{Message}", message));
+            var approvalQueue = Track(new ApprovalQueue(config, ticketStore, new ServerToolRunner(host.Server), confirmations));
+            approvalWiring = Track(new ApprovalWiring(host, approvalQueue, approvalSessions, notifications, log));
+
             // Scoped objects providers may request in their constructors (besides Dalamud services).
-            host.LoadProviders(typeof(Plugin).Assembly, config, gameThread, notifier, board, host, hostState, confirmations);
+            host.LoadProviders(typeof(Plugin).Assembly, config, gameThread, notifier, board, host, hostState, confirmations, approvalQueue, approvalSessions);
 
             mainWindow = new MainWindow(pluginInterface, config, host, board, confirmations);
+            mainWindow.Approvals = approvalQueue;
+            mainWindow.ApprovalSessions = approvalSessions;
             confirmWindow = new ConfirmWindow(confirmations);
             windowSystem.AddWindow(mainWindow);
             windowSystem.AddWindow(confirmWindow);
@@ -121,6 +134,7 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
             host.Tick();
+            approvalWiring.Tick();
         }
         catch (Exception ex)
         {
