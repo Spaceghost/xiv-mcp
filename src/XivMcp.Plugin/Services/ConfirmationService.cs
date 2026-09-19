@@ -21,8 +21,9 @@ public enum ConfirmationDecision
 /// <summary>One call waiting for the player to approve or deny it in game.</summary>
 public sealed class PendingConfirmation
 {
-    internal PendingConfirmation(string toolName, ToolPermission permission, ToolPermission tier, string? clientName, string? arguments, bool argumentsTruncated, DateTimeOffset createdAt, TimeSpan timeout)
+    internal PendingConfirmation(string toolName, ToolPermission permission, ToolPermission tier, string? clientName, string? arguments, bool argumentsTruncated, DateTimeOffset createdAt, TimeSpan timeout, string? sessionId = null)
     {
+        SessionId = sessionId;
         ToolName = toolName;
         Permission = permission;
         Tier = tier;
@@ -45,6 +46,12 @@ public sealed class PendingConfirmation
 
     /// <summary>Client-reported name and version (not authenticated).</summary>
     public string? ClientName { get; }
+
+    /// <summary>MCP session of the call; null for stateless requests.</summary>
+    public string? SessionId { get; }
+
+    /// <summary>Per-client token name the call authenticated with (not self-reported), or null.</summary>
+    public string? AuthenticatedClient { get; init; }
 
     /// <summary>Pretty-printed arguments with invisible characters made visible, or null when the call has none.</summary>
     public string? Arguments { get; }
@@ -69,7 +76,7 @@ public sealed record ConfirmationGrant(string ToolName, ToolPermission Tier, str
 /// from the framework thread through <see cref="Resolve"/>. Timeouts, cancellation, "Deny all" and plugin unload all
 /// deny, so nothing waits forever and nothing runs unconfirmed.
 /// </summary>
-public sealed class ConfirmationService : IToolCallApprover, IDisposable
+public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDisposable
 {
     public const int MaxArgumentsLength = 4000;
 
@@ -96,8 +103,17 @@ public sealed class ConfirmationService : IToolCallApprover, IDisposable
         this.time = time ?? TimeProvider.System;
     }
 
+    /// <summary>
+    /// "Allow everything from this client" sessions. Checked after the confirmation toggle and before a prompt; null means
+    /// no sessions (tests, or before the plugin wires it).
+    /// </summary>
+    public ApprovalSessionService? Sessions { get; set; }
+
     /// <summary>Raised (any thread) when a request is added or resolved, or grants change.</summary>
     public event Action? Changed;
+
+    /// <summary>Raised (caller's thread) for every call an owner auto-approve rule let through without a prompt.</summary>
+    public event Action<ToolCallApprovalRequest, ToolPermission, AutoApproveMatch>? AutoApproved;
 
     public bool HasPending
     {
@@ -126,31 +142,31 @@ public sealed class ConfirmationService : IToolCallApprover, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<bool> ApproveToolCallAsync(string toolName, ToolPermission permission, string? clientName, string? argumentsJson, CancellationToken cancellationToken)
+    public Task<bool> ApproveToolCallAsync(string toolName, ToolPermission permission, string? clientName, string? argumentsJson, CancellationToken cancellationToken) =>
+        ApproveToolCallAsync(new ToolCallApprovalRequest(toolName, permission, clientName, null, argumentsJson), cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest call, CancellationToken cancellationToken)
     {
+        var (toolName, permission, clientName, sessionId, argumentsJson, authenticatedClient) = call;
         if (permission < ToolPermission.Action || !config.ConfirmActions)
             return true;
 
-        var tier = permission;
-        if (toolName == ExecuteCommandTool && CommandArgument(argumentsJson) is { } commandLine)
-        {
-            switch (ChatCommands.Classify(commandLine))
-            {
-                case CommandKind.Blocked or CommandKind.Automation:
-                    return true; // the tool refuses these itself; do not ask the player about a call that cannot run
-                case CommandKind.Chat when !config.AllowChat:
-                    return true; // likewise: execute_command rejects chat commands while the Chat tier is off
-                case CommandKind.Chat:
-                    tier = ToolPermission.Chat;
-                    break;
-            }
-        }
+        // Null: the tool refuses the call by itself, so do not ask the player about a call that cannot run.
+        if (EffectiveTier(toolName, permission, argumentsJson, config.AllowChat) is not { } tier)
+            return true;
+
+        if (PolicyApproves(call, tier))
+            return true;
+
+        if (Sessions?.Covers(clientName, sessionId, tier) == true)
+            return true;
 
         var now = time.GetUtcNow();
         var key = GrantKeyOf(toolName, tier, clientName);
         var (arguments, truncated) = FormatArguments(argumentsJson);
         var timeout = TimeSpan.FromSeconds(Math.Clamp(config.ConfirmTimeoutSeconds, 5, 300));
-        var request = new PendingConfirmation(toolName, permission, tier, clientName, arguments, truncated, now, timeout);
+        var request = new PendingConfirmation(toolName, permission, tier, clientName, arguments, truncated, now, timeout, sessionId) { AuthenticatedClient = authenticatedClient };
         lock (gate)
         {
             if (disposed)
@@ -228,6 +244,82 @@ public sealed class ConfirmationService : IToolCallApprover, IDisposable
         DenyAll();
     }
 
+    /// <summary>
+    /// What an Action/Chat call effectively does: Chat for an execute_command line that posts chat, otherwise
+    /// <paramref name="permission"/>. Null when the tool refuses the call by itself (blocked or automation commands, or chat
+    /// while the Chat tier is off), so there is nothing to approve.
+    /// </summary>
+    public static ToolPermission? EffectiveTier(string toolName, ToolPermission permission, string? argumentsJson, bool allowChat)
+    {
+        if (toolName != ExecuteCommandTool || CommandArgument(argumentsJson) is not { } commandLine)
+            return permission;
+        return ChatCommands.Classify(commandLine) switch
+        {
+            CommandKind.Blocked or CommandKind.Automation => null,
+            CommandKind.Chat when !allowChat => null,
+            CommandKind.Chat => ToolPermission.Chat,
+            _ => permission,
+        };
+    }
+
+    /// <summary>
+    /// True when an Action/Chat call of <paramref name="tier"/> would run now without a prompt: confirmation is off, an
+    /// owner rule pre-approves it for the token-identified client, an approval session covers the client, or an "allow this
+    /// tool" grant matches. <paramref name="how"/> names which. A policy match raises <see cref="AutoApproved"/>.
+    /// </summary>
+    public bool PassesWithoutPrompt(ToolCallApprovalRequest call, ToolPermission tier, out string how)
+    {
+        var (toolName, _, clientName, sessionId, _, _) = call;
+        how = "";
+        if (!config.ConfirmActions)
+        {
+            how = "confirmation off";
+            return true;
+        }
+
+        if (PolicyApproves(call, tier))
+        {
+            how = "policy";
+            return true;
+        }
+
+        if (Sessions?.Covers(clientName, sessionId, tier) == true)
+        {
+            how = "session";
+            return true;
+        }
+
+        var key = GrantKeyOf(toolName, tier, clientName);
+        lock (gate)
+        {
+            if (disposed)
+                return false;
+            PruneGrantsLocked(time.GetUtcNow());
+            if (!grants.ContainsKey(key))
+                return false;
+        }
+
+        how = "grant";
+        return true;
+    }
+
+    /// <summary>Owner auto-approve rules (<see cref="Configuration.AutoApproveRules"/>); raises <see cref="AutoApproved"/> on a match.</summary>
+    private bool PolicyApproves(ToolCallApprovalRequest call, ToolPermission tier)
+    {
+        if (AutoApprovePolicy.Match(config.AutoApproveRules, call.AuthenticatedClient, call.ToolName, tier, call.ArgumentsJson) is not { } match)
+            return false;
+        try
+        {
+            AutoApproved?.Invoke(call, tier, match);
+        }
+        catch
+        {
+            // Logging plumbing must not change the decision.
+        }
+
+        return true;
+    }
+
     internal static string GrantKeyOf(string toolName, ToolPermission tier, string? clientName) =>
         $"{toolName}\n{(int)tier}\n{clientName ?? ""}";
 
@@ -297,8 +389,18 @@ public sealed class ConfirmationService : IToolCallApprover, IDisposable
             pretty = argumentsJson;
         }
 
-        var sb = new StringBuilder(pretty.Length);
-        foreach (var ch in pretty)
+        var text = ShowInvisible(pretty);
+        return text.Length > MaxArgumentsLength ? (text[..MaxArgumentsLength], true) : (text, false);
+    }
+
+    /// <summary>
+    /// Shows characters that could hide or reorder what the player reads (format/bidi, line separators, controls other
+    /// than a newline, lone surrogates) as \uXXXX escapes; everything else stays as it is.
+    /// </summary>
+    public static string ShowInvisible(string text)
+    {
+        var sb = new StringBuilder(text.Length);
+        foreach (var ch in text)
         {
             var category = CharUnicodeInfo.GetUnicodeCategory(ch);
             if (category is UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Surrogate
@@ -308,8 +410,7 @@ public sealed class ConfirmationService : IToolCallApprover, IDisposable
                 sb.Append(ch);
         }
 
-        var text = sb.ToString();
-        return text.Length > MaxArgumentsLength ? (text[..MaxArgumentsLength], true) : (text, false);
+        return sb.ToString();
     }
 
     private void RaiseChanged()

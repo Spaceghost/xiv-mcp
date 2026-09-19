@@ -79,6 +79,8 @@ public sealed class ConfirmWindow : Window
             ImGui.TableSetupColumn("##value", ImGuiTableColumnFlags.WidthStretch);
             Row("Tool", request.ToolName, ImGuiColors.DalamudYellow);
             Row("Client", request.ClientName ?? "(unnamed client)", null);
+            if (request.AuthenticatedClient is { } tokenClient)
+                Row("Token", tokenClient, ImGuiColors.ParsedBlue);
             if (request.Tier != request.Permission)
                 Row("Tier", $"{request.Tier} (declared {request.Permission})", null);
             ImGui.EndTable();

@@ -267,8 +267,9 @@ public sealed partial class McpServer
         Game = GameThread,
         Notifier = new CallNotifier(this, scope),
         CancellationToken = token,
-        SessionId = scope.Session?.Id,
+        SessionId = scope.Session?.Id ?? scope.DetachedSessionId,
         ClientName = scope.ClientName,
+        AuthenticatedClient = scope.AuthenticatedClient,
         ProtocolVersion = scope.ProtocolVersion,
         ReportProgress = scope.ProgressToken is null
             ? static (_, _, _) => Task.CompletedTask
@@ -309,7 +310,7 @@ public sealed partial class McpServer
         var name = JsonRpc.RequireString(scope.Params, "name");
         scope.Target = name;
         if (!_registry.Snapshot.ToolsByName.TryGetValue(name, out var tool))
-            throw new McpProtocolException(JsonRpcCodes.InvalidParams, $"Unknown tool: '{name}'. Call tools/list for the available tools.", new JsonObject { ["name"] = name });
+            throw new McpProtocolException(JsonRpcCodes.InvalidParams, UnknownToolMessage(name), new JsonObject { ["name"] = name });
 
         JsonObject? arguments = null;
         if (scope.Params!.TryGetPropertyValue("arguments", out var argsNode) && argsNode is not null)
@@ -318,17 +319,33 @@ public sealed partial class McpServer
                 ?? throw new McpProtocolException(JsonRpcCodes.InvalidParams, "params.arguments must be an object");
         }
 
-        if (!CategoryEnabled(tool.Category))
-        {
-            return ToolError(scope,
-                $"Tool '{name}' is unavailable: the '{tool.Category}' tool category is disabled in the xiv-mcp plugin settings (/xivmcp). Ask the user to enable it.");
-        }
+        return await CallToolAsync(scope, tool, arguments, preApproved: false).ConfigureAwait(false);
+    }
 
+    private static string UnknownToolMessage(string name) => $"Unknown tool: '{name}'. Call tools/list for the available tools.";
+
+    /// <summary>Category and tier gate shared by tools/call, <see cref="CheckToolCall"/> and approved executions. Null when the tool may run.</summary>
+    private string? ToolGateError(ToolDescriptor tool)
+    {
+        if (!CategoryEnabled(tool.Category))
+            return $"Tool '{tool.Name}' is unavailable: the '{tool.Category}' tool category is disabled in the xiv-mcp plugin settings (/xivmcp). Ask the user to enable it.";
         if (!Permitted(tool.Permission))
-        {
-            return ToolError(scope,
-                $"Tool '{name}' is unavailable: it needs the '{PermissionLabel(tool.Permission)}' permission tier, which is disabled in the xiv-mcp plugin settings (/xivmcp). Ask the user to enable '{PermissionLabel(tool.Permission)}' tools.");
-        }
+            return $"Tool '{tool.Name}' is unavailable: it needs the '{PermissionLabel(tool.Permission)}' permission tier, which is disabled in the xiv-mcp plugin settings (/xivmcp). Ask the user to enable '{PermissionLabel(tool.Permission)}' tools.";
+        return null;
+    }
+
+    private static string InvalidArgumentsMessage(ToolDescriptor tool, List<string> errors) =>
+        $"Invalid arguments for tool '{tool.Name}': {string.Join("; ", errors)}. Expected arguments: {tool.Signature}.";
+
+    /// <summary>
+    /// Gates, binds, approves (unless <paramref name="preApproved"/>: the player already approved this exact call) and runs
+    /// one tool call. Tool-level failures come back as isError results with <see cref="RequestScope.ToolError"/> set.
+    /// </summary>
+    private async Task<JsonObject> CallToolAsync(RequestScope scope, ToolDescriptor tool, JsonObject? arguments, bool preApproved)
+    {
+        var name = tool.Name;
+        if (ToolGateError(tool) is { } gateError)
+            return ToolError(scope, gateError);
 
         var timeout = Options.CallTimeout > TimeSpan.Zero ? Options.CallTimeout : TimeSpan.FromSeconds(30);
 
@@ -340,12 +357,9 @@ public sealed partial class McpServer
         var errors = new List<string>();
         var args = ArgumentBinder.Bind(tool.Parameters, arguments, context, linked.Token, errors);
         if (errors.Count > 0)
-        {
-            return ToolError(scope,
-                $"Invalid arguments for tool '{name}': {string.Join("; ", errors)}. Expected arguments: {tool.Signature}.");
-        }
+            return ToolError(scope, InvalidArgumentsMessage(tool, errors));
 
-        if (tool.Permission >= ToolPermission.Action && Approver is { } approver)
+        if (!preApproved && tool.Permission >= ToolPermission.Action && Approver is { } approver)
         {
             var denial = await ApproveAsync(scope, tool, approver, arguments).ConfigureAwait(false);
             if (denial is not null)
@@ -417,7 +431,12 @@ public sealed partial class McpServer
             }
 
             var argumentsJson = arguments?.ToJsonString(McpJson.Options);
-            var approved = await Task.Run(() => approver.ApproveToolCallAsync(name, tool.Permission, scope.ClientName, argumentsJson, linked.Token), linked.Token)
+            var sessionId = scope.Session?.Id;
+            var approved = await Task.Run(
+                    () => approver is ISessionAwareToolCallApprover aware
+                        ? aware.ApproveToolCallAsync(new ToolCallApprovalRequest(name, tool.Permission, scope.ClientName, sessionId, argumentsJson, scope.AuthenticatedClient), linked.Token)
+                        : approver.ApproveToolCallAsync(name, tool.Permission, scope.ClientName, argumentsJson, linked.Token),
+                    linked.Token)
                 .WaitAsync(linked.Token)
                 .ConfigureAwait(false);
             if (approved)

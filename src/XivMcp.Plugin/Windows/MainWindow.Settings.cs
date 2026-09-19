@@ -37,6 +37,8 @@ public sealed partial class MainWindow
         ImGui.Spacing();
         DrawCategorySettings();
         ImGui.Spacing();
+        DrawPolicySettings();
+        ImGui.Spacing();
         DrawAdvancedSettings();
     }
 
@@ -104,6 +106,8 @@ public sealed partial class MainWindow
             if (ImGui.SmallButton("Revoke all##grants"))
                 host.Confirmations.RevokeGrants();
         }
+
+        DrawApprovalSettings();
     }
 
     private void TierCheckbox(ToolPermission tier, string description)

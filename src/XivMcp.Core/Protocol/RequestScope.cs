@@ -47,6 +47,12 @@ internal sealed class RequestScope
 
     public string? ClientName { get; init; }
 
+    /// <summary>Per-client token name the request authenticated with (unlike ClientName, not self-reported).</summary>
+    public string? AuthenticatedClient { get; init; }
+
+    /// <summary>MCP session id for calls that run outside an HTTP request (approved tickets); requests use <see cref="Session"/>.</summary>
+    public string? DetachedSessionId { get; init; }
+
     /// <summary>Modern: minimum level from _meta (null = no log notifications). Legacy uses the session level.</summary>
     public McpLogLevel? LogLevel { get; init; }
 
