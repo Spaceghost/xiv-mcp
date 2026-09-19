@@ -81,6 +81,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Seconds a confirmation waits before it is denied automatically.</summary>
     public int ConfirmTimeoutSeconds { get; set; } = 20;
 
+    /// <summary>Length of an "allow everything from this client" approval session, 1-60 minutes. Sessions are never saved.</summary>
+    public int ApprovalSessionMinutes { get; set; } = 5;
+
     /// <summary>Provider categories switched off (everything else is on).</summary>
     public List<string> DisabledCategories { get; set; } = [];
 
@@ -296,6 +299,7 @@ public sealed class Configuration : IPluginConfiguration
         changed |= Clamp(Port, 1, 65535, v => Port = v);
         changed |= Clamp(CallTimeoutSeconds, 5, 600, v => CallTimeoutSeconds = v);
         changed |= Clamp(ConfirmTimeoutSeconds, 5, 300, v => ConfirmTimeoutSeconds = v);
+        changed |= Clamp(ApprovalSessionMinutes, 1, 60, v => ApprovalSessionMinutes = v);
         changed |= Clamp(ChatBufferSize, 50, 5000, v => ChatBufferSize = v);
         changed |= Clamp(AgentBoardExpiryMinutes, 0, 7 * 24 * 60, v => AgentBoardExpiryMinutes = v);
 
