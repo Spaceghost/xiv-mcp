@@ -117,6 +117,22 @@ and categories are hidden from `tools/list` and rejected on call.
   `execute_command` lines that post chat are shown and granted as Chat. Turning confirmation off makes Action/Chat
   follow their tier toggles directly. **Unverified in game:** the window and its buttons have not been exercised
   inside FINAL FANTASY XIV yet; the server-side hook and the service logic are covered by host tests.
+- **Approve later (ticket queue).** An agent that may run while you are away calls `request_action` instead of the
+  tool: the call becomes a ticket in the **Approvals** tab and waits, across reloads and game restarts, until you
+  approve or deny it. Approved tickets run with the normal checks and call timeout, and the agent picks up the result
+  with `get_ticket`/`list_tickets` or a resource subscription and resumes its plan. From a ticket you can also
+  **Allow everything from this client for 5 min** (1–60 in Settings; Chat only with a separate checkbox; banner with
+  countdown and Revoke; never saved). For unattended CI, a **client token** plus **auto-approve rules** pre-approve
+  exact command prefixes for that token only. Details, diagrams and the client resume contract:
+  [docs/APPROVALS.md](docs/APPROVALS.md). **Game automation through XivMcp is limited to what you approve**: a click,
+  a session you opened, or a rule you wrote. **Unverified in game**, like the confirmation window.
+
+```
+agent --request_action--> ticket (pending, saved) --you: Approve--> runs in game --> result on the ticket --> agent resumes
+                                                  \--you: Deny----> denied (agent does not retry)
+agent --tools/call-------> confirmation window (auto-deny after N s)  [unchanged]
+session / rule / 10-min grant covers the call --> runs without a prompt, logged
+```
 - **Categories** (character, chat, gamedata, ui, meta, prompts, ...) can be switched off individually.
 - **Resources** follow the Read tier as well as their category; prompts only return text and follow their category.
 - **Network.** The listener binds `127.0.0.1` by default. Any other host is shown with a red warning,
@@ -130,7 +146,8 @@ All settings: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 - `/xivmcp` toggles the window; `/xivmcp start|stop|restart|status|settings`.
 - **Status**: running state, endpoint, sessions, bind errors, provider load failures, masked token,
-  client snippets. **Agents**: the agent board with state colours and progress bars. **Activity**: live
+  client snippets. **Agents**: the agent board with state colours and progress bars. **Approvals** (with the
+  pending count): queued tickets to approve or deny, approval sessions and recent results. **Activity**: live
   request feed with filter; failures highlighted. **Tools**: every registered tool by category with its
   tier and whether it is currently available. **Settings**: everything configurable.
 - Server info bar entry `MCP ● n` (n = active sessions; `?` when a confirmation is waiting). Click to
@@ -146,7 +163,7 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-56 tools, 9 resources and templates, 6 prompts. Tier and category are the in-game switches
+60 tools, 11 resources and templates, 6 prompts. Tier and category are the in-game switches
 (Settings → Permissions / Categories); *Login* means the call fails at the title screen. Descriptions are the first
 sentence of what clients see; `tools/list` has the full text and schemas. Behaviour in game is unverified unless
 stated elsewhere.
@@ -162,6 +179,10 @@ stated elsewhere.
 | `set_focus_target` | Action | actions | yes | Sets the user's focus target (the secondary tracked target shown in the Focus Target bar), or clears it with clear=true. |
 | `set_target` | Action | actions | yes | Sets the user's current target, like clicking an object. |
 | `teleport` | Action | actions | yes | Starts the Teleport spell to one of the character's attuned aetherytes (or free-company/private estate and apartment entries), exactly like choosing it in the Teleport window. |
+| `get_ticket` | Read | approvals | no | Returns one of your approval tickets: state (pending, approved, executed, failed, denied, cancelled, expired), who decided, your resumeToken, and once it ran the tool result (result, same shape as a tools/call result)… |
+| `list_tickets` | Read | approvals | no | Lists your approval tickets, oldest first. state filters: open (pending or approved, the default), pending, final, all. |
+| `cancel_ticket` | Ui | approvals | no | Withdraws one of your pending tickets so the player is no longer asked about it. |
+| `request_action` | Ui | approvals | no | Files an Action- or Chat-tier tool call (e.g. teleport, execute_command, send_chat) as an approval ticket and returns immediately with its id and state pending; nothing runs until the player approves it in the XivMcp… |
 | `get_conditions` | Read | character | no | The game's condition flags (what state the client is in). |
 | `get_job_gauge` | Read | character | yes | The current job's gauge (the job-specific resource UI: e.g. PLD oath, WAR beast gauge, BLM astral fire/umbral ice and polyglot, SAM sen/kenki, VPR rattling coils/serpent offerings, PCT palette/canvas/motifs). |
 | `get_job_levels` | Read | character | yes | Every combat class/job, crafter and gatherer with the logged-in character's level and experience. |
@@ -218,6 +239,8 @@ Resources and templates follow the Read tier and their category.
 
 | URI | Category | Login | What |
 | --- | --- | --- | --- |
+| `ffxiv://tickets` | approvals | no | Your approval tickets (same shape as list_tickets with state all). |
+| `ffxiv://tickets/{id}` | approvals | no | One of your approval tickets (same shape as get_ticket). |
 | `ffxiv://player` | character | yes | Same JSON as the get_player tool: the logged-in character's identity, job, level, HP/MP, position, statuses. |
 | `ffxiv://target` | character | yes | Same JSON as get_target (target, target of target, soft, focus, mouseover). |
 | `ffxiv://chat/recent` | chat | no | The newest 100 captured chat lines (oldest first) in the same shape as read_chat, excluding private tells and battle-log lines. |

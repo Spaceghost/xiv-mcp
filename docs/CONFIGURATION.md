@@ -46,10 +46,19 @@ which stops the listener and binds the new endpoint.
 | `ConfirmActions` | `true` | *Ask me in game before Action/Chat calls* (Allow / Deny / Allow this tool for 10 min). Off: Action/Chat follow their tier toggles directly. See [ARCHITECTURE.md](ARCHITECTURE.md#confirmation-of-actionchat-calls). Unverified in game. |
 | `ConfirmTimeoutSeconds` | `20` (5–300) | Seconds before a pending confirmation is denied automatically (the client gets "not confirmed in game within N s"). |
 | `DisabledCategories` | `[]` | Provider categories that are switched off (e.g. `"chat"`). Their tools, resources and prompts are hidden and rejected. |
+| `ApprovalSessionMinutes` | `5` (1–60) | Length of an "Allow everything from this client" approval session started from the Approvals tab. Sessions themselves are never saved. See [APPROVALS.md](APPROVALS.md). |
+| `ClientTokens` | `[]` | Per-client bearer tokens: `{Name, TokenSha256, CreatedAt}`. Only the SHA-256 is stored; the token is shown once when generated (Settings → *Client tokens and auto-approve rules*). Revoking removes the entry; the server stops accepting the token on the next request. Entries with an invalid name or hash are dropped on load. |
+| `AutoApproveRules` | `[]` | Owner pre-approvals for a token-identified client: `{Enabled, Client, Tool, Argument ("command"), Prefixes[], IncludeChat}`. Matching rules are in [APPROVALS.md](APPROVALS.md#auto-approve-rules-and-client-tokens-ci); prefixes that are not printable ASCII are dropped on load. |
 
 Tier and category changes take effect immediately. Connected clients receive `tools/list_changed`,
 `prompts/list_changed` and `resources/list_changed`, and temporary "allow for 10 min" grants are revoked. Resources
-follow the Read tier as well as their category. Grants are kept in memory only (never written to this file).
+follow the Read tier as well as their category. Grants and approval sessions are kept in memory only (never written to
+this file); permission changes also revoke approval sessions, deny pending tickets when the Action tier goes off (Chat
+tickets when Chat goes off), and leave client tokens and rules alone.
+
+Approval tickets are stored separately in `pluginConfigs/XivMcp/approval-tickets.json` (the plugin config directory).
+It holds the arguments of queued calls; treat it like `XivMcp.json`. An unreadable file is renamed to
+`approval-tickets.json.unreadable-<time>` and the queue starts empty.
 
 ## Providers and interface (Advanced)
 
@@ -76,4 +85,5 @@ is pressed. `tools/claude-mcp-add.sh` registers the same server without storing 
 - The token protects against other local users and processes, not against software running as you.
   Regenerate it if it leaks. Clients registered through `tools/claude-mcp-add.sh` read the new token on
   their next connection.
-- `pluginConfigs/XivMcp.json` contains the token. Do not publish it or commit it.
+- `pluginConfigs/XivMcp.json` contains the token. Do not publish it or commit it. Client tokens are stored only as
+  hashes, but each one grants the same access as the main token while it exists; revoke those you no longer use.
