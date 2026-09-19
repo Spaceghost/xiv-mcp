@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace XivMcp.Plugin.Objectives;
 
 /// <summary>One step of an objective. Immutable; progress changes replace the objective.</summary>
@@ -15,9 +17,11 @@ public sealed record ObjectiveConditions
     /// <summary>How close to the spot (yalms, on the ground plane) counts as "there".</summary>
     public float Radius { get; init; } = Objective.DefaultRadius;
 
+    [JsonIgnore]
     public EorzeaTimeWindow TimeWindow => EorzeaTimeWindow.TryParse(EorzeaTime, out var window, out _) ? window : EorzeaTimeWindow.Any;
 
     /// <summary>Weather names that actually constrain (without "any", blanks and duplicates).</summary>
+    [JsonIgnore]
     public IReadOnlyList<string> WeatherConstraint =>
         Weather.Any(w => ObjectiveText.IsAny(w))
             ? []
@@ -74,9 +78,11 @@ public sealed record Objective
 
     public DateTimeOffset? CompletedAt { get; init; }
 
+    [JsonIgnore]
     public bool HasSpot => TerritoryId is > 0 && MapX is not null && MapY is not null;
 
     /// <summary>Index of the first step not done, or -1 when every step is done (or there are none).</summary>
+    [JsonIgnore]
     public int CurrentStepIndex
     {
         get
@@ -91,8 +97,10 @@ public sealed record Objective
         }
     }
 
+    [JsonIgnore]
     public string? CurrentStepText => CurrentStepIndex is >= 0 and var i ? Steps[i].Text : null;
 
+    [JsonIgnore]
     public int StepsDone => Steps.Count(s => s.Done);
 }
 
