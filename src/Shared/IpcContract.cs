@@ -58,6 +58,8 @@ public static class IpcContract
     /// Func&lt;string, string&gt;: argument = client name (1-64 of letters, digits, '-', '_', '.'). Issues a fresh per-client
     /// bearer token for that name (replacing an existing one) and returns { endpoint, token, clientName }, or
     /// { error: "disabled" | "invalid_client_name" | "failed" }. Game actions from that client still need in-game approval.
+    /// <c>endpoint</c> is the address the listener bound (the configured one while the server is stopped); an
+    /// <c>endpoints</c> array follows when bind modes land.
     /// </summary>
     public const string ConnectClient = "XivMcp.ConnectClient";
 
