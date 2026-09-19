@@ -3,6 +3,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using XivMcp.Plugin.Ipc;
+using XivMcp.Plugin.Objectives;
 using XivMcp.Plugin.Services;
 using XivMcp.Plugin.Windows;
 
@@ -29,6 +30,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly WindowSystem windowSystem = new("XivMcp");
     private readonly MainWindow mainWindow;
     private readonly ConfirmWindow confirmWindow;
+    private readonly ObjectiveTracker objectives;
+    private readonly ObjectiveChatCommand questCommand;
     private DateTime nextTick;
     private bool commandRegistered;
 
@@ -40,7 +43,11 @@ public sealed class Plugin : IDalamudPlugin
         IObjectTable objectTable,
         ICommandManager commands,
         IChatGui chat,
-        IDtrBar dtrBar)
+        IDtrBar dtrBar,
+        IDataManager data,
+        IGameGui gameGui,
+        ITextureProvider textures,
+        IToastGui toasts)
     {
         this.pluginInterface = pluginInterface;
         this.log = log;
@@ -58,15 +65,23 @@ public sealed class Plugin : IDalamudPlugin
             var notifier = new NotifierProxy(log);
             var board = new AgentBoard(config);
 
+            var objectiveStore = new ObjectiveStore(Path.Combine(pluginInterface.GetPluginConfigDirectory(), "objectives.json"));
+            objectiveStore.Load();
+            if (objectiveStore.LastError is { } objectiveError)
+                log.Warning("XivMcp objectives: {Error}", objectiveError);
+            objectives = Track(new ObjectiveTracker(objectiveStore, config, framework, clientState, objectTable, data, toasts, log));
+            questCommand = new ObjectiveChatCommand(objectives, config, pluginInterface, Print);
+
             host = Track(new ServerHost(pluginInterface, log, config, gameThread, hostState, notifier, confirmations));
 
             // Scoped objects providers may request in their constructors (besides Dalamud services).
-            host.LoadProviders(typeof(Plugin).Assembly, config, gameThread, notifier, board, host, hostState, confirmations);
+            host.LoadProviders(typeof(Plugin).Assembly, config, gameThread, notifier, board, host, hostState, confirmations, objectives);
 
             mainWindow = new MainWindow(pluginInterface, config, host, board, confirmations);
             confirmWindow = new ConfirmWindow(confirmations);
             windowSystem.AddWindow(mainWindow);
             windowSystem.AddWindow(confirmWindow);
+            windowSystem.AddWindow(Track(new ObjectiveOverlay(objectives, config, gameGui, textures, pluginInterface, Print)));
 
             pluginInterface.UiBuilder.Draw += DrawUi;
             pluginInterface.UiBuilder.OpenMainUi += OpenMainUi;
@@ -74,7 +89,7 @@ public sealed class Plugin : IDalamudPlugin
 
             commandRegistered = commands.AddHandler(Command, new CommandInfo(OnCommand)
             {
-                HelpMessage = "Toggle the XivMcp window. \"/xivmcp start|stop|restart|status|settings\".",
+                HelpMessage = "Toggle the XivMcp window. \"/xivmcp start|stop|restart|status|settings\"; custom objectives: " + ObjectiveCommands.Usage + ".",
             });
 
             Track(new IpcProvider(pluginInterface, framework, log, host, board, config, ToggleMainUi));
@@ -138,7 +153,14 @@ public sealed class Plugin : IDalamudPlugin
     {
         try
         {
-            switch (arguments.Trim().ToLowerInvariant())
+            var trimmed = arguments.Trim();
+            if (trimmed.Equals("quests", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("quests ", StringComparison.OrdinalIgnoreCase))
+            {
+                questCommand.Handle(trimmed[6..]);
+                return;
+            }
+
+            switch (trimmed.ToLowerInvariant())
             {
                 case "":
                     ToggleMainUi();
@@ -161,7 +183,7 @@ public sealed class Plugin : IDalamudPlugin
                     OpenConfigUi();
                     break;
                 default:
-                    Print($"unknown argument \"{arguments.Trim()}\". Use {Command} [start|stop|restart|status|settings].");
+                    Print($"unknown argument \"{arguments.Trim()}\". Use {Command} [start|stop|restart|status|settings|quests].");
                     break;
             }
         }
