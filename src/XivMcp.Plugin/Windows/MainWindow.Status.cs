@@ -39,8 +39,12 @@ public sealed partial class MainWindow
         ImGui.Spacing();
 
         // ---- facts
-        if (ImGui.BeginTable("##status-facts", 2, ImGuiTableFlags.SizingFixedFit))
+        // The value column stretches: with a fixed-fit column, wrapped text has no width to
+        // wrap into and prints one character per line.
+        if (ImGui.BeginTable("##status-facts", 2, ImGuiTableFlags.SizingStretchProp))
         {
+            ImGui.TableSetupColumn("##label", ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableSetupColumn("##value", ImGuiTableColumnFlags.WidthStretch);
             Row("Endpoint", host.Endpoint);
             Row("Enabled", config.Enabled ? "yes" : "no (server stays stopped on load)");
             Row("Uptime", host.StartedAt is { } started ? FormatAge(DateTimeOffset.UtcNow - started) : "—");
