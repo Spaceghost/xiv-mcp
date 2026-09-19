@@ -17,7 +17,7 @@ version 1) are dropped on the first save.
 - **What clients may do**: the four tiers, *Ask me in game before Action/Chat calls*, and its auto-deny timeout.
 - **Categories** (collapsed): per-category switches.
 - **Advanced** (collapsed): listen host, allowed origins, require token, regenerate token, call timeout,
-  chat buffer, activity log verbosity, server info bar entry, agent notifications, agent board expiry.
+  chat buffer, activity log verbosity, server info bar entry, agent notifications, agent board expiry, custom objectives.
 
 Every change is saved and applied at once, except port, host and origins: they are edited as a draft
 (so typing does not restart the server per keystroke) and applied with **Apply and restart server**,
@@ -60,6 +60,10 @@ follow the Read tier as well as their category. Grants are kept in memory only (
 | `ShowDtrEntry` | `true` | `MCP ● n` in the server info bar (`MCP ○` when stopped, `?` while a confirmation waits). Click to toggle the window. |
 | `NotifyAgentCompletion` | `true` | Dalamud notification when an agent's board entry moves to `done` or `failed`. |
 | `AgentBoardExpiryMinutes` | `120` (0–10080, 0 = never) | Board entries not updated for this long are removed. |
+| `ShowObjectives` | `true` | Show custom objectives (see [OBJECTIVES.md](OBJECTIVES.md)). `/xivmcp quests show\|hide` toggles it. |
+| `ObjectivesFollowDutyList` | `true` | Pin the objectives under the game's Duty List; off makes them a small movable window. |
+| `NotifyObjectiveReady` | `true` | Normal toast when an objective's conditions become ready. |
+| `ShowCompletedObjectives` | `false` | Keep completed objectives listed (greyed) until cleared. |
 | `Version` | `2` | Schema version for migrations (1 → 2: stop writing computed properties; no value changes). |
 
 ## Client setup

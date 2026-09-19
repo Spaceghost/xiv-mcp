@@ -64,7 +64,7 @@ public sealed class FooProvider : IDisposable
 - Any Dalamud service interface (`Dalamud.Plugin.Services.I*`) and `IDalamudPluginInterface`.
 - Plugin extras: `XivMcp.Core.IGameThread`, `XivMcp.Core.IMcpNotifier`, `XivMcp.Plugin.Configuration`.
   The shell also exposes `AgentBoard`, `ServerHost`, `HostState` and `ConfirmationService` (used by
-  Meta providers).
+  Meta providers) and `ObjectiveTracker` (objectives).
 - `ToolContext.ProtocolVersion` is the MCP revision the call is served under.
 - The constructor runs on a thread-pool thread, **not** the framework thread. Do not read game memory
   there.
