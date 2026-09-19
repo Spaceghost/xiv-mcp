@@ -268,5 +268,28 @@ public sealed partial class MainWindow
         if (ImGui.IsItemDeactivatedAfterEdit())
             SaveConfig(apply: false);
         HelpMarker("Entries idle this long are removed. 0 = keep until cleared. Default 120.");
+
+        ImGui.Spacing();
+        ImGui.TextColored(ImGuiColors.DalamudViolet, "Custom objectives");
+        ImGui.Separator();
+        SettingCheckbox("Show custom objectives", config.ShowObjectives, v => config.ShowObjectives = v,
+            "Objectives posted by agents (post_objective) or loaded from a pack (/xivmcp quests load <file>).");
+        SettingCheckbox("Pin under the Duty List", config.ObjectivesFollowDutyList, v => config.ObjectivesFollowDutyList = v,
+            "Off: a small movable window instead (drag it anywhere).");
+        SettingCheckbox("Toast when an objective becomes ready", config.NotifyObjectiveReady, v => config.NotifyObjectiveReady = v, null);
+        SettingCheckbox("Keep completed objectives listed", config.ShowCompletedObjectives, v => config.ShowCompletedObjectives = v,
+            "Greyed out until cleared (/xivmcp quests clear-done).");
+    }
+
+    private void SettingCheckbox(string label, bool value, Action<bool> set, string? help)
+    {
+        if (ImGui.Checkbox(label, ref value))
+        {
+            set(value);
+            SaveConfig(apply: false);
+        }
+
+        if (help is not null)
+            HelpMarker(help);
     }
 }
