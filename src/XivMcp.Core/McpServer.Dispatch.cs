@@ -269,6 +269,7 @@ public sealed partial class McpServer
         CancellationToken = token,
         SessionId = scope.Session?.Id ?? scope.DetachedSessionId,
         ClientName = scope.ClientName,
+        AuthenticatedClient = scope.AuthenticatedClient,
         ProtocolVersion = scope.ProtocolVersion,
         ReportProgress = scope.ProgressToken is null
             ? static (_, _, _) => Task.CompletedTask
@@ -433,7 +434,7 @@ public sealed partial class McpServer
             var sessionId = scope.Session?.Id;
             var approved = await Task.Run(
                     () => approver is ISessionAwareToolCallApprover aware
-                        ? aware.ApproveToolCallAsync(new ToolCallApprovalRequest(name, tool.Permission, scope.ClientName, sessionId, argumentsJson), linked.Token)
+                        ? aware.ApproveToolCallAsync(new ToolCallApprovalRequest(name, tool.Permission, scope.ClientName, sessionId, argumentsJson, scope.AuthenticatedClient), linked.Token)
                         : approver.ApproveToolCallAsync(name, tool.Permission, scope.ClientName, argumentsJson, linked.Token),
                     linked.Token)
                 .WaitAsync(linked.Token)
