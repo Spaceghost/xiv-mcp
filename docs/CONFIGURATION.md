@@ -16,6 +16,9 @@ version 1) are dropped on the first save.
 - **Server** (always visible): Enabled, Port.
 - **What clients may do**: the four tiers, *Ask me in game before Action/Chat calls*, and its auto-deny timeout.
 - **Categories** (collapsed): per-category switches.
+- **Client tokens and auto-approve rules** (collapsed): see [APPROVALS.md](APPROVALS.md). Tokens issued over IPC are marked *via IPC*.
+- **Local model** (collapsed): endpoint, model, optional API key (Save/Revert), **Detect**, **Test**, and
+  *Let other plugins (Almanac, Ghostty) connect themselves*.
 - **Advanced** (collapsed): listen host, allowed origins, require token, regenerate token, call timeout,
   chat buffer, activity log verbosity, server info bar entry, agent notifications, agent board expiry, custom objectives.
 
@@ -74,6 +77,23 @@ It holds the arguments of queued calls; treat it like `XivMcp.json`. An unreadab
 | `NotifyObjectiveReady` | `true` | Normal toast when an objective's conditions become ready. |
 | `ShowCompletedObjectives` | `false` | Keep completed objectives listed (greyed) until cleared. |
 | `Version` | `2` | Schema version for migrations (1 → 2: stop writing computed properties; no value changes). |
+
+## Local model
+
+XivMcp does not run a model. These settings tell companion plugins (Almanac, the Ghostty terminal's `/ask`) which
+local OpenAI-compatible server to use; they read them over IPC (`XivMcp.GetLocalModel`, see
+[ARCHITECTURE.md](ARCHITECTURE.md#ipc-plugin--umbra)).
+
+| Key | Default | Effect |
+| --- | --- | --- |
+| `LocalModelEndpoint` | `""` (not configured) | Base URL, e.g. Ollama `http://127.0.0.1:11434/v1`, LM Studio `:1234/v1`, llama.cpp `:8080/v1`, KoboldCpp `:5001/v1`. Trimmed, trailing `/` removed; anything but an absolute http(s) URL is dropped on load. |
+| `LocalModelName` | `""` | Model id at that endpoint (trimmed). |
+| `LocalModelApiKey` | `""` | Optional. Never logged and never returned over IPC (only `hasApiKey`). Stored in plain text in this file. |
+| `AllowIpcClientTokens` | `true` | Other plugins may issue themselves a client token (`XivMcp.ConnectClient`). Off: the gate returns `{"error":"disabled"}`. |
+
+**Detect** sends `GET {base}/models` (1.5 s timeout, falling back to Ollama's `/api/tags`) to the four default ports and
+offers what answered. **Test** lists `{endpoint}/models`, checks the model is listed, then posts a `max_tokens: 8`
+"Reply with OK" chat completion and shows the result and latency. Both run off the framework thread.
 
 ## Client setup
 
