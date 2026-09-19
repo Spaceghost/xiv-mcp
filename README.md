@@ -261,6 +261,9 @@ source tree. Writing a provider: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
 Host tests prove only what they run; nothing in them loads the plugin in FINAL FANTASY XIV.
 
+CI runs the same tests and build through one script, `tools/ci/run.sh` (locally: `tools/ci/local.sh`):
+[docs/CI.md](docs/CI.md).
+
 ## Troubleshooting
 
 - **"Could not start on http://127.0.0.1:41800/mcp: ... address already in use"** — another process

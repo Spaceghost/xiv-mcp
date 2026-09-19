@@ -1,0 +1,118 @@
+# Test and build on every push and pull request; see docs/CI.md.
+# Both jobs run the same thing, tools/ci/run.sh: the workflow only sets up the
+# .NET SDK, restores the NuGet cache and calls it.
+#
+# The hosted job's runner comes from the repository variable CI_RUNS_ON (a JSON
+# string or label array), default GitHub's ubuntu-latest. The self-hosted job
+# only exists when the repository variable CI_SELF_HOSTED is "true".
+#
+# Neither job has a game installation, so the Dalamud reference assemblies are
+# absent: tools/ci/run.sh skips tests/XivMcp.Plugin.Tests and the Dalamud
+# projects with a message instead of failing. A runner with DALAMUD_LIB_PATH
+# pointing at real reference assemblies covers them.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hosted:
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Probe for the .NET SDK
+        id: dotnet
+        run: |
+          if command -v dotnet >/dev/null && dotnet --list-sdks | grep -q '^10\.'; then
+            echo "have=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "have=false" >>"$GITHUB_OUTPUT"
+          fi
+      - name: Install the .NET SDK
+        if: steps.dotnet.outputs.have != 'true'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/xiv-mcp-ci/nuget
+          key: nuget-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.csproj', 'XivMcp.slnx', 'global.json', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Test and build
+        run: tools/ci/run.sh test build
+
+      - name: Upload build output
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiv-mcp-${{ github.sha }}
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 14
+
+  # The same stages on the owner's runner, which can carry the Dalamud reference
+  # assemblies. A self-hosted runner executes whatever a workflow asks for, so a
+  # pull request from a fork must never reach it: the `if` below runs the job
+  # only for events from this repository, and only while CI_SELF_HOSTED is
+  # "true" (an offline runner then just queues nothing). The xiv-mcp label keeps
+  # other repositories' jobs off it. No environment or secret is involved.
+  self-hosted:
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_SELF_HOSTED == 'true' }}
+    runs-on: [self-hosted, Linux, X64, xiv-mcp]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Probe for the .NET SDK
+        id: dotnet
+        run: |
+          if command -v dotnet >/dev/null && dotnet --list-sdks | grep -q '^10\.'; then
+            echo "have=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "have=false" >>"$GITHUB_OUTPUT"
+          fi
+      - name: Install the .NET SDK
+        if: steps.dotnet.outputs.have != 'true'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/xiv-mcp-ci/nuget
+          key: nuget-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.csproj', 'XivMcp.slnx', 'global.json', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Test and build
+        run: tools/ci/run.sh test build
+
+      - name: Upload build output
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiv-mcp-self-hosted-${{ github.sha }}
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 14
