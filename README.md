@@ -128,7 +128,7 @@ All settings: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ## In game
 
-- `/xivmcp` toggles the window; `/xivmcp start|stop|restart|status|settings`.
+- `/xivmcp` toggles the window; `/xivmcp start|stop|restart|status|settings`; `/xivmcp quests ...` for custom objectives.
 - **Status**: running state, endpoint, sessions, bind errors, provider load failures, masked token,
   client snippets. **Agents**: the agent board with state colours and progress bars. **Activity**: live
   request feed with filter; failures highlighted. **Tools**: every registered tool by category with its
@@ -137,6 +137,11 @@ All settings: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
   open the window.
 - The agent board: agents call `post_status` to show "what I'm doing" in game (and in the Umbra
   widget); a notification appears when an agent posts `done` or `failed`.
+- Custom objectives ("quests"): agents call `post_objective` / `update_objective` (or you load a quest pack with
+  `/xivmcp quests load <file>`), and each one appears under the game's Duty List with its current step and a live
+  *Ready now* / *Next window in N min* line from its zone, spot, Eorzea time window and weather. Click one to flag it
+  on the map. They are **not** Journal quests (those are server-side and cannot be added); they are an overlay drawn to
+  match the Duty List. Details and the in-game checklist: [docs/OBJECTIVES.md](docs/OBJECTIVES.md).
 
 ## Tool catalog
 
@@ -146,7 +151,7 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-56 tools, 9 resources and templates, 6 prompts. Tier and category are the in-game switches
+61 tools, 10 resources and templates, 6 prompts. Tier and category are the in-game switches
 (Settings → Permissions / Categories); *Login* means the call fails at the title screen. Descriptions are the first
 sentence of what clients see; `tools/list` has the full text and schemas. Behaviour in game is unverified unless
 stated elsewhere.
@@ -196,6 +201,11 @@ stated elsewhere.
 | `list_status` | Read | meta | no | Returns every entry on the in-game agent board (newest update first) with agent, status, state (running\|done\|failed\|info), progress, detail, the MCP client that posted it and seconds since its last update (ageSeconds). |
 | `clear_status` | Ui | meta | no | Removes your entry (pass agent) or every entry (omit agent) from the in-game agent board. |
 | `post_status` | Ui | meta | no | Shows your progress inside the player's game: creates or replaces the board entry for `agent` (one entry per agent name, case-insensitive) in the XivMcp window and Umbra toolbar widget. |
+| `list_objectives` | Read | objectives | no | Every custom objective in insertion order with steps, location, conditions and live status: ready (in the zone, within the radius, inside the Eorzea time window and weather), summary (the line the player sees, e.g. "N… |
+| `clear_objectives` | Ui | objectives | no | Removes one objective (id), every completed one (completedOnly=true) or all of them (no arguments). |
+| `load_objective_pack` | Ui | objectives | no | Loads many objectives at once from a quest pack: pass the JSON text (json) or a file path on the player's machine (path; host paths such as /home/me/pack.json or ~/pack.json are mapped to Wine's Z: drive). |
+| `post_objective` | Ui | objectives | no | Creates or replaces (same id) a custom objective that the player sees in game like a tracked quest: title and current step under the Duty List, live 'ready now' / 'next window in N min' state, click to place the map f… |
+| `update_objective` | Ui | objectives | no | Reports progress on an objective posted with post_objective or loaded from a pack: advance=true marks the current step done (after the last step the objective completes), step=N makes step N (0-based) current with eve… |
 | `get_party` | Read | party | yes | The player's party. mode is solo \| party \| crossRealmParty \| alliance. members (the 8-slot party list; empty when solo) each have index, name, contentId (string), entityId, homeWorld, job {abbreviation, name, role}, l… |
 | `get_collection_progress` | Read | progress | yes | Unlock progress for one collection kind: mounts, minions, orchestrion (orchestrion rolls), emotes, fashionAccessories (also accepted as ornaments), triadCards (Triple Triad cards), bardings (chocobo barding), glasses… |
 | `get_quest_status` | Read | progress | yes | For each quest id (Quest sheet row id; short ids below 65536 are accepted): whether the character has completed it, whether it is currently accepted (in the journal) and its current sequence step, plus name and whethe… |
@@ -225,6 +235,7 @@ Resources and templates follow the Read tier and their category.
 | `ffxiv://sheet/{sheet}/{rowId}` | gamedata | no | One Excel sheet row as JSON (same content as get_sheet_row with default options). |
 | `ffxiv://inventory` | inventory | yes | Main inventory bags (4 pages) with per-container usage; updated notifications are sent when the inventory changes. |
 | `ffxiv://agents` | meta | no | JSON snapshot of the in-game agent board (same shape as list_status). |
+| `ffxiv://objectives` | objectives | no | Same JSON as list_objectives (with completed ones). |
 | `ffxiv://party` | party | yes | Same JSON as get_party. |
 | `ffxiv://location` | world | yes | Same JSON as get_location. |
 
