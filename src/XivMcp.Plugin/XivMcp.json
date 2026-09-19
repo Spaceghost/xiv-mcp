@@ -3,6 +3,8 @@
   "Name": "XivMcp",
   "Punchline": "Model Context Protocol server for FINAL FANTASY XIV.",
   "Description": "Exposes game state, game data and opt-in actions to MCP clients over loopback Streamable HTTP. Optional Umbra toolbar widget.",
+  "IconUrl": "https://raw.githubusercontent.com/Spaceghost/xiv-mcp/main/images/icon.png",
+  "ImageUrls": ["https://raw.githubusercontent.com/Spaceghost/xiv-mcp/main/images/banner.png"],
   "Tags": ["mcp", "ai", "api", "utility"],
   "RepoUrl": ""
 }

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>XivMcp</title>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0" stop-color="#1f3564"/>
+      <stop offset="0.55" stop-color="#0f1c3b"/>
+      <stop offset="1" stop-color="#060b1a"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6e2a4"/>
+      <stop offset="0.5" stop-color="#c99a4b"/>
+      <stop offset="1" stop-color="#8a6128"/>
+    </linearGradient>
+    <linearGradient id="goldH" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8a6128"/>
+      <stop offset="0.35" stop-color="#f6e2a4"/>
+      <stop offset="1" stop-color="#9a6e2e"/>
+    </linearGradient>
+    <linearGradient id="fA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d4f7ff"/>
+      <stop offset="1" stop-color="#3a9be0"/>
+    </linearGradient>
+    <linearGradient id="fB" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6cd0f8"/>
+      <stop offset="1" stop-color="#1a5aa0"/>
+    </linearGradient>
+    <linearGradient id="fC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f86cf"/>
+      <stop offset="1" stop-color="#0f3a72"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#7fdcff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#7fdcff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="amberHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffc861" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffb13b" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="frame"><rect width="512" height="512" rx="104"/></clipPath>
+    <g id="node">
+      <circle r="22" fill="url(#amberHalo)"/>
+      <circle r="10" fill="#ffd27a" stroke="#fff3d0" stroke-width="3"/>
+    </g>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <g fill="#cfe8ff">
+      <circle cx="84" cy="96" r="3"/><circle cx="132" cy="62" r="2"/><circle cx="420" cy="84" r="2.5"/>
+      <circle cx="444" cy="200" r="2"/><circle cx="66" cy="230" r="2"/><circle cx="400" cy="440" r="1.8"/>
+    </g>
+    <circle cx="256" cy="220" r="200" fill="url(#halo)"/>
+
+    <!-- client links: outer nodes wired to the crystal -->
+    <g stroke="#ffc861" stroke-width="5" stroke-linecap="round" opacity="0.85" fill="none">
+      <path d="M96 150 L166 214"/>
+      <path d="M418 150 L346 214"/>
+      <path d="M90 330 L166 214"/>
+      <path d="M424 330 L346 214"/>
+    </g>
+
+    <!-- crystal: facets meet at a flat base that becomes the plug -->
+    <g filter="url(#glow)">
+      <path d="M256 52 L166 214 L256 244 Z" fill="url(#fA)"/>
+      <path d="M256 52 L346 214 L256 244 Z" fill="url(#fB)"/>
+      <path d="M166 214 L256 244 L226 346 L206 346 Z" fill="url(#fB)"/>
+      <path d="M346 214 L256 244 L286 346 L306 346 Z" fill="url(#fC)"/>
+      <path d="M256 244 L226 346 L286 346 Z" fill="url(#fA)" opacity="0.9"/>
+    </g>
+    <!-- facet edges as graph edges -->
+    <g stroke="#e8fbff" stroke-width="3" stroke-linejoin="round" fill="none" opacity="0.9">
+      <path d="M256 52 L166 214 L256 244 L346 214 Z"/>
+      <path d="M256 52 L256 244"/>
+      <path d="M166 214 L206 346 M346 214 L306 346 M256 244 L226 346 M256 244 L286 346"/>
+    </g>
+
+    <!-- plug collar + prongs -->
+    <rect x="186" y="340" width="140" height="40" rx="12" fill="url(#goldH)" stroke="#fbe9b8" stroke-width="3"/>
+    <path d="M200 380 L312 380 L300 404 L212 404 Z" fill="url(#gold)"/>
+    <rect x="222" y="400" width="18" height="58" rx="6" fill="url(#gold)" stroke="#fbe9b8" stroke-width="2"/>
+    <rect x="272" y="400" width="18" height="58" rx="6" fill="url(#gold)" stroke="#fbe9b8" stroke-width="2"/>
+
+    <!-- graph nodes at the vertices -->
+    <use href="#node" x="256" y="52"/>
+    <use href="#node" x="166" y="214"/>
+    <use href="#node" x="346" y="214"/>
+    <use href="#node" x="256" y="244"/>
+    <use href="#node" x="96" y="150"/>
+    <use href="#node" x="418" y="150"/>
+    <use href="#node" x="90" y="330"/>
+    <use href="#node" x="424" y="330"/>
+
+    <rect x="12" y="12" width="488" height="488" rx="94" fill="none" stroke="url(#gold)" stroke-width="8"/>
+    <rect x="26" y="26" width="460" height="460" rx="82" fill="none" stroke="#c99a4b" stroke-opacity="0.45" stroke-width="2"/>
+  </g>
+</svg>

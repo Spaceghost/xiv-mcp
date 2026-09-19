@@ -1,5 +1,7 @@
 # xiv-mcp
 
+![XivMcp: your game, for your AI assistant](images/banner.png)
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server that runs **inside FINAL FANTASY XIV** as a
 Dalamud plugin. MCP clients such as Claude Code connect to it over Streamable HTTP on loopback
 (`http://127.0.0.1:41800/mcp`) and get tools, resources and prompts for game state, game data, the
