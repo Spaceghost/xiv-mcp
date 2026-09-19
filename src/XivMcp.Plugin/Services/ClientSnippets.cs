@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -9,7 +10,9 @@ public static class ClientSnippets
     public const string ServerName = "ffxiv";
     public const string TokenPlaceholder = "<token>";
 
-    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+    // Relaxed escaping keeps "<token>" readable instead of "\u003Ctoken\u003E"; the output is
+    // copied into config files, never embedded in HTML.
+    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     /// <summary>`claude mcp add` at user scope with the token as a static header.</summary>
     public static string ClaudeCode(Configuration config, TokenDisplay display)

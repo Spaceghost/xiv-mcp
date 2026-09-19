@@ -73,8 +73,10 @@ public sealed class ConfirmWindow : Window
         var chat = request.Tier == ToolPermission.Chat;
         ImGui.TextColored(chat ? ImGuiColors.DalamudRed : ImGuiColors.DalamudOrange, chat ? "CHAT — other players will see this" : "ACTION — changes your game client");
 
-        if (ImGui.BeginTable("##request", 2, ImGuiTableFlags.SizingFixedFit))
+        if (ImGui.BeginTable("##request", 2, ImGuiTableFlags.SizingStretchProp))
         {
+            ImGui.TableSetupColumn("##label", ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableSetupColumn("##value", ImGuiTableColumnFlags.WidthStretch);
             Row("Tool", request.ToolName, ImGuiColors.DalamudYellow);
             Row("Client", request.ClientName ?? "(unnamed client)", null);
             if (request.Tier != request.Permission)
