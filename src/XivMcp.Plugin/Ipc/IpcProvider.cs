@@ -159,6 +159,11 @@ public sealed class IpcProvider : IDisposable
                 _ = host.ApplyConfigAsync();
                 log.Information("IPC ConnectClient: issued a client token for {Client}", result.ClientName!);
                 MarkDirty();
+                // The endpoint comes from the server, not from Configuration.Host/Port: ServerHost.Endpoint is the
+                // address the listener actually bound (the configured one only while it is stopped), so it stays right
+                // when the listener moves. When the bind-mode work (tailnet-bind) lands, this must consume its endpoint
+                // list + preferred endpoint instead, with the provisioning file being just another source of those
+                // values; the IPC must not read the configuration directly. Add `endpoints` to the payload then.
                 return IpcJson.Connect(host.Endpoint, result.Token!, result.ClientName!);
             }).GetAwaiter().GetResult();
         }
