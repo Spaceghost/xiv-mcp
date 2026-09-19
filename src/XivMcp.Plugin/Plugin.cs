@@ -105,7 +105,8 @@ public sealed class Plugin : IDalamudPlugin
                 HelpMessage = "Toggle the XivMcp window. \"/xivmcp start|stop|restart|status|settings\"; custom objectives: " + ObjectiveCommands.Usage + ".",
             });
 
-            Track(new IpcProvider(pluginInterface, framework, log, host, board, config, ToggleMainUi));
+            var ipc = Track(new IpcProvider(pluginInterface, framework, log, host, board, config, ToggleMainUi));
+            mainWindow.LocalModelSaved = ipc.NotifyLocalModelChanged;
             Track(new DtrEntry(dtrBar, framework, log, config, host, confirmations, ToggleMainUi));
 
             framework.Update += OnFrameworkUpdate;

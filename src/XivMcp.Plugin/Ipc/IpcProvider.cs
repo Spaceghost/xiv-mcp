@@ -17,6 +17,8 @@ namespace XivMcp.Plugin.Ipc;
 /// ApiVersion <c>&lt;int&gt;</c>, GetStatus <c>&lt;string&gt;</c>, GetActivity <c>&lt;int, string&gt;</c>,
 /// GetAgentBoard <c>&lt;string&gt;</c>, SetRunning <c>&lt;bool, bool&gt;</c>,
 /// ToggleWindow <c>&lt;object&gt;</c> (action), Changed <c>&lt;object&gt;</c> (message, no arguments).
+/// Revision 2 (additive): ApiRevision <c>&lt;int&gt;</c>, GetLocalModel <c>&lt;string&gt;</c>,
+/// ConnectClient <c>&lt;string, string&gt;</c>, LocalModelChanged <c>&lt;object&gt;</c> (message, no arguments).
 /// </remarks>
 public sealed class IpcProvider : IDisposable
 {
@@ -35,6 +37,11 @@ public sealed class IpcProvider : IDisposable
     private readonly ICallGateProvider<bool, bool> setRunning;
     private readonly ICallGateProvider<object> toggleWindow;
     private readonly ICallGateProvider<object> changed;
+    private readonly ICallGateProvider<int> apiRevision;
+    private readonly ICallGateProvider<string> getLocalModel;
+    private readonly ICallGateProvider<string, string> connectClient;
+    private readonly ICallGateProvider<object> localModelChanged;
+    private readonly IDalamudPluginInterface pluginInterface;
 
     private int dirty;
     private DateTime lastChangedSent = DateTime.MinValue;
@@ -46,6 +53,7 @@ public sealed class IpcProvider : IDisposable
         this.host = host;
         this.board = board;
         this.config = config;
+        this.pluginInterface = pluginInterface;
 
         apiVersion = pluginInterface.GetIpcProvider<int>(IpcContract.ApiVersion);
         getStatus = pluginInterface.GetIpcProvider<string>(IpcContract.GetStatus);
@@ -54,12 +62,19 @@ public sealed class IpcProvider : IDisposable
         setRunning = pluginInterface.GetIpcProvider<bool, bool>(IpcContract.SetRunning);
         toggleWindow = pluginInterface.GetIpcProvider<object>(IpcContract.ToggleWindow);
         changed = pluginInterface.GetIpcProvider<object>(IpcContract.Changed);
+        apiRevision = pluginInterface.GetIpcProvider<int>(IpcContract.ApiRevision);
+        getLocalModel = pluginInterface.GetIpcProvider<string>(IpcContract.GetLocalModel);
+        connectClient = pluginInterface.GetIpcProvider<string, string>(IpcContract.ConnectClient);
+        localModelChanged = pluginInterface.GetIpcProvider<object>(IpcContract.LocalModelChanged);
 
         apiVersion.RegisterFunc(static () => IpcContract.Version);
         getStatus.RegisterFunc(StatusJson);
         getActivity.RegisterFunc(ActivityJson);
         getAgentBoard.RegisterFunc(BoardJson);
         setRunning.RegisterFunc(SetRunning);
+        apiRevision.RegisterFunc(static () => IpcContract.Revision);
+        getLocalModel.RegisterFunc(LocalModelJson);
+        connectClient.RegisterFunc(ConnectClient);
         toggleWindow.RegisterAction(() =>
         {
             try
@@ -114,6 +129,46 @@ public sealed class IpcProvider : IDisposable
 
     internal string BoardJson() => IpcJson.Board(board.Snapshot());
 
+    internal string LocalModelJson() => IpcJson.LocalModel(config.LocalModelEndpoint, config.LocalModelName, config.LocalModelApiKey);
+
+    /// <summary>Raises XivMcp.LocalModelChanged (called by the Settings tab after saving the local model block).</summary>
+    public void NotifyLocalModelChanged()
+    {
+        try
+        {
+            localModelChanged.SendMessage();
+        }
+        catch (Exception ex)
+        {
+            log.Debug(ex, "IPC LocalModelChanged dispatch failed");
+        }
+    }
+
+    private string ConnectClient(string clientName)
+    {
+        try
+        {
+            // The configuration is written only on the framework thread (inline when the caller is already on it).
+            return framework.RunOnFrameworkThread(() =>
+            {
+                var result = ClientConnector.Connect(config, clientName, DateTimeOffset.UtcNow);
+                if (!result.Ok)
+                    return IpcJson.Error(result.Error!);
+                config.Normalize();
+                pluginInterface.SavePluginConfig(config);
+                _ = host.ApplyConfigAsync();
+                log.Information("IPC ConnectClient: issued a client token for {Client}", result.ClientName!);
+                MarkDirty();
+                return IpcJson.Connect(host.Endpoint, result.Token!, result.ClientName!);
+            }).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "IPC ConnectClient failed");
+            return IpcJson.Error("failed");
+        }
+    }
+
     private bool SetRunning(bool run)
     {
         try
@@ -143,5 +198,8 @@ public sealed class IpcProvider : IDisposable
         getAgentBoard.UnregisterFunc();
         setRunning.UnregisterFunc();
         toggleWindow.UnregisterAction();
+        apiRevision.UnregisterFunc();
+        getLocalModel.UnregisterFunc();
+        connectClient.UnregisterFunc();
     }
 }
