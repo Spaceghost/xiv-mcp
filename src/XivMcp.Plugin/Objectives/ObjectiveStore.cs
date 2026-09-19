@@ -67,13 +67,16 @@ public sealed class ObjectiveStore
     public IReadOnlyList<Objective> Upsert(IEnumerable<Objective> objectives)
     {
         var stored = new List<Objective>();
+        var incoming = objectives.ToList();
         lock (gate)
         {
-            foreach (var objective in objectives)
+            var added = incoming.Select(o => o.Id).Distinct().Count(id => items.All(o => o.Id != id));
+            if (items.Count + added > MaxObjectives)
+                throw new InvalidOperationException($"At most {MaxObjectives} objectives ({items.Count} stored, {added} new); clear completed ones first.");
+
+            foreach (var objective in incoming)
             {
                 var index = items.FindIndex(o => o.Id == objective.Id);
-                if (index < 0 && items.Count >= MaxObjectives)
-                    throw new InvalidOperationException($"At most {MaxObjectives} objectives; clear completed ones first.");
                 var merged = ObjectiveFactory.Merge(index >= 0 ? items[index] : null, objective);
                 if (index >= 0)
                     items[index] = merged;

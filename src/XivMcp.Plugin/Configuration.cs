@@ -100,6 +100,20 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Board entries not updated for this many minutes are dropped. 0 = keep until cleared.</summary>
     public int AgentBoardExpiryMinutes { get; set; } = 120;
 
+    // ---- objectives ----------------------------------------------------------------------
+
+    /// <summary>Show the custom objectives overlay (under the game's Duty List).</summary>
+    public bool ShowObjectives { get; set; } = true;
+
+    /// <summary>Pin the overlay under the Duty List (_ToDoList); off makes it a movable window.</summary>
+    public bool ObjectivesFollowDutyList { get; set; } = true;
+
+    /// <summary>Show a toast when an objective's conditions become ready.</summary>
+    public bool NotifyObjectiveReady { get; set; } = true;
+
+    /// <summary>Also list completed objectives in the overlay (greyed) until they are cleared.</summary>
+    public bool ShowCompletedObjectives { get; set; }
+
     // ---- helpers (not persisted state) -------------------------------------------------------
 
     public bool IsPermitted(ToolPermission permission) => permission switch
