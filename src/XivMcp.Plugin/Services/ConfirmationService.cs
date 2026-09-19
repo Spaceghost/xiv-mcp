@@ -50,6 +50,9 @@ public sealed class PendingConfirmation
     /// <summary>MCP session of the call; null for stateless requests.</summary>
     public string? SessionId { get; }
 
+    /// <summary>Per-client token name the call authenticated with (not self-reported), or null.</summary>
+    public string? AuthenticatedClient { get; init; }
+
     /// <summary>Pretty-printed arguments with invisible characters made visible, or null when the call has none.</summary>
     public string? Arguments { get; }
 
@@ -109,6 +112,9 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
     /// <summary>Raised (any thread) when a request is added or resolved, or grants change.</summary>
     public event Action? Changed;
 
+    /// <summary>Raised (caller's thread) for every call an owner auto-approve rule let through without a prompt.</summary>
+    public event Action<ToolCallApprovalRequest, ToolPermission, AutoApproveMatch>? AutoApproved;
+
     public bool HasPending
     {
         get
@@ -142,12 +148,15 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
     /// <inheritdoc />
     public async Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest call, CancellationToken cancellationToken)
     {
-        var (toolName, permission, clientName, sessionId, argumentsJson) = call;
+        var (toolName, permission, clientName, sessionId, argumentsJson, authenticatedClient) = call;
         if (permission < ToolPermission.Action || !config.ConfirmActions)
             return true;
 
         // Null: the tool refuses the call by itself, so do not ask the player about a call that cannot run.
         if (EffectiveTier(toolName, permission, argumentsJson, config.AllowChat) is not { } tier)
+            return true;
+
+        if (PolicyApproves(call, tier))
             return true;
 
         if (Sessions?.Covers(clientName, sessionId, tier) == true)
@@ -157,7 +166,7 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
         var key = GrantKeyOf(toolName, tier, clientName);
         var (arguments, truncated) = FormatArguments(argumentsJson);
         var timeout = TimeSpan.FromSeconds(Math.Clamp(config.ConfirmTimeoutSeconds, 5, 300));
-        var request = new PendingConfirmation(toolName, permission, tier, clientName, arguments, truncated, now, timeout, sessionId);
+        var request = new PendingConfirmation(toolName, permission, tier, clientName, arguments, truncated, now, timeout, sessionId) { AuthenticatedClient = authenticatedClient };
         lock (gate)
         {
             if (disposed)
@@ -255,14 +264,22 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
 
     /// <summary>
     /// True when an Action/Chat call of <paramref name="tier"/> would run now without a prompt: confirmation is off, an
-    /// approval session covers the client, or an "allow this tool" grant matches. <paramref name="how"/> names which.
+    /// owner rule pre-approves it for the token-identified client, an approval session covers the client, or an "allow this
+    /// tool" grant matches. <paramref name="how"/> names which. A policy match raises <see cref="AutoApproved"/>.
     /// </summary>
-    public bool PassesWithoutPrompt(string toolName, ToolPermission tier, string? clientName, string? sessionId, out string how)
+    public bool PassesWithoutPrompt(ToolCallApprovalRequest call, ToolPermission tier, out string how)
     {
+        var (toolName, _, clientName, sessionId, _, _) = call;
         how = "";
         if (!config.ConfirmActions)
         {
             how = "confirmation off";
+            return true;
+        }
+
+        if (PolicyApproves(call, tier))
+        {
+            how = "policy";
             return true;
         }
 
@@ -283,6 +300,23 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
         }
 
         how = "grant";
+        return true;
+    }
+
+    /// <summary>Owner auto-approve rules (<see cref="Configuration.AutoApproveRules"/>); raises <see cref="AutoApproved"/> on a match.</summary>
+    private bool PolicyApproves(ToolCallApprovalRequest call, ToolPermission tier)
+    {
+        if (AutoApprovePolicy.Match(config.AutoApproveRules, call.AuthenticatedClient, call.ToolName, tier, call.ArgumentsJson) is not { } match)
+            return false;
+        try
+        {
+            AutoApproved?.Invoke(call, tier, match);
+        }
+        catch
+        {
+            // Logging plumbing must not change the decision.
+        }
+
         return true;
     }
 

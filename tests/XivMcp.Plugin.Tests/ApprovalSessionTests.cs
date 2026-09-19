@@ -116,9 +116,10 @@ public class ApprovalSessionTests
         Assert.False(await chat);
         Assert.False(await otherSession);
 
-        Assert.True(confirmations.PassesWithoutPrompt("teleport", ToolPermission.Action, "agent 1.0", "s1", out var how));
+        var teleport = new ToolCallApprovalRequest("teleport", ToolPermission.Action, "agent 1.0", "s1", null);
+        Assert.True(confirmations.PassesWithoutPrompt(teleport, ToolPermission.Action, out var how));
         Assert.Equal("session", how);
         time.Advance(TimeSpan.FromMinutes(6));
-        Assert.False(confirmations.PassesWithoutPrompt("teleport", ToolPermission.Action, "agent 1.0", "s1", out _));
+        Assert.False(confirmations.PassesWithoutPrompt(teleport, ToolPermission.Action, out _));
     }
 }

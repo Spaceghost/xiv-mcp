@@ -32,7 +32,7 @@ internal sealed class FakeToolRunner : IToolRunner
         return arguments?["invalid"] is not null ? "Invalid arguments for tool." : null;
     }
 
-    public async Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, CancellationToken cancellationToken)
+    public async Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, string? authenticatedClient, CancellationToken cancellationToken)
     {
         if (Gate is { } gate)
             await gate.Task.WaitAsync(cancellationToken);
@@ -74,8 +74,8 @@ internal sealed class ApprovalFixture : IDisposable
 
     public ConcurrentQueue<TicketActivity> Activity { get; } = new();
 
-    public Ticket Submit(string tool = "teleport", JsonObject? arguments = null, string client = "agent 1.0", string? session = "s1", string? resume = null, int? expires = null, string reason = "Go to Limsa for the vendor") =>
-        Queue.Submit(new TicketRequest(tool, arguments ?? new JsonObject { ["destination"] = "Limsa Lominsa" }, reason, resume, expires, client, session));
+    public Ticket Submit(string tool = "teleport", JsonObject? arguments = null, string client = "agent 1.0", string? session = "s1", string? resume = null, int? expires = null, string reason = "Go to Limsa for the vendor", string? token = null) =>
+        Queue.Submit(new TicketRequest(tool, arguments ?? new JsonObject { ["destination"] = "Limsa Lominsa" }, reason, resume, expires, client, session, token));
 
     public async Task<Ticket> WaitForAsync(string id, TicketState state)
     {
