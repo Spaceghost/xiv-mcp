@@ -28,14 +28,29 @@ public class ConfirmationServiceTests
     }
 
     [Fact]
-    public async Task ReadUiAndDisabledConfirmationPassWithoutPrompt()
+    public async Task ReadAndDisabledConfirmationPassWithoutPrompt()
     {
         var (service, config, _) = Create();
         Assert.True(await service.ApproveToolCallAsync("get_player", ToolPermission.Read, "c", null, default));
-        Assert.True(await service.ApproveToolCallAsync("show_toast", ToolPermission.Ui, "c", null, default));
         config.ConfirmActions = false;
         Assert.True(await service.ApproveToolCallAsync("teleport", ToolPermission.Action, "c", null, default));
+        Assert.True(await service.ApproveToolCallAsync("set_map_flag", ToolPermission.Ui, "c", null, default));
+        Assert.True(await service.ApproveToolCallAsync("send_chat", ToolPermission.Chat, "c", null, default));
         Assert.False(service.HasPending);
+    }
+
+    /// <summary>The server only sends a Ui tool here when it asked for approval (the map flag, opening a window): it is prompted like an Action.</summary>
+    [Fact]
+    public async Task AUiToolThatReachesTheGateIsPromptedAndCarriesItsSummary()
+    {
+        var (service, _, _) = Create();
+        var call = service.ApproveToolCallAsync(
+            new ToolCallApprovalRequest("set_map_flag", ToolPermission.Ui, "c", null, """{"x":11.2}""") { Summary = "Place the map flag at 11.2, 9" }, default);
+        var pending = await WaitForPendingAsync(service);
+        Assert.Equal(ToolPermission.Action, pending.Tier);
+        Assert.Equal("Place the map flag at 11.2, 9", pending.Summary);
+        service.Resolve(pending.Id, ConfirmationDecision.Allow);
+        Assert.True(await call);
     }
 
     [Fact]
