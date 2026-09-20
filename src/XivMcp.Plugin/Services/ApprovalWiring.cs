@@ -17,9 +17,14 @@ public sealed class ApprovalWiring : IDisposable
     private readonly ApprovalSessionService sessions;
     private readonly INotificationManager notifications;
     private readonly IPluginLog log;
+    private readonly Configuration? config;
+    private readonly ActionLog? actions;
 
-    public ApprovalWiring(ServerHost host, ApprovalQueue queue, ApprovalSessionService sessions, INotificationManager notifications, IPluginLog log)
+    public ApprovalWiring(ServerHost host, ApprovalQueue queue, ApprovalSessionService sessions, INotificationManager notifications, IPluginLog log, Configuration? config = null, ActionLog? actions = null)
     {
+        this.config = config;
+        this.actions = actions;
+        host.Server.GatedToolExecuted += OnGatedToolExecuted;
         this.host = host;
         confirmations = host.Confirmations;
         this.queue = queue;
@@ -50,6 +55,29 @@ public sealed class ApprovalWiring : IDisposable
                 log.Information("MCP ticket {Target} from {Client} executed (approved by {By})", t.ActivityTarget, t.ClientName ?? "?", t.DecidedBy ?? "?");
             else
                 log.Warning("MCP ticket {Target} from {Client} failed: {Error}", t.ActivityTarget, t.ClientName ?? "?", a.Error ?? "");
+        }
+    }
+
+    /// <summary>
+    /// Every state-changing call that ran lands in the action log, asked or not. With the approval switch off the player
+    /// was not asked, so a call that sent chat or changed gear also gets a small notification.
+    /// </summary>
+    private void OnGatedToolExecuted(GatedToolExecution e)
+    {
+        try
+        {
+            var approvalOn = config?.ConfirmActions ?? true;
+            actions?.Record(e, approvalOn);
+            log.Information("MCP action {Tool} [{Tier}] from {Client} (token {Token}): {Outcome}", e.ToolName, e.Permission, e.ClientName ?? "?", e.AuthenticatedClient ?? "main", e.Success ? "ok" : "failed");
+            if (approvalOn || !e.Success)
+                return;
+            var tier = ConfirmationService.EffectiveTier(e.ToolName, e.Permission, e.ArgumentsJson, config?.AllowChat ?? false) ?? e.Permission;
+            if (ActionLog.DeservesToast(e.ToolName, tier, e.ArgumentsJson))
+                Toast(tier == ToolPermission.Chat ? "XivMcp sent chat" : "XivMcp changed gear", $"{e.Summary}\n— {e.AuthenticatedClient ?? e.ClientName ?? "unnamed client"}", NotificationType.Info);
+        }
+        catch (Exception ex)
+        {
+            log.Debug(ex, "action log failed");
         }
     }
 
@@ -106,6 +134,7 @@ public sealed class ApprovalWiring : IDisposable
 
     public void Dispose()
     {
+        host.Server.GatedToolExecuted -= OnGatedToolExecuted;
         host.PermissionsChanged -= OnPermissionsChanged;
         confirmations.AutoApproved -= OnAutoApproved;
         sessions.Started -= OnSessionStarted;

@@ -265,6 +265,7 @@ public sealed class ServerHost : IDisposable
         // Live options (no restart needed).
         Server.Options.ApprovalTimeout = TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds);
         Server.Options.CallTimeout = TimeSpan.FromSeconds(config.CallTimeoutSeconds);
+        Server.Options.RateLimitPerMinute = Math.Clamp(config.RateLimitPerMinute, 0, 100_000);
         Server.Options.ClientTokens = config.ClientTokenHashes();
 
         var permissions = PermissionFingerprint();
@@ -334,9 +335,20 @@ public sealed class ServerHost : IDisposable
         }
 
         ApplyOptions(Server.Options, plan);
+        Server.ControlHandler ??= HandleControlAsync;
         try
         {
-            await Server.StartAsync().ConfigureAwait(false);
+            try
+            {
+                await Server.StartAsync().ConfigureAwait(false);
+            }
+            catch (System.Net.Sockets.SocketException ex) when (ex.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse)
+            {
+                // The standalone host (static game data, runs while the game is closed) uses the same port on purpose.
+                // Ask it to let go, then bind again: the game is up now, so this host has strictly more to offer.
+                if (!await TakeOverFromStandaloneAsync(plan).ConfigureAwait(false))
+                    throw;
+            }
         }
         catch (Exception ex)
         {
@@ -367,6 +379,36 @@ public sealed class ServerHost : IDisposable
         else
             log.Information("MCP server listening on {Endpoint}", RunningEndpoint);
     }
+
+    /// <summary>
+    /// Asks a standalone host holding our port to yield it, then binds. False when whatever holds the port is not a
+    /// standalone host that agreed (another program, another game client's plugin): the caller reports the bind error.
+    /// </summary>
+    private async Task<bool> TakeOverFromStandaloneAsync(BindPlan plan)
+    {
+        var token = config.RequireToken ? config.BearerToken : null;
+        var endpoint = new Uri(BindPlanner.Endpoint(plan.Hosts.Count > 0 ? plan.Hosts[0] : Configuration.DefaultHost, config.Port, config.Path));
+        if (!await HostHandoff.RequestYieldAsync(endpoint, token, TimeSpan.FromSeconds(3)).ConfigureAwait(false))
+            return false;
+        log.Information("MCP: the standalone host released port {Port}; taking over", config.Port);
+        try
+        {
+            await Server.StopAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Best effort: release anything the failed start bound before trying again.
+        }
+
+        await HostHandoff.RetryAsync(() => Server.StartAsync(), attempts: 10, delay: TimeSpan.FromMilliseconds(300)).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>GET {path}/host: tells a client (and the standalone host) that the plugin, with the live game, answers here.</summary>
+    private Task<ControlResponse?> HandleControlAsync(ControlRequest request) =>
+        Task.FromResult<ControlResponse?>(request is { Method: "GET", SubPath: HostHandoff.HostRoute }
+            ? new ControlResponse(200, HostHandoff.Identity(HostKind.Plugin, Server.Options.ServerVersion, gameRunning: true))
+            : null);
 
     private async Task StopCoreAsync()
     {
@@ -404,6 +446,7 @@ public sealed class ServerHost : IDisposable
 
         // The call timeout starts after in-game approval, which has its own timeout.
         options.CallTimeout = TimeSpan.FromSeconds(config.CallTimeoutSeconds);
+        options.RateLimitPerMinute = Math.Clamp(config.RateLimitPerMinute, 0, 100_000);
         options.ApprovalTimeout = TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds);
     }
 

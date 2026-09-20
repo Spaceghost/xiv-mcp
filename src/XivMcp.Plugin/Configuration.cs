@@ -257,6 +257,9 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Lines kept by the chat provider's ring buffer (read_chat).</summary>
     public int ChatBufferSize { get; set; } = 500;
 
+    /// <summary>Tool calls, resource reads and prompt gets allowed per minute for each client; 0 switches the limit off.</summary>
+    public int RateLimitPerMinute { get; set; } = 600;
+
     public ActivityLogLevel ActivityLogLevel { get; set; } = ActivityLogLevel.Failures;
 
     /// <summary>Show "MCP ● n" in the server info bar.</summary>

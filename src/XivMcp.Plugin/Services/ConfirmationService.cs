@@ -53,6 +53,9 @@ public sealed class PendingConfirmation
     /// <summary>Per-client token name the call authenticated with (not self-reported), or null.</summary>
     public string? AuthenticatedClient { get; init; }
 
+    /// <summary>What the call will do, in one sentence, with the arguments filled in verbatim (from the tool's ApprovalSummary).</summary>
+    public string? Summary { get; init; }
+
     /// <summary>Pretty-printed arguments with invisible characters made visible, or null when the call has none.</summary>
     public string? Arguments { get; }
 
@@ -149,7 +152,11 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
     public async Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest call, CancellationToken cancellationToken)
     {
         var (toolName, permission, clientName, sessionId, argumentsJson, authenticatedClient) = call;
-        if (permission < ToolPermission.Action || !config.ConfirmActions)
+
+        // THE approval switch. The server puts every state-changing call (Action, Chat, and the Ui tools that ask for it)
+        // to this method and nothing else decides whether the player is asked: unticked, everything runs at once (and is
+        // still written to the action log); ticked, rules, sessions and grants below are refinements under it.
+        if (!RequiresPrompting(config, permission))
             return true;
 
         // Null: the tool refuses the call by itself, so do not ask the player about a call that cannot run.
@@ -166,7 +173,7 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
         var key = GrantKeyOf(toolName, tier, clientName);
         var (arguments, truncated) = FormatArguments(argumentsJson);
         var timeout = TimeSpan.FromSeconds(Math.Clamp(config.ConfirmTimeoutSeconds, 5, 300));
-        var request = new PendingConfirmation(toolName, permission, tier, clientName, arguments, truncated, now, timeout, sessionId) { AuthenticatedClient = authenticatedClient };
+        var request = new PendingConfirmation(toolName, permission, tier, clientName, arguments, truncated, now, timeout, sessionId) { AuthenticatedClient = authenticatedClient, Summary = call.Summary };
         lock (gate)
         {
             if (disposed)
@@ -203,6 +210,13 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
             Grant(request);
         return decision != ConfirmationDecision.Deny;
     }
+
+    /// <summary>
+    /// The single approval switch (<see cref="Configuration.ConfirmActions"/>, "Ask me before anything changes"): false
+    /// when it is unticked, or for a Read call, which never reaches the gate anyway.
+    /// </summary>
+    public static bool RequiresPrompting(Configuration config, ToolPermission permission) =>
+        config.ConfirmActions && permission > ToolPermission.Read;
 
     /// <summary>Called from the Draw loop when the player clicks a button.</summary>
     public void Resolve(Guid id, ConfirmationDecision decision)
@@ -251,6 +265,9 @@ public sealed class ConfirmationService : ISessionAwareToolCallApprover, IDispos
     /// </summary>
     public static ToolPermission? EffectiveTier(string toolName, ToolPermission permission, string? argumentsJson, bool allowChat)
     {
+        // A Ui tool only gets here when it asked for approval; rules, sessions and grants treat it as an Action.
+        if (permission == ToolPermission.Ui)
+            return ToolPermission.Action;
         if (toolName != ExecuteCommandTool || CommandArgument(argumentsJson) is not { } commandLine)
             return permission;
         return ChatCommands.Classify(commandLine) switch

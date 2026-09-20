@@ -24,6 +24,9 @@ public sealed partial class MainWindow
 
     public ApprovalSessionService? ApprovalSessions { get; set; }
 
+    /// <summary>The record of every state-changing call that ran, asked or not.</summary>
+    public ActionLog? Actions { get; set; }
+
     private string ApprovalsTabLabel => Approvals is { PendingCount: > 0 and var n } ? $"{ApprovalsTab} ({n})###{ApprovalsTab}" : $"{ApprovalsTab}###{ApprovalsTab}";
 
     /// <summary>Countdown banner for every running approval session, with one-click revoke. Drawn in the header.</summary>
@@ -94,6 +97,7 @@ public sealed partial class MainWindow
         }
 
         DrawSessionPopup();
+        DrawActionLog(now);
 
         var active = tickets.Where(t => t.State == TicketState.Approved).ToArray();
         var finished = tickets.Where(t => t.IsFinal).OrderByDescending(t => t.CompletedAt ?? t.DecidedAt ?? t.CreatedAt).Take(FinishedShown).ToArray();
@@ -106,6 +110,29 @@ public sealed partial class MainWindow
             DrawTicketLine(ticket, now);
     }
 
+    /// <summary>The newest lines of the action log: every state-changing call that ran, whether or not the player was asked.</summary>
+    private void DrawActionLog(DateTimeOffset now)
+    {
+        if (Actions is not { } actions)
+            return;
+        var entries = actions.Recent();
+        ImGui.Spacing();
+        if (!ImGui.CollapsingHeader($"Action log ({entries.Count})###actionlog"))
+            return;
+        ImGui.TextDisabled(actions.Path is { } path ? $"Everything that changed something, asked or not. Also written to {System.IO.Path.GetFileName(path)} in this plugin's config folder." : "Everything that changed something, asked or not.");
+        foreach (var entry in entries.Take(50))
+        {
+            ImGui.TextColored(entry.Success ? ImGuiColors.DalamudGrey : ImGuiColors.DalamudRed, $"{FormatAge(now - entry.Time)} ago");
+            ImGui.SameLine();
+            ImGui.TextColored(ImGuiColors.DalamudYellow, entry.Tool);
+            ImGui.SameLine();
+            ImGui.TextDisabled($"[{entry.Tier}, approval {entry.Approval}] {entry.Token ?? entry.Client ?? "(unnamed client)"}");
+            ImGui.PushTextWrapPos(0);
+            ImGui.TextUnformatted(ConfirmationService.ShowInvisible(entry.Error is { } error ? $"  {entry.Summary} - {error}" : "  " + entry.Summary));
+            ImGui.PopTextWrapPos();
+        }
+    }
+
     private void DrawPendingTicket(ApprovalQueue queue, Ticket ticket, DateTimeOffset now)
     {
         var chat = ticket.Tier == ToolPermission.Chat;
@@ -116,6 +143,8 @@ public sealed partial class MainWindow
         ImGui.SameLine();
         ImGui.TextDisabled($"from {ticket.ClientName ?? "(unnamed client)"} · {FormatAge(now - ticket.CreatedAt)} ago{(ticket.ExpiresAt is { } at ? $" · expires in {FormatAge(at - now)}" : "")}");
         ImGui.PushTextWrapPos(0);
+        if (ticket.Summary is { Length: > 0 } summary)
+            ImGui.TextUnformatted(summary);
         ImGui.TextUnformatted(ConfirmationService.ShowInvisible(ticket.Reason));
         ImGui.PopTextWrapPos();
 

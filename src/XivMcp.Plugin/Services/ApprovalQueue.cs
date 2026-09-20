@@ -48,6 +48,9 @@ public sealed record Ticket
     /// <summary>The arguments object as compact JSON, kept to run the call. Never written to logs or the activity feed.</summary>
     public string? ArgumentsJson { get; init; }
 
+    /// <summary>What the call will do, in one sentence, as the tool describes it (absent on tickets from older builds).</summary>
+    public string? Summary { get; init; }
+
     public required string Reason { get; init; }
 
     public string? ResumeToken { get; init; }
@@ -96,6 +99,9 @@ public interface IToolRunner
     /// <summary>Null when the call could run now, otherwise the error a client would get. Runs nothing.</summary>
     string? CheckToolCall(string toolName, JsonObject? arguments, out ToolPermission permission);
 
+    /// <summary>Whether the call goes through the approval gate, and what it will do in one sentence. Null when unknown.</summary>
+    ToolApprovalInfo? DescribeApproval(string toolName, JsonObject? arguments) => null;
+
     /// <summary>Runs an approved call with the server's normal validation and call timeout.</summary>
     Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, string? authenticatedClient, CancellationToken cancellationToken);
 }
@@ -105,6 +111,8 @@ public sealed class ServerToolRunner(McpServer server) : IToolRunner
 {
     public string? CheckToolCall(string toolName, JsonObject? arguments, out ToolPermission permission) =>
         server.CheckToolCall(toolName, arguments, out permission);
+
+    public ToolApprovalInfo? DescribeApproval(string toolName, JsonObject? arguments) => server.DescribeApproval(toolName, arguments);
 
     public Task<ToolExecutionResult> ExecuteApprovedToolAsync(string toolName, JsonObject? arguments, string? clientName, string? sessionId, string? authenticatedClient, CancellationToken cancellationToken) =>
         server.ExecuteApprovedToolAsync(toolName, arguments, clientName, sessionId, cancellationToken, authenticatedClient);
@@ -260,13 +268,14 @@ public sealed class ApprovalQueue : IDisposable
         if (argumentsJson is { Length: > MaxArgumentsLength })
             throw new McpToolException($"arguments are too large ({argumentsJson.Length} characters of JSON, max {MaxArgumentsLength}).");
 
-        if (!config.AllowAction)
-            throw new McpToolException("The approval queue is closed: the Action permission tier is disabled in the xiv-mcp plugin settings (/xivmcp).");
-
         if (runner.CheckToolCall(request.ToolName, request.Arguments, out var permission) is { } problem)
             throw new McpToolException(problem);
-        if (permission < ToolPermission.Action)
+        var approval = runner.DescribeApproval(request.ToolName, request.Arguments);
+        var gatedUi = permission == ToolPermission.Ui && approval?.NeedsApproval == true;
+        if (permission < ToolPermission.Action && !gatedUi)
             throw new McpToolException($"Tool '{request.ToolName}' is a {permission} tool and needs no approval; call it directly.");
+        if (!config.AllowAction && !gatedUi)
+            throw new McpToolException("The approval queue is closed: the Action permission tier is disabled in the xiv-mcp plugin settings (/xivmcp).");
         if (ConfirmationService.EffectiveTier(request.ToolName, permission, argumentsJson, config.AllowChat) is not { } tier)
             throw new McpToolException($"Tool '{request.ToolName}' would refuse this call by itself (a blocked or automation command, or chat while the Chat tier is off); it cannot be queued.");
         if (tier == ToolPermission.Chat && !config.AllowChat)
@@ -280,6 +289,7 @@ public sealed class ApprovalQueue : IDisposable
             Permission = permission,
             Tier = tier,
             ArgumentsJson = argumentsJson,
+            Summary = approval?.Summary,
             Reason = reason,
             ResumeToken = resumeToken,
             ClientName = request.ClientName,
@@ -290,7 +300,7 @@ public sealed class ApprovalQueue : IDisposable
             State = TicketState.Pending,
         };
 
-        var call = new ToolCallApprovalRequest(ticket.ToolName, permission, ticket.ClientName, ticket.SessionId, argumentsJson, ticket.AuthenticatedClient);
+        var call = new ToolCallApprovalRequest(ticket.ToolName, permission, ticket.ClientName, ticket.SessionId, argumentsJson, ticket.AuthenticatedClient) { Summary = approval?.Summary };
         if (confirmations.PassesWithoutPrompt(call, tier, out var how))
             ticket = ticket with { State = TicketState.Approved, DecidedBy = how, DecidedAt = now };
 
@@ -392,7 +402,8 @@ public sealed class ApprovalQueue : IDisposable
             for (var i = 0; i < tickets.Count; i++)
             {
                 var t = tickets[i];
-                if (t.State != TicketState.Pending || (config.AllowAction && t.Tier != ToolPermission.Chat))
+                // A Ui tool that asks for approval (the map flag, opening a window) does not depend on the Action tier.
+                if (t.State != TicketState.Pending || t.Permission == ToolPermission.Ui || (config.AllowAction && t.Tier != ToolPermission.Chat))
                     continue;
                 tickets[i] = t with { State = TicketState.Denied, DecidedBy = "system", DecidedAt = now, Error = error };
                 denied.Add(tickets[i]);

@@ -51,6 +51,8 @@ public sealed partial class MainWindow
 
     private void DrawSettingsTab()
     {
+        DrawApprovalSwitch();
+        ImGui.Spacing();
         DrawProvisionBanner();
         DrawMainSettings();
         ImGui.Spacing();
@@ -61,6 +63,43 @@ public sealed partial class MainWindow
         DrawLocalModelSettings();
         ImGui.Spacing();
         DrawAdvancedSettings();
+    }
+
+    // ---- the approval switch ---------------------------------------------------------------------
+
+    /// <summary>
+    /// The one checkbox that decides whether the player is asked before anything changes. It is the first thing in the
+    /// tab on purpose: every state-changing tool goes through <see cref="Services.ConfirmationService"/>, which reads it.
+    /// </summary>
+    private void DrawApprovalSwitch()
+    {
+        var confirm = config.ConfirmActions;
+        if (ImGui.Checkbox("Ask me before anything changes", ref confirm))
+        {
+            config.ConfirmActions = confirm;
+            SaveConfig();
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "On (the default): every tool that changes something - targeting, gearsets, teleport, slash commands, macros,\n" +
+                "chat, enabling or disabling plugins, opening windows, the map flag, terminal and desktop panels - waits for\n" +
+                "Allow / Deny in a game window, or queues as a ticket. Allow sessions, 'allow this tool for 10 min' and your\n" +
+                "auto-approve rules are shortcuts under this switch.\n\n" +
+                "Off: those tools run at once, with no prompt. Each one is still written to the action log (Approvals tab),\n" +
+                "and anything that sends chat or changes gear still shows a notification.\n\n" +
+                "Reading is never prompted. The permission tiers below still decide which tools exist at all, and nothing\n" +
+                "here makes the server play the game for you: there are no such tools.");
+        }
+
+        ImGui.SameLine();
+        ImGui.TextColored(
+            config.ConfirmActions ? ImGuiColors.HealerGreen : ImGuiColors.DalamudOrange,
+            config.ConfirmActions
+                ? "On: you approve each change in game (Allow / Deny, or a ticket)."
+                : "Off: changes run immediately; they are logged, and chat or gear changes show a notification.");
+        ImGui.Separator();
     }
 
     // ---- main ----------------------------------------------------------------------------------
@@ -95,15 +134,9 @@ public sealed partial class MainWindow
         TierCheckbox(ToolPermission.Chat, "Send chat OTHER PLAYERS can see: say, party, tells, FC.");
 
         ImGui.Spacing();
-        var confirm = config.ConfirmActions;
-        if (ImGui.Checkbox("Ask me in game before Action/Chat calls", ref confirm))
-        {
-            config.ConfirmActions = confirm;
-            SaveConfig();
-        }
-
-        HelpMarker("Each Action/Chat call waits for Allow / Deny / Allow this tool for 10 min in a game window.");
-
+        ImGui.TextDisabled(config.ConfirmActions
+            ? "Approval is on (top of this tab): Action, Chat and window/flag calls wait for you."
+            : "Approval is off (top of this tab): whatever is ticked here runs at once.");
         ImGui.BeginDisabled(!config.ConfirmActions || config.IsProvisioned(nameof(Services.ProvisionDocument.ConfirmTimeoutSeconds)));
         var timeout = config.ConfirmTimeoutSeconds;
         ImGui.SetNextItemWidth(160);
@@ -113,9 +146,6 @@ public sealed partial class MainWindow
             SaveConfig();
         ImGui.EndDisabled();
         HelpMarker("5-300 seconds without an answer counts as Deny.");
-
-        if (!config.ConfirmActions && (config.AllowAction || config.AllowChat))
-            ImGui.TextColored(ImGuiColors.DalamudOrange, "Action/Chat calls run without asking you.");
 
         var grants = host.Confirmations.Grants();
         if (grants.Count > 0)
