@@ -23,7 +23,7 @@
     <RootNamespace>Umbra.XivMcp</RootNamespace>
     <AssemblyName>Umbra.XivMcp</AssemblyName>
     <Version>0.1.0.0</Version>
-    <Authors>xiv-mcp contributors</Authors>
+    <Authors>Johnneylee Jack Rollins</Authors>
     <Description>Umbra toolbar widgets for the XivMcp Model Context Protocol server (talks to it over Dalamud IPC).</Description>
     <IsPackable>false</IsPackable>
     <DebugType>portable</DebugType>
