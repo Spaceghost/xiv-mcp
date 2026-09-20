@@ -15,19 +15,18 @@ Statuses mean exactly what they mean in the What's new view in game:
 
 ## [Unreleased] — In the workshop
 
-BETA is merged but has not been seen working in game. SOON is still being built on its own branch and is not merged yet.
-
-### Merged, not yet verified in game
+Everything here is merged into master. BETA means exactly that and no more: merged, and not yet seen working in the game.
 
 * The Status tab's facts no longer print one character per line, and the Claude Code snippet shows the token placeholder as <token> instead of an escaped string.
 * Settings leads with what you actually change — the server switch and port, the four permission tiers and in-game confirmation — and folds categories and advanced options away. Turning the server on or off takes effect at once; a port or host change restarts the listener cleanly. An unreadable settings file is kept aside and your token and readable values recovered rather than lost.
 * Tools that act in the world or speak in chat ask you in game first: an Allow/Deny window, with resources and completions held to the Read tier.
 * XivMcp itself: a Model Context Protocol server inside the game that your own MCP client (Claude Code and others) connects to on loopback with a bearer token, with tools, resources and prompts for character, items and the game's UI, and an optional Umbra toolbar widget showing the server and the agent board.
-
-### Being built
-
 * Ask a local model without leaving the game: a Local model block in Settings with Detect (it probes the common local servers) and Test (it lists the model and times a one-line completion), and a switch that lets other plugins — Almanac, Ghostty — connect themselves and be handed their own token. XivMcp does not run the model, and the API key is never handed to another plugin.
 * Approvals you can take your time over: an Action or Chat call you are not ready for waits as a ticket you approve or deny later, in bulk if you like, from an Approvals tab with a pending badge. Nothing ever times out into an approval. "Allow everything from this client" grants a client a few minutes at a time (Chat only if you tick it), with a banner counting it down and a Revoke button.
 * Clients can be given their own bearer token, so a client cannot claim to be someone else, and an owner rule can pre-approve exactly one tool with an exact argument prefix for one named client. Only the token's hash is stored, arguments are never logged, and revocation takes effect on the next request.
 * Custom objectives: post your own goals with conditions the game understands — an Eorzea time window, a zone's weather, a place and a radius — and XivMcp tracks them, places the map flag, shows the game's quest toast when one starts or completes, and lists them under the Duty List in the game's own font. It only reads the addon; nothing is injected into it. /xivmcp quests works from chat, and objective packs can be loaded from a file.
 * Plugin icon and banner art, listed in the manifest.
+* Where the server listens is now a choice: loopback only (the default), your Tailscale address, or an address you type. The plugin finds the tailnet address itself, listens on every address the mode resolves to, and forces the bearer token on for anything that is not loopback. A read-only provisioning file can pin the bind and the token so a managed install cannot be changed from the settings window.
+* A much larger tool surface: market-board prices and the world/data-centre list, an event stream you can poll or subscribe to (zone, duty, combat, party, inventory, level, login), screenshots, character attributes, duty roulette, gathering windows, item comparison, achievements, glamour, map coordinates, housing, and a catalogue of other plugins XivMcp can read over Dalamud IPC.
+* The build itself now refuses a reload leak: the .NET analyzers run with warnings as errors and the disposal rules pinned on, which found and fixed several real leaks in the plugin's own teardown. Nightly fuzzing of the HTTP request handling found two bodies answered with a 500 — invalid UTF-8 and a duplicated JSON key — which are parse errors (400) now.
+* The plugin can be installed from a plugin repository listing: every push builds, tests, packages and checks the manifest, and a tagged release publishes the zip the listing points at.

@@ -91,41 +91,41 @@ tools/ci/local.sh test
 CI_LOCAL_REMOTE=0 tools/ci/local.sh test build    # force this machine
 ```
 
-The workstation runs the game and has little free memory, so when an Incus remote
-with the build container is reachable (`incus remote list` is set, or
-`INCUS_REMOTE` is set) `local.sh` pushes the checkout — `git ls-files --cached
---others --exclude-standard`, through `tar` — into `xiv-mcp-build` on that remote,
-runs the same `tools/ci/run.sh` stages there and streams the output back. Nothing
-is copied back and nothing is installed into the game. `CI_LOCAL_REMOTE=0`,
-`INCUS`, `CI_CONTAINER` and `CI_REMOTE_DIR` are the only knobs. The container has
-no game installation, so a remote run skips the Dalamud projects and the plugin
-tests exactly as a GitHub-hosted runner does; run those on this machine, where
-`~/.xlcore/dalamud/Hooks/dev` exists.
+A machine that runs the game has little memory to spare for a build, so
+`local.sh` can run the stages in an Incus container instead: set `INCUS_REMOTE`
+(and `CI_CONTAINER`, default `xiv-mcp-build`) and it pushes the checkout — `git
+ls-files --cached --others --exclude-standard`, through `tar` — runs the same
+`tools/ci/run.sh` stages there and streams the output back. Nothing is copied
+back and nothing is installed into the game. With no `INCUS_REMOTE` it runs here.
+`CI_LOCAL_REMOTE=0`, `INCUS`, `CI_CONTAINER` and `CI_REMOTE_DIR` are the only
+knobs. A container without reference assemblies skips the Dalamud projects and
+the plugin tests exactly as a GitHub-hosted runner without them does; point
+`DALAMUD_LIB_PATH` at reference assemblies inside it (or run on a machine with
+`~/.xlcore/dalamud/Hooks/dev`) to cover them.
 
 ## What is and is not verified
 
 Actually run:
 
-* `shellcheck -x tools/ci/*.sh` — clean.
-* `actionlint .github/workflows/ci.yml` (actionlint 1.7.12) — clean.
+* `shellcheck -x tools/*.sh tools/ci/*.sh` — clean.
+* `actionlint` over `.github/workflows/` — clean.
 * `tools/ci/run.sh --help` exits 0; an unknown stage and no stage at all exit 2.
-* `tools/ci/local.sh test build` against the Incus the configured remote, in the
-  `xiv-mcp-build` container (.NET SDK 10.0.401 installed there under
-  `/root/.dotnet`): the push, the SDK probe, `test` and `build` all ran.
-  `tests/XivMcp.Core.Tests`: **163 passed, 0 failed, 0 skipped**, and the `.trx`
-  report was written. The plugin tests and the three Dalamud projects were
-  skipped there with the expected message, and the reduced build of
-  `XivMcp.Core`, `XivMcp.DevHost`, `tools/catalog` and `XivMcp.Core.Tests`
-  succeeded.
+* `tools/ci/run.sh all` in a .NET 10.0.401 container with the Dalamud and Umbra
+  reference assemblies mounted in, i.e. the full path including the Dalamud
+  projects: `tests/XivMcp.Core.Tests` **222 passed, 0 failed**,
+  `tests/XivMcp.Plugin.Tests` **345 passed, 0 failed**, `dotnet build
+  XivMcp.slnx -c Release` clean with **0 warnings** under the quality gate, and
+  `tools/package.sh` wrote `latest.zip` and `pluginmaster.json`.
+* `tools/check-manifest.py` exits 0.
 
 Not verified:
 
-* `tests/XivMcp.Plugin.Tests` and `dotnet build XivMcp.slnx -c Release` (the full
-  solution, with the Dalamud projects) have **not** been run through
-  `tools/ci/run.sh`; the README's total test count is not something this document
-  observed. Run `tools/ci/run.sh test build` on a machine with
-  `~/.xlcore/dalamud/Hooks/dev` to cover that path.
-* Nothing here has run on GitHub: the workflow, the NuGet cache, the artifact
-  upload, the runner labels and the `CI_RUNS_ON` / `CI_SELF_HOSTED` variables are
-  only checked by `actionlint`. The first run on GitHub is their test.
-* No part of CI loads the plugin in FINAL FANTASY XIV.
+* Nothing here has run on GitHub: the workflows, the NuGet cache, the artifact
+  upload, the runner labels, the `CI_RUNS_ON` / `CI_SELF_HOSTED` variables, the
+  nightly fuzz schedule and the release workflow are only checked by
+  `actionlint`. The first run on GitHub is their test.
+* `tools/fetch-dalamud.sh` downloads from goatcorp's distribution; that download
+  has not been exercised here (the reference assemblies came from a local
+  XIVLauncher install), so the hosted job's Dalamud step is unproven.
+* No part of CI loads the plugin in FINAL FANTASY XIV, and nothing below the
+  build has been observed running in the game.
