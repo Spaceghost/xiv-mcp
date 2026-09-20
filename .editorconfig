@@ -1,0 +1,94 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
+
+[*.{sh,bash}]
+indent_size = 2
+
+[*.cs]
+indent_size = 4
+
+# ---------------------------------------------------------------------------
+# Quality gate: reload-leak rules. Directory.Build.props turns every warning
+# into an error, but these are pinned to `error` here as well so the gate
+# survives someone flipping TreatWarningsAsErrors off. A Dalamud plugin that
+# misses one of these keeps the whole game alive across a reload.
+# ---------------------------------------------------------------------------
+
+# Disposable fields must be disposed. This is *the* build-time check that every
+# IDisposable field of a type gets released.
+dotnet_diagnostic.CA2213.severity = error
+# A type that owns a disposable field must itself be IDisposable.
+dotnet_diagnostic.CA1001.severity = error
+# Dispose(bool)/GC.SuppressFinalize correctness.
+dotnet_diagnostic.CA1816.severity = error
+dotnet_diagnostic.CA1063.severity = error
+# Do not drop an IDisposable on the floor.
+dotnet_diagnostic.CA2000.severity = error
+# Unobserved / not-awaited async work: a fire-and-forget Task that outlives the
+# plugin keeps its closure (and therefore the plugin) alive.
+dotnet_diagnostic.CS4014.severity = error
+dotnet_diagnostic.CA2012.severity = error
+dotnet_diagnostic.CA2008.severity = error
+# An IAsyncDisposable must be disposed too.
+dotnet_diagnostic.CA2213.severity = error
+
+# ---------------------------------------------------------------------------
+# Demotions. Each one is a rule the gate would otherwise fail on for reasons
+# that are not defects; the whole gate stays on, only the named rule moves.
+# ---------------------------------------------------------------------------
+
+# CA1822 "mark members as static": 80 sites, purely a call-site performance
+# hint on code that is not hot. Mechanical churn with no correctness value.
+dotnet_diagnostic.CA1822.severity = suggestion
+
+# CA1716/CA1711/CA1720 naming: satisfying these means renaming public types
+# (ToolPermission, XivMcp.Shared) that the IPC contract and the MCP tool
+# catalogue name on the wire. A rename here is a breaking protocol change.
+dotnet_diagnostic.CA1716.severity = suggestion
+dotnet_diagnostic.CA1711.severity = suggestion
+dotnet_diagnostic.CA1720.severity = suggestion
+
+# CA1051 "do not declare visible instance fields": all sites are test fakes and
+# the DevHost simulator, where a public field is the point.
+dotnet_diagnostic.CA1051.severity = suggestion
+
+# CA1068 "CancellationToken last": the two sites are private binder overloads
+# whose trailing parameters are the diagnostics accumulator; moving the token
+# would make the two overloads disagree.
+dotnet_diagnostic.CA1068.severity = suggestion
+
+# CA1834 "Append(char) for a constant unit string": the four sites append McpFormat's shared
+# display constants (DotRunning, DotStopped, Dash, Play), which the widget and its tests consume
+# as strings; keeping a char duplicate of each for one Append is worse than the micro-cost.
+dotnet_diagnostic.CA1834.severity = suggestion
+
+# CA1859 "use the concrete type": returning the interface is deliberate here;
+# the concrete List<T> is an implementation detail callers must not mutate.
+dotnet_diagnostic.CA1859.severity = suggestion
+
+# xUnit: test methods deliberately use the non-cancellable overloads.
+dotnet_diagnostic.xUnit1051.severity = none
+
+# ---------------------------------------------------------------------------
+# Test projects. Everything above still applies to them; only the rules listed
+# here move, and only here.
+# ---------------------------------------------------------------------------
+[tests/**/*.cs]
+
+# CA2000 stays an error for everything that ships (src/, tools/). In the test
+# projects it fires 77 times on HttpRequestMessage/HttpResponseMessage handed
+# straight into an assertion — the process exits at the end of the run and the
+# rule cannot see the ownership handover through the TestServer helpers. The
+# leak rules that matter for a reload (CA2213, CA1001, CA1816, CA1063) stay
+# errors here too.
+dotnet_diagnostic.CA2000.severity = suggestion

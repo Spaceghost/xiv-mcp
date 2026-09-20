@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Plugin.Services;
@@ -153,7 +154,7 @@ public sealed class PlayerProvider
         return new PlayerDto(
             player.Name.TextValue,
             player.EntityId,
-            playerState.ContentId.ToString(),
+            playerState.ContentId.ToString(CultureInfo.InvariantCulture),
             home,
             current,
             home != null && current != null && home.Id != current.Id,

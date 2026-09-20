@@ -257,7 +257,7 @@ public sealed class RecipeDataProvider
         foreach (var (_, children) in edges)
         foreach (var (child, _) in children)
         {
-            if (indegree.ContainsKey(child)) indegree[child]++;
+            if (indegree.TryGetValue(child, out var n)) indegree[child] = n + 1;
         }
 
         var ready = new Queue<uint>(indegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));

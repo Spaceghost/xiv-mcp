@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Game.ClientState.Party;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
@@ -192,7 +193,7 @@ public sealed class PartyProvider : IDisposable
                         cm.GroupIndex,
                         cm.MemberIndex,
                         cm.NameString,
-                        cm.ContentId.ToString(),
+                        cm.ContentId.ToString(CultureInfo.InvariantCulture),
                         Snapshots.EntityIdOrNull(cm.EntityId),
                         cm.Level,
                         job,
@@ -280,7 +281,7 @@ public sealed class PartyProvider : IDisposable
         return new PartyMemberDto(
             index,
             member.Name.TextValue,
-            member.ContentId.ToString(),
+            member.ContentId.ToString(CultureInfo.InvariantCulture),
             Snapshots.EntityIdOrNull(member.EntityId),
             Snapshots.World(member.World),
             member.ClassJob.RowId != 0 ? Snapshots.Job(member.ClassJob) : null,

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Providers.Character;
@@ -118,7 +119,7 @@ public sealed class LocationProvider : IDisposable
                 Text(territory.PlaceNameRegion.ValueNullable?.Name),
                 Text(territory.PlaceNameZone.ValueNullable?.Name),
                 intendedUseId,
-                intendedUseId <= byte.MaxValue ? ((CsTerritoryIntendedUse)intendedUseId).ToString() : intendedUseId.ToString(),
+                intendedUseId <= byte.MaxValue ? ((CsTerritoryIntendedUse)intendedUseId).ToString() : intendedUseId.ToString(CultureInfo.InvariantCulture),
                 territory.IsPvpZone,
                 territory.Mount);
             contentFinderFromTerritory = territory.ContentFinderCondition.RowId;

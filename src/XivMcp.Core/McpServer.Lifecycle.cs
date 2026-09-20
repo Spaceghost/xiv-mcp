@@ -138,7 +138,11 @@ public sealed partial class McpServer
             _path = path.Length > 1 ? path.TrimEnd('/') : path;
 
             var limits = HttpLimitsOverride ?? new HttpLimits { MaxBodyBytes = Math.Max(1024, Options.MaxRequestBytes) };
+            // Every start gets a fresh cancellation source; the previous one is dead and its
+            // registrations must not be kept alive across a restart.
+            var previousServerCts = _serverCts;
             _serverCts = new CancellationTokenSource();
+            previousServerCts.Dispose();
             var http = new HttpServer(limits, HandleHttpAsync, LogSink);
 
             var deadline = Environment.TickCount64 + 3000;
@@ -237,6 +241,7 @@ public sealed partial class McpServer
 
             // 3. Reset every remaining connection (no TIME_WAIT on the server side).
             await http.StopAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            http.Dispose();
             _listeners.Clear();
 
             _housekeepingCts?.Cancel();
@@ -265,6 +270,16 @@ public sealed partial class McpServer
     public partial async ValueTask DisposeAsync()
     {
         await StopAsync().ConfigureAwait(false);
+
+        // A Dalamud plugin is reloaded in-process: anything still holding a cancellation
+        // registration or a wait handle after unload is a leak that survives the reload.
+        // StopAsync already disposed the housekeeping source; this is the rest.
+        _housekeepingCts?.Dispose();
+        _housekeepingCts = null;
+        _http?.Dispose();
+        _http = null;
+        _serverCts.Dispose();
+        _lifecycleLock.Dispose();
     }
 
     public partial ServerStatus GetStatus()

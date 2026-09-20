@@ -116,7 +116,7 @@ public sealed class McpResourceTemplateAttribute : Attribute
 
     public bool GameThread { get; init; } = true;
 
-    public bool RequiresLogin { get; init; } = false;
+    public bool RequiresLogin { get; init; }
 }
 
 /// <summary>
