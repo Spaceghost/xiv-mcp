@@ -301,7 +301,7 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-145 tools (33 change something and go through the approval switch; 26 also work before the game starts), 19 resources and templates, 10 prompts.
+155 tools (38 change something and go through the approval switch; 26 also work before the game starts), 19 resources and templates, 10 prompts.
 Catalogue version 2; the machine-readable listing is [docs/tools.json](docs/tools.json) and the full reference (arguments, data sources, approval text) is [docs/TOOLS.md](docs/TOOLS.md).
 Tier and category are the in-game switches; *Login* means the call fails at the title screen; *Approval* means the call waits for you in game
 while *Ask me before anything changes* is ticked; *Pre-game* means the standalone host serves it while the game is closed.
@@ -384,8 +384,18 @@ Behaviour in game is unverified unless stated elsewhere.
 | `print_echo` | Ui | chat | yes | — | — | Prints a line into the user's OWN chat log only (tagged [MCP]); nobody else can see it and nothing is sent to the server. |
 | `execute_command` | Action | chat | yes | yes | — | Runs one slash command as if the user typed it into the chat box, e.g. "/gearset change 3", "/hudlayout 2", "/xlplugins" or another installed plugin's command. |
 | `send_chat` | Chat | chat | yes | yes | — | Sends one line of text that OTHER PLAYERS WILL SEE, on the chosen channel, exactly as if the user typed it into the chat box. |
-| `get_dalamud_info` | Read | dalamud | no | — | — | Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamu… |
+| `get_dalamud_info` | Read | dalamud | no | — | — | Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, dalamudTrack (the beta track name, or "release" when Dalamud reports none), clientStru… |
+| `get_plugin_stats` | Read | dalamud | no | — | — | Best-effort copy of Dalamud's Plugin Statistics window (/xlstats). draw: per loaded plugin the UI draw time in milliseconds (lastMs, averageMs over Dalamud's rolling window, maxMs), sorted by averageMs descending. fra… |
+| `get_troubleshooting_summary` | Read | dalamud | no | — | — | A compact overview like the header of Dalamud's troubleshooting pack: dalamudVersion, dalamudTrack, dalamudApiLevel, gameVersion, clientLanguage, dalamudUiLanguage, hostPlatform and isWine, pluginSafeMode, installed/l… |
+| `get_ui_info` | Read | dalamud | no | — | — | Returns how Dalamud draws plugin windows: globalScale (Dalamud's global UI scale, 1.0 = 100 %; not the game's HUD scale, which get_dalamud_info reports as globalUiScale), defaultFont (English description of the defaul… |
+| `list_plugin_repositories` | Read | dalamud | no | — | — | Lists the custom (third-party) plugin repositories configured in Dalamud's settings (Experimental tab): url and enabled for each, in the configured order; Dalamud's own main repository is not part of this list. |
 | `list_plugins` | Read | dalamud | no | — | — | Lists the Dalamud plugins installed in this game client. |
+| `read_plugin_log` | Read | dalamud | no | — | — | Returns the newest matching entries of dalamud.log (Dalamud's and every plugin's log), oldest first so the newest is last. |
+| `open_dalamud_window` | Ui | dalamud | no | yes | — | Opens one of Dalamud's own windows in front of the player: window='installer' (the plugin installer; tab is allPlugins, installedPlugins, updateablePlugins, changelogs or dalamudChangelogs) or window='settings' (Dalam… |
+| `open_plugin_ui` | Ui | dalamud | no | yes | — | Opens the main window or the settings window of an installed, loaded Dalamud plugin, exactly like the buttons in the plugin installer (IExposedPlugin.OpenMainUi / OpenConfigUi). plugin is the internal name from list_p… |
+| `add_plugin_repository` | Action | dalamud | no | yes | — | ASSISTED, not automatic: a custom repository can ship code that runs inside the game, so adding one is the player's supply-chain decision and this tool never writes Dalamud's configuration. |
+| `reload_plugin` | Action | dalamud | no | yes | — | Unloads and loads again one installed, currently loaded Dalamud plugin (Dalamud's LocalPlugin.ReloadAsync, what a dev plugin's automatic reload uses): the same files are loaded again, nothing is downloaded or updated,… |
+| `set_plugin_enabled` | Action | dalamud | no | yes | — | Enables (loads) or disables (unloads) an INSTALLED Dalamud plugin and records the choice the way the plugin installer's toggle does, so it persists across restarts: disabling unloads the plugin and then marks it not w… |
 | `get_duty_state` | Read | duty | yes | — | — | Instanced-content status. |
 | `get_duty_unlocks` | Read | duty | yes | — | — | Which Duty Finder duties this character has unlocked and cleared, as far as the client knows. |
 | `get_roulette_status` | Read | duty | yes | — | — | Which Duty Finder roulettes have already given their daily completion bonus this reset. |

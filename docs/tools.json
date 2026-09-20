@@ -2,6 +2,70 @@
   "catalogueVersion": 2,
   "tools": [
     {
+      "name": "add_plugin_repository",
+      "title": "Help the player add a custom plugin repository",
+      "category": "dalamud",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Open Dalamud settings (Experimental tab) and copy this custom plugin repository URL to your clipboard so YOU can paste and save it; nothing is added automatically: {url}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:IDalamudPluginInterface.OpenDalamudSettingsTo",
+        "dalamud:internal.DalamudConfiguration"
+      ],
+      "description": "ASSISTED, not automatic: a custom repository can ship code that runs inside the game, so adding one is the player's supply-chain decision and this tool never writes Dalamud's configuration. After approval it (1) opens Dalamud settings on the Experimental tab, where custom repositories live, (2) copies the URL to the clipboard and (3) shows a notification telling the player to paste it into the list, press +, and save. The result always says added=false: nothing has been added when the call returns, and only the player can finish it; check list_plugin_repositories afterwards. alreadyConfigured=true (and nothing is opened or copied) when the URL is already in the list. The url must be https, at most 300 printable ASCII characters, parse as an absolute URL with a full host name, and carry no credentials (user:password@); otherwise invalid_arguments. After the player has added it, open_dalamud_window (installer, with searchText) puts the plugin in front of them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "description": "The repository's pluginmaster URL (https only).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "boolean"
+          },
+          "alreadyConfigured": {
+            "type": "boolean"
+          },
+          "existingEnabled": {
+            "type": "boolean"
+          },
+          "settingsOpened": {
+            "type": "boolean"
+          },
+          "copiedToClipboard": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "nextStep": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "added",
+          "alreadyConfigured",
+          "settingsOpened",
+          "copiedToClipboard"
+        ]
+      }
+    },
+    {
       "name": "apply_terminal_layout",
       "title": "Apply a saved terminal layout",
       "category": "bridges",
@@ -3814,9 +3878,10 @@
       "openWorldHint": false,
       "dataSources": [
         "dalamud:IDalamudPluginInterface",
+        "dalamud:internal.PluginManager",
         "lumina:GameData.Repositories"
       ],
-      "description": "Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamudUiLanguage, loggedIn, isPvP, inGpose, inCutscene, gameUiHidden, globalUiScale (the game's UI scale factor), colorTheme (System Configuration theme: dark, light, classicFF, clearBlue) and hasModifiedGameDataFiles, plus plugin counts. Use for troubleshooting or to adapt behaviour to the client's language and state.",
+      "description": "Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, dalamudTrack (the beta track name, or \"release\" when Dalamud reports none), clientStructsGitHash, pluginSafeMode (plugins were not loaded this session; read from Dalamud's plugin manager, which is not public API, so it is omitted when unreachable), gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamudUiLanguage, loggedIn, isPvP, inGpose, inCutscene, gameUiHidden, globalUiScale (the game's UI scale factor), colorTheme (System Configuration theme: dark, light, classicFF, clearBlue) and hasModifiedGameDataFiles, plus plugin counts. Use for troubleshooting or to adapt behaviour to the client's language and state.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -3884,6 +3949,15 @@
           },
           "loadedPlugins": {
             "type": "integer"
+          },
+          "dalamudTrack": {
+            "type": "string"
+          },
+          "clientStructsGitHash": {
+            "type": "string"
+          },
+          "pluginSafeMode": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -9160,6 +9234,120 @@
       }
     },
     {
+      "name": "get_plugin_stats",
+      "title": "Plugin performance statistics",
+      "category": "dalamud",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:internal.PluginDrawStatistics",
+        "dalamud:internal.Framework.StatsHistory"
+      ],
+      "description": "Best-effort copy of Dalamud's Plugin Statistics window (/xlstats). draw: per loaded plugin the UI draw time in milliseconds (lastMs, averageMs over Dalamud's rolling window, maxMs), sorted by averageMs descending. framework: per Framework.Update handler the run time in milliseconds (lastMs, averageMs, maxMs, samples; up to 1000 samples each), keyed handler = \"Type::Method\" as Dalamud records it, sorted by averageMs descending. Dalamud only measures while the player has switched on draw-time tracking and framework-update tracking in that window: drawTrackingEnabled / frameworkTrackingEnabled say so, and with tracking off the numbers are stale or empty (this tool never switches tracking on). All of this is Dalamud-internal, not public API: a part that cannot be reached on this build is omitted with drawAvailable/frameworkAvailable=false, and when neither can be reached the tool fails with unavailable. Hook statistics are not included.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "description": "Maximum rows per list (1-200).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "drawAvailable": {
+            "type": "boolean"
+          },
+          "drawTrackingEnabled": {
+            "type": "boolean"
+          },
+          "draw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "internalName": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "lastMs": {
+                  "type": "number"
+                },
+                "averageMs": {
+                  "type": "number"
+                },
+                "maxMs": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "lastMs",
+                "averageMs",
+                "maxMs"
+              ]
+            }
+          },
+          "frameworkAvailable": {
+            "type": "boolean"
+          },
+          "frameworkTrackingEnabled": {
+            "type": "boolean"
+          },
+          "framework": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "handler": {
+                  "type": "string"
+                },
+                "lastMs": {
+                  "type": "number"
+                },
+                "averageMs": {
+                  "type": "number"
+                },
+                "maxMs": {
+                  "type": "number"
+                },
+                "samples": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lastMs",
+                "averageMs",
+                "maxMs",
+                "samples"
+              ]
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "drawAvailable",
+          "frameworkAvailable",
+          "truncated"
+        ]
+      }
+    },
+    {
       "name": "get_quest",
       "title": "Get quest details",
       "category": "gamedata",
@@ -13663,6 +13851,227 @@
       }
     },
     {
+      "name": "get_troubleshooting_summary",
+      "title": "Troubleshooting summary",
+      "category": "dalamud",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:IDalamudPluginInterface",
+        "dalamud:InstalledPlugins",
+        "dalamud:internal.PluginManager",
+        "dalamud:internal.DalamudConfiguration",
+        "file:dalamud.log",
+        "lumina:GameData.Repositories"
+      ],
+      "description": "A compact overview like the header of Dalamud's troubleshooting pack: dalamudVersion, dalamudTrack, dalamudApiLevel, gameVersion, clientLanguage, dalamudUiLanguage, hostPlatform and isWine, pluginSafeMode, installed/loaded/thirdParty/dev/testing plugin counts, and lists of internal names that need attention: notLoaded, failedToLoad (state LoadError or DependencyResolutionFailed), outdated, orphaned, banned, decommissioned, updateAvailable. logErrorsLastHour counts error and fatal log entries of the last 60 minutes per plugin tag (untagged lines count as Dalamud), from the last 4 MiB of dalamud.log; logAvailable=false when the log could not be read. customRepositoryCount/enabledCustomRepositoryCount give the number of custom plugin repositories, never their URLs (list_plugin_repositories has those). failedToLoad, updateAvailable, pluginSafeMode and the repository counts come from Dalamud internals and are omitted when this Dalamud build does not expose them. Nothing here contains paths, addresses or tokens. Start here when the player says a plugin is broken, then read_plugin_log for that plugin.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dalamudVersion": {
+            "type": "string"
+          },
+          "dalamudTrack": {
+            "type": "string"
+          },
+          "dalamudApiLevel": {
+            "type": "integer"
+          },
+          "gameVersion": {
+            "type": "string"
+          },
+          "clientLanguage": {
+            "type": "string"
+          },
+          "dalamudUiLanguage": {
+            "type": "string"
+          },
+          "hostPlatform": {
+            "type": "string"
+          },
+          "isWine": {
+            "type": "boolean"
+          },
+          "pluginSafeMode": {
+            "type": "boolean"
+          },
+          "installedPlugins": {
+            "type": "integer"
+          },
+          "loadedPlugins": {
+            "type": "integer"
+          },
+          "thirdPartyPlugins": {
+            "type": "integer"
+          },
+          "devPlugins": {
+            "type": "integer"
+          },
+          "testingPlugins": {
+            "type": "integer"
+          },
+          "notLoaded": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failedToLoad": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outdated": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "orphaned": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "banned": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decommissioned": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updateAvailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "logAvailable": {
+            "type": "boolean"
+          },
+          "logErrorsLastHour": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "plugin": {
+                  "type": "string"
+                },
+                "errors": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "errors"
+              ]
+            }
+          },
+          "customRepositoryCount": {
+            "type": "integer"
+          },
+          "enabledCustomRepositoryCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "isWine",
+          "installedPlugins",
+          "loadedPlugins",
+          "thirdPartyPlugins",
+          "devPlugins",
+          "testingPlugins",
+          "logAvailable"
+        ]
+      }
+    },
+    {
+      "name": "get_ui_info",
+      "title": "Dalamud UI settings",
+      "category": "dalamud",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:ImGuiHelpers.GlobalScale",
+        "dalamud:IUiBuilder.DefaultFontSpec",
+        "dalamud:StyleModel"
+      ],
+      "description": "Returns how Dalamud draws plugin windows: globalScale (Dalamud's global UI scale, 1.0 = 100 %; not the game's HUD scale, which get_dalamud_info reports as globalUiScale), defaultFont (English description of the default font, e.g. \"Game: Axis (12pt)\"), defaultFontSizePx/defaultFontSizePt/defaultFontLineHeightPx, usesGameFont (true when the default font is one of the game's own fonts rather than a Dalamud or system font), styleName (the chosen Dalamud style/theme, e.g. \"Dalamud Standard\"; omitted when Dalamud reports none) and the UI-hide switches this plugin runs under. Public Dalamud API only. Use it when advising on window sizes or unreadable text in plugin windows.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "globalScale": {
+            "type": "number"
+          },
+          "defaultFont": {
+            "type": "string"
+          },
+          "defaultFontSizePx": {
+            "type": "number"
+          },
+          "defaultFontSizePt": {
+            "type": "number"
+          },
+          "defaultFontLineHeightPx": {
+            "type": "number"
+          },
+          "usesGameFont": {
+            "type": "boolean"
+          },
+          "styleName": {
+            "type": "string"
+          },
+          "disableAutomaticUiHide": {
+            "type": "boolean"
+          },
+          "disableUserUiHide": {
+            "type": "boolean"
+          },
+          "disableCutsceneUiHide": {
+            "type": "boolean"
+          },
+          "disableGposeUiHide": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "disableAutomaticUiHide",
+          "disableUserUiHide",
+          "disableCutsceneUiHide",
+          "disableGposeUiHide"
+        ]
+      }
+    },
+    {
       "name": "get_weather_forecast",
       "title": "Get weather forecast",
       "category": "world",
@@ -16293,6 +16702,79 @@
       }
     },
     {
+      "name": "list_plugin_repositories",
+      "title": "List custom plugin repositories",
+      "category": "dalamud",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:internal.DalamudConfiguration"
+      ],
+      "description": "Lists the custom (third-party) plugin repositories configured in Dalamud's settings (Experimental tab): url and enabled for each, in the configured order; Dalamud's own main repository is not part of this list. URLs are scrubbed of embedded credentials and token/key query values (<redacted:kind>). The list is read from Dalamud's in-memory configuration (DalamudConfiguration.ThirdRepoList), which is not public plugin API: on a Dalamud build where it moved the tool fails with unavailable. Nothing is read from or written to Dalamud's config files. Use it to tell where a third-party plugin could have come from (compare list_plugins installedFromUrl); add_plugin_repository is the assisted way to add one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "description": "Maximum entries to return (1-500).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 100
+          },
+          "offset": {
+            "description": "Entries to skip.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "repositories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ]
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "enabledTotal": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "enabledTotal",
+          "truncated"
+        ]
+      }
+    },
+    {
       "name": "list_plugins",
       "title": "List Dalamud plugins",
       "category": "dalamud",
@@ -16306,9 +16788,10 @@
       "idempotentHint": true,
       "openWorldHint": false,
       "dataSources": [
-        "dalamud:InstalledPlugins"
+        "dalamud:InstalledPlugins",
+        "dalamud:internal.PluginManager"
       ],
-      "description": "Lists the Dalamud plugins installed in this game client. Each entry: internalName, name, version, author, loaded (currently running), isDev (local dev plugin), isThirdParty (from a custom repository), isTesting, isOutdated, isBanned/isOrphaned/isDecommissioned (only when true), hasMainUi/hasConfigUi, apiLevel. Use to check whether a plugin the user mentions is installed and enabled before suggesting its commands. Sorted by name; truncated=true when more match than limit.",
+      "description": "Lists the Dalamud plugins installed in this game client. Each entry: internalName, name, version, author, loaded (currently running), isDev (local dev plugin), isThirdParty (from a custom repository), isTesting, isOutdated, isBanned/isOrphaned/isDecommissioned (only when true), hasMainUi/hasConfigUi, apiLevel, installedFromUrl (the repository the plugin was installed from: a custom repository URL, scrubbed of credentials, or Dalamud's markers OFFICIAL / DEVPLUGIN), projectUrl (the manifest's source link), state (Dalamud's load state: Loaded, Unloaded, LoadError, UnloadError, Loading, Unloading, DependencyResolutionFailed) and updateAvailable. state and updateAvailable come from Dalamud's plugin manager, which is not public API: they are omitted when this Dalamud build does not expose them, and updateAvailable only reflects the repository data Dalamud last fetched (what its installer shows), not a fresh check. Use to check whether a plugin the user mentions is installed and enabled before suggesting its commands. Sorted by name; truncated=true when more match than limit.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -16383,6 +16866,18 @@
                 },
                 "apiLevel": {
                   "type": "integer"
+                },
+                "installedFromUrl": {
+                  "type": "string"
+                },
+                "projectUrl": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "updateAvailable": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -17406,6 +17901,70 @@
       }
     },
     {
+      "name": "open_dalamud_window",
+      "title": "Open the plugin installer or Dalamud settings",
+      "category": "dalamud",
+      "permission": "ui",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Open Dalamud's {window} window on tab {tab}, searching for: {searchText}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:IDalamudPluginInterface.OpenPluginInstallerTo",
+        "dalamud:IDalamudPluginInterface.OpenDalamudSettingsTo"
+      ],
+      "description": "Opens one of Dalamud's own windows in front of the player: window='installer' (the plugin installer; tab is allPlugins, installedPlugins, updateablePlugins, changelogs or dalamudChangelogs) or window='settings' (Dalamud settings; tab is general, lookAndFeel, autoUpdates, serverInfoBar, badge, experimental or about), optionally with searchText typed into that window's search box. This is the whole answer to \"install plugin X\" or \"update my plugins\": this server never installs, updates or removes a plugin, it puts the installer on that search and the player clicks. Returns opened (what Dalamud reported), window, tab and searchText. Fails with invalid_arguments for an unknown window or tab.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "description": "Which Dalamud window.",
+            "type": "string",
+            "enum": [
+              "installer",
+              "settings"
+            ]
+          },
+          "tab": {
+            "description": "Tab to show; default is the window's first tab (allPlugins / general). Installer: allPlugins, installedPlugins, updateablePlugins, changelogs, dalamudChangelogs. Settings: general, lookAndFeel, autoUpdates, serverInfoBar, badge, experimental, about.",
+            "type": "string"
+          },
+          "searchText": {
+            "description": "Text for the window's search box (single line, up to 100 characters).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "window"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "opened": {
+            "type": "boolean"
+          },
+          "window": {
+            "type": "string"
+          },
+          "tab": {
+            "type": "string"
+          },
+          "searchText": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "opened"
+        ]
+      }
+    },
+    {
       "name": "open_game_window",
       "title": "Open a game window",
       "category": "ui",
@@ -17492,6 +18051,60 @@
           },
           "alreadyOpen": {
             "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "open_plugin_ui",
+      "title": "Open a plugin's window",
+      "category": "dalamud",
+      "permission": "ui",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Open {plugin}'s {which} window.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:IExposedPlugin"
+      ],
+      "description": "Opens the main window or the settings window of an installed, loaded Dalamud plugin, exactly like the buttons in the plugin installer (IExposedPlugin.OpenMainUi / OpenConfigUi). plugin is the internal name from list_plugins (a display name works when it is unambiguous); which is 'main' or 'config'. Returns the plugin's internalName and which window was asked for; whether a window actually appeared is up to that plugin. Fails with not_found for an unknown plugin, unavailable when the plugin is not loaded or has no such window (list_plugins hasMainUi/hasConfigUi). It only opens a window; it clicks nothing inside it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "description": "Plugin internal name (see list_plugins), or its display name.",
+            "type": "string"
+          },
+          "which": {
+            "description": "Which window to open.",
+            "type": "string",
+            "enum": [
+              "main",
+              "config"
+            ],
+            "default": "main"
+          }
+        },
+        "required": [
+          "plugin"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "internalName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "which": {
+            "type": "string"
           }
         }
       }
@@ -18261,6 +18874,184 @@
           "oldestBufferedSequence",
           "buffered",
           "capacity"
+        ]
+      }
+    },
+    {
+      "name": "read_plugin_log",
+      "title": "Read the Dalamud log",
+      "category": "dalamud",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "file:dalamud.log"
+      ],
+      "description": "Returns the newest matching entries of dalamud.log (Dalamud's and every plugin's log), oldest first so the newest is last. Each entry: time (ISO 8601 with offset), level (verbose|debug|information|warning|error|fatal), plugin (the [Tag] the line starts with: a plugin's internal name, or a Dalamud module such as PLUGINM; omitted for untagged Dalamud lines), message, and details (exception/stack-trace lines that followed, capped). Only the last tailMiB of the file is scanned (never the whole file), so matched counts that window; windowStartsMidFile=true means older entries exist beyond it. truncated=true when more entries matched than limit (the oldest matches are dropped). Every returned string is scrubbed: bearer/Authorization values, token=/key=/password= values, long hex/base64 secrets, e-mail addresses, IPv4/IPv6 addresses (a bare four-part number counts as one unless written as a version) become <redacted:kind>, and home directories become ~ with the OS user name removed. Character names are NOT scrubbed: this is the player's own log and the client already shows them. Use it to see why a plugin failed to load or what it logged around an error; use get_troubleshooting_summary first for the overview. Fails with unavailable when the log file cannot be found or read.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "description": "Only lines tagged [plugin]: a plugin's internal or display name (see list_plugins), or a Dalamud module tag. Case-insensitive, exact.",
+            "type": "string"
+          },
+          "level": {
+            "description": "Minimum level.",
+            "type": "string",
+            "enum": [
+              "verbose",
+              "debug",
+              "information",
+              "warning",
+              "error",
+              "fatal"
+            ],
+            "default": "information"
+          },
+          "contains": {
+            "description": "Only entries whose message or details contain this text (case-insensitive).",
+            "type": "string"
+          },
+          "sinceMinutes": {
+            "description": "Only entries from the last N minutes (1-10080).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10080
+          },
+          "limit": {
+            "description": "Maximum entries to return (1-500).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 100
+          },
+          "tailMiB": {
+            "description": "How much of the end of the file to scan, in MiB (1-4).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 2
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "string"
+                },
+                "plugin": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "returned": {
+            "type": "integer"
+          },
+          "matched": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "fileBytes": {
+            "type": "integer"
+          },
+          "scannedBytes": {
+            "type": "integer"
+          },
+          "windowStartsMidFile": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "returned",
+          "matched",
+          "truncated",
+          "fileBytes",
+          "scannedBytes",
+          "windowStartsMidFile"
+        ]
+      }
+    },
+    {
+      "name": "reload_plugin",
+      "title": "Reload a plugin",
+      "category": "dalamud",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Reload Dalamud plugin {plugin} (unload it and load the same files again).",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:internal.PluginManager"
+      ],
+      "description": "Unloads and loads again one installed, currently loaded Dalamud plugin (Dalamud's LocalPlugin.ReloadAsync, what a dev plugin's automatic reload uses): the same files are loaded again, nothing is downloaded or updated, and the plugin's enabled state is unchanged. Use it when a plugin is stuck; the plugin loses whatever it kept only in memory. Returns internalName, state and loaded afterwards. Internal to Dalamud, not public API: fails with unavailable when this build does not expose it, in safe mode, while Dalamud is busy, when the plugin is not loaded (set_plugin_enabled loads it), or when the plugin throws while loading. Refused for this MCP server's own plugin (the connection would drop mid-call; the player can toggle it in /xlplugins).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "description": "Plugin internal name (see list_plugins), or its display name.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "internalName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "loaded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "changed",
+          "loaded"
         ]
       }
     },
@@ -19907,6 +20698,71 @@
           "worldX",
           "worldZ",
           "mapOpened"
+        ]
+      }
+    },
+    {
+      "name": "set_plugin_enabled",
+      "title": "Enable or disable a plugin",
+      "category": "dalamud",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Set Dalamud plugin {plugin} to enabled = {enabled} (loads or unloads it now and remembers the choice).",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:internal.PluginManager",
+        "dalamud:internal.ProfileManager"
+      ],
+      "description": "Enables (loads) or disables (unloads) an INSTALLED Dalamud plugin and records the choice the way the plugin installer's toggle does, so it persists across restarts: disabling unloads the plugin and then marks it not wanted in Dalamud's default plugin collection; enabling marks it wanted and then loads it. plugin is the internal name from list_plugins. Returns internalName, enabled (what was asked), changed (false when it already was in that state), state and loaded afterwards. There is no public Dalamud API for this: it calls the same internal methods the installer calls, and fails with unavailable when this Dalamud build does not expose them, when Dalamud itself would grey the toggle out (safe mode, a banned/outdated/orphaned plugin, a load in progress, a plugin managed by a non-default collection), or when the plugin throws while loading (the message says why; read_plugin_log has the rest). Refused: disabling this MCP server's own plugin (the connection would drop mid-call; the player can do it in /xlplugins). It never installs or updates anything: an outdated plugin stays outdated, and a plugin that is not installed is not_found (open_dalamud_window puts the installer on a search instead). Disabling is the destructive direction: whatever the plugin was doing stops.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "description": "Plugin internal name (see list_plugins), or its display name.",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "true loads the plugin and keeps it enabled; false unloads it and keeps it disabled.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plugin",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "internalName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "loaded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "changed",
+          "loaded"
         ]
       }
     },
