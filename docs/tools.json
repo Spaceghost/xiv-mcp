@@ -138,6 +138,93 @@
       }
     },
     {
+      "name": "clear_macro",
+      "title": "Clear a user macro",
+      "category": "actions",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Delete the contents of macro slot {index} of your {set} macros (title, icon and all lines).",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:RaptureMacroModule",
+        "client:RaptureHotbarModule"
+      ],
+      "description": "Empties one User Macros slot (set individual or shared, index 0-99): title, icon and lines are removed, as with Delete in the User Macros window. Returns previous (title, iconId, lines, restorable) so the content can be written back with write_macro; wasEmpty is true when there was nothing to clear. Hotbar slots that pointed at the macro are refreshed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "set": {
+            "description": "Which macro page: individual or shared.",
+            "type": "string",
+            "enum": [
+              "individual",
+              "shared"
+            ]
+          },
+          "index": {
+            "description": "Slot number 0-99 as shown in list_macros.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 99
+          }
+        },
+        "required": [
+          "set",
+          "index"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "set": {
+            "type": "string"
+          },
+          "index": {
+            "type": "integer"
+          },
+          "wasEmpty": {
+            "type": "boolean"
+          },
+          "previous": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "iconId": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "restorable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "iconId",
+              "restorable"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "wasEmpty"
+        ]
+      }
+    },
+    {
       "name": "clear_objectives",
       "title": "Remove custom objectives",
       "category": "objectives",
@@ -695,7 +782,7 @@
       "availability": "live",
       "requiresLogin": true,
       "needsApproval": true,
-      "approvalSummary": "Change to gear set {id} {name} (this can also change your job).",
+      "approvalSummary": "Change to your gear set number {id} / named {name} (only one of the two is given); this can also change your job.",
       "readOnlyHint": false,
       "destructiveHint": false,
       "idempotentHint": true,
@@ -11384,6 +11471,97 @@
       }
     },
     {
+      "name": "open_game_window",
+      "title": "Open a game window",
+      "category": "ui",
+      "permission": "ui",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Open the game's {kind} window (on id {id}, territory {territoryId}).",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:AgentModule",
+        "client:AgentMap",
+        "client:AgentQuestJournal",
+        "client:AgentRecipeNote",
+        "client:AgentGatheringNote",
+        "client:AgentContentsFinder",
+        "client:AgentAchievement",
+        "lumina:Map",
+        "lumina:Quest",
+        "lumina:Recipe",
+        "lumina:Item",
+        "lumina:GatheringItem",
+        "lumina:ContentFinderCondition",
+        "lumina:Achievement"
+      ],
+      "description": "Opens one of the game's own windows so the player can look at it; it never clicks, selects, registers, crafts or buys anything inside the window. kind: map (id = Map row id, or territoryId = zone whose main map to show; neither = current map), journal (id = Quest row id to show that quest), recipe (Crafting Log; id = Recipe row id), recipeSearch (Crafting Log searched for an item; id = Item row id, required), gatheringLog (id = Item row id of a gatherable), teleport, character, armoury, inventory, dutyFinder (id = ContentFinderCondition row id to show that duty; it is not joined), achievements (id = Achievement row id), currency, gearsets, macros. Ids are checked against the game data first (not_found). Refused while in combat, casting, crafting, gathering, in a cutscene or event, or changing zones. If the window is already open it is brought to the front (alreadyOpen=true) instead of being toggled shut. The game decides what the window shows: a recipe or duty the character has not unlocked may open the window without the entry. Returns kind, id and the client function used. For a flag on the map use set_map_flag; for item data use the read tools (there is no standalone item window to open).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "Which window to open.",
+            "type": "string",
+            "enum": [
+              "map",
+              "journal",
+              "recipe",
+              "recipeSearch",
+              "gatheringLog",
+              "teleport",
+              "character",
+              "armoury",
+              "inventory",
+              "dutyFinder",
+              "achievements",
+              "currency",
+              "gearsets",
+              "macros"
+            ]
+          },
+          "id": {
+            "description": "Optional row id whose meaning depends on kind (see the description).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "territoryId": {
+            "description": "Only for kind=map: TerritoryType row id whose main map to open.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "api": {
+            "type": "string"
+          },
+          "alreadyOpen": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
       "name": "post_objective",
       "title": "Post a custom objective (quest) to the player's game",
       "category": "objectives",
@@ -13357,6 +13535,92 @@
       }
     },
     {
+      "name": "target_party_member",
+      "title": "Target a party member",
+      "category": "actions",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Target the party member named {name} / in party list slot {slot} (only one of the two is given).",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:IPartyList",
+        "dalamud:ITargetManager",
+        "dalamud:IObjectTable",
+        "client:AgentHUD"
+      ],
+      "description": "Targets one member of the user's own party, like clicking their row in the party list. Choose with exactly one of: name (case-insensitive; the full name, optionally \"Firstname Lastname@World\" to tell apart members with the same name, otherwise a unique part of the name) or slot (1-8, the row in the on-screen party list from the top; 1 is the user). One named member per call: there is no lowest-HP, next-member, role or other filter, and the call never uses an action. Alliance members outside the party are not included (use set_target). Fails with not_found when nobody matches or the slot is empty, invalid_arguments when the name matches several members (the message lists them), and unavailable when the member is in another zone or too far away to be targeted. Returns slot, name, world, entityId, distance (yalms) and the party as the tool saw it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Party member name, optionally with @World.",
+            "type": "string"
+          },
+          "slot": {
+            "description": "Row in the party list, 1-8 from the top.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "world": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "gameObjectId": {
+            "type": "string"
+          },
+          "distance": {
+            "type": "number"
+          },
+          "party": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slot": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "world": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "slot"
+              ]
+            }
+          }
+        },
+        "required": [
+          "slot",
+          "entityId"
+        ]
+      }
+    },
+    {
       "name": "teleport",
       "title": "Teleport to aetheryte",
       "category": "actions",
@@ -13628,6 +13892,131 @@
           "radius",
           "createdAt",
           "updatedAt"
+        ]
+      }
+    },
+    {
+      "name": "write_macro",
+      "title": "Write a user macro",
+      "category": "actions",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Overwrite macro slot {index} of your {set} macros with the title \"{title}\", icon {iconId}, and exactly these lines: {lines}",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:RaptureMacroModule",
+        "client:RaptureHotbarModule",
+        "lumina:MacroIcon"
+      ],
+      "description": "Writes one slot of the User Macros window, replacing whatever is in it: set individual (this character) or shared (all characters), index 0-99 as in list_macros, title (at most 20 characters), optional iconId (an icon from the macro icon picker; omitted keeps the slot's icon, or the default icon for an empty slot) and 1-15 lines of at most 180 UTF-8 bytes each. The player runs the macro; this tool never does. Every line follows execute_command's rules: lines that log out, close the game or change Dalamud, action and movement commands (/ac /action /automove /follow ...) and xiv-mcp's own commands are refused (error code refused), and lines other players would see (/say /party ..., or plain text without a command) need the Chat permission tier. The whole lines array must fit the approval prompt (500 characters as JSON), so very long macros are rejected rather than approved unseen. Returns the slot as written and previous (title, iconId, lines, and restorable: whether write_macro would accept those lines again) so the old content can be put back. Hotbar slots that point at the macro are refreshed; the macro file is saved by the game as after an edit in the window.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "set": {
+            "description": "Which macro page to write: individual or shared.",
+            "type": "string",
+            "enum": [
+              "individual",
+              "shared"
+            ]
+          },
+          "index": {
+            "description": "Slot number 0-99 as shown in list_macros.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 99
+          },
+          "title": {
+            "description": "Macro name, at most 20 characters.",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Macro text, 1-15 lines, each a single line of at most 180 UTF-8 bytes.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "iconId": {
+            "description": "Icon id from the macro icon picker (MacroIcon sheet). Omit to keep the slot's icon.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        },
+        "required": [
+          "set",
+          "index",
+          "title",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "set": {
+            "type": "string"
+          },
+          "index": {
+            "type": "integer"
+          },
+          "written": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "iconId": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "iconId"
+            ]
+          },
+          "previous": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "iconId": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "restorable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "iconId",
+              "restorable"
+            ]
+          }
+        },
+        "required": [
+          "index"
         ]
       }
     }

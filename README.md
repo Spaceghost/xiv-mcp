@@ -301,7 +301,7 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-86 tools (10 change something and go through the approval switch; 18 also work before the game starts), 14 resources and templates, 6 prompts.
+90 tools (14 change something and go through the approval switch; 18 also work before the game starts), 14 resources and templates, 6 prompts.
 Catalogue version 2; the machine-readable listing is [docs/tools.json](docs/tools.json) and the full reference (arguments, data sources, approval text) is [docs/TOOLS.md](docs/TOOLS.md).
 Tier and category are the in-game switches; *Login* means the call fails at the title screen; *Approval* means the call waits for you in game
 while *Ask me before anything changes* is ticked; *Pre-game* means the standalone host serves it while the game is closed.
@@ -313,11 +313,14 @@ Behaviour in game is unverified unless stated elsewhere.
 | --- | --- | --- | --- | --- | --- | --- |
 | `list_gearsets` | Read | actions | yes | — | — | Lists the character's saved gear sets. |
 | `list_macros` | Read | actions | yes | — | — | Lists the user's macros from the in-game User Macros window: set individual (this character) or shared (all characters on the account), 100 slots each. |
+| `clear_macro` | Action | actions | yes | yes | — | Empties one User Macros slot (set individual or shared, index 0-99): title, icon and lines are removed, as with Delete in the User Macros window. |
 | `clear_target` | Action | actions | yes | yes | — | Clears the user's current target (like pressing Escape on a target). |
 | `equip_gearset` | Action | actions | yes | yes | — | Equips one of the character's saved gear sets (which also changes class/job when the set belongs to another job), exactly like /gearset change. |
 | `set_focus_target` | Action | actions | yes | yes | — | Sets the user's focus target (the secondary tracked target shown in the Focus Target bar), or clears it with clear=true. |
 | `set_target` | Action | actions | yes | yes | — | Sets the user's current target, like clicking an object. |
+| `target_party_member` | Action | actions | yes | yes | — | Targets one member of the user's own party, like clicking their row in the party list. |
 | `teleport` | Action | actions | yes | yes | — | Starts the Teleport spell to one of the character's attuned aetherytes (or free-company/private estate and apartment entries), exactly like choosing it in the Teleport window. |
+| `write_macro` | Action | actions | yes | yes | — | Writes one slot of the User Macros window, replacing whatever is in it: set individual (this character) or shared (all characters), index 0-99 as in list_macros, title (at most 20 characters), optional iconId (an icon… |
 | `get_ticket` | Read | approvals | no | — | — | Returns one of your approval tickets: state (pending, approved, executed, failed, denied, cancelled, expired), who decided, your resumeToken, and once it ran the tool result (result, same shape as a tools/call result)… |
 | `list_tickets` | Read | approvals | no | — | — | Lists your approval tickets, oldest first. state filters: open (pending or approved, the default), pending, final, all. |
 | `cancel_ticket` | Ui | approvals | no | — | — | Withdraws one of your pending tickets so the player is no longer asked about it. |
@@ -385,6 +388,7 @@ Behaviour in game is unverified unless stated elsewhere.
 | `get_addon_text` | Read | ui | yes | — | — | Reads every text string shown in one game UI window (addon), including text inside nested components such as lists, buttons and tabs, in reading order (top-to-bottom, left-to-right by screen position). |
 | `get_dialogue` | Read | ui | yes | — | — | Returns whatever conversation or prompt windows are currently visible, read-only: talk (NPC speaker + dialogue text of the current Talk box), subtitle (cutscene subtitle), selectString / selectIconString (the option l… |
 | `list_addons` | Read | ui | yes | — | — | Lists the game's loaded UI windows ("addons") with their internal names, which get_addon_text needs. |
+| `open_game_window` | Ui | ui | yes | yes | — | Opens one of the game's own windows so the player can look at it; it never clicks, selects, registers, crafts or buys anything inside the window. kind: map (id = Map row id, or territoryId = zone whose main map to sho… |
 | `set_map_flag` | Ui | ui | yes | yes | — | Places the user's map flag marker (the one shown on the map/minimap and inserted by <flag> in chat) and by default opens the map window on it. |
 | `show_notification` | Ui | ui | no | — | — | Shows a Dalamud overlay notification card (bottom-right corner, with title, text and a coloured icon for the type) visible only to the user; works on the title screen too. |
 | `show_toast` | Ui | ui | yes | — | — | Shows a short, transient on-screen message using the game's own toast styles, visible only to the user: normal (small banner near the top of the screen), quest (large centred quest-style text with a chime), error (red… |
