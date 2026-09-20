@@ -58,7 +58,7 @@ public sealed unsafe class MacroProvider
         return new MacroListResult(set.ToString().ToLowerInvariant(), list, list.Count);
     }
 
-    private static string Read(ref Utf8String str)
+    internal static string Read(ref Utf8String str)
     {
         if (str.StringPtr.Value == null || str.BufUsed <= 1)
             return "";
