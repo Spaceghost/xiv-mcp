@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using XivMcp.Core;
 
 namespace XivMcp.Plugin.Providers.Prompts;
@@ -16,7 +18,9 @@ public sealed class GuidePromptsProvider
         "tools unless the player explicitly asks. For work that takes more than a few calls, call post_status with " +
         "agent \"{0}\" (state running, with progress), and finish with state done or failed.";
 
-    private static string Rules(string agent) => string.Format(Ground, agent);
+    private static readonly CompositeFormat GroundFormat = CompositeFormat.Parse(Ground);
+
+    private static string Rules(string agent) => string.Format(CultureInfo.InvariantCulture, GroundFormat, agent);
 
     [McpPrompt("character_overview",
         Title = "Character overview",

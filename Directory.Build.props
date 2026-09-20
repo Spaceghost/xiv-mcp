@@ -10,7 +10,24 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    Quality gate (docs/QUALITY-GATE.md). The Roslyn half: the .NET analyzers run on every
+    build and every warning is an error, so a reload leak cannot be merged as "just a warning".
+    Individual rule severities live in .editorconfig, next to the reason each one is set.
+  -->
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <AnalysisMode>Default</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- A rule demoted in .editorconfig must stay a warning: promoting every warning to an
+         error must not undo those decisions. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors)</WarningsNotAsErrors>
+    <!-- CI can take one pass with the gate relaxed to count new noise: -p:QualityGateStrict=false -->
+    <TreatWarningsAsErrors Condition="'$(QualityGateStrict)' == 'false'">false</TreatWarningsAsErrors>
   </PropertyGroup>
 </Project>

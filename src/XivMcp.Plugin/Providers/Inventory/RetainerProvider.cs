@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using XivMcp.Core;
@@ -55,7 +56,7 @@ public sealed unsafe class RetainerProvider
 
             var job = retainer->ClassJob != 0 ? index.ClassJob(retainer->ClassJob) : null;
             list.Add(new RetainerInfo(
-                retainer->RetainerId.ToString(),
+                retainer->RetainerId.ToString(CultureInfo.InvariantCulture),
                 retainer->NameString,
                 retainer->Available,
                 job != null ? $"{job.Name} ({job.Abbreviation})" : null,

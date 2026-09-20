@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -62,7 +63,7 @@ public class HttpTransportTests
         for (var i = 0; i < 3; i++)
         {
             var body = ModernEcho(i, "p" + i);
-            sb.Append($"POST /mcp HTTP/1.1\r\n{ModernHeaders(s)}Content-Length: {Encoding.UTF8.GetByteCount(body)}\r\n\r\n{body}");
+            sb.Append(CultureInfo.InvariantCulture, $"POST /mcp HTTP/1.1\r\n{ModernHeaders(s)}Content-Length: {Encoding.UTF8.GetByteCount(body)}\r\n\r\n{body}");
         }
 
         var response = await s.RawAsync(sb.ToString(), TimeSpan.FromSeconds(1));

@@ -1,6 +1,7 @@
 // Native Umbra popup (Una.Drawing nodes) shared by both widgets: server header, agent board,
 // recent activity and window/clipboard buttons. Row nodes are pooled; each frame only changes
 // values that differ, so an open popup costs almost nothing.
+using System.Diagnostics.CodeAnalysis;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Umbra.Common;
@@ -202,6 +203,8 @@ public sealed class McpPopup : WidgetPopup
     private int _activityCount = 10;
 
     /// <param name="agentsFocused">Defaults for the "MCP Agents" widget: board first, no server header or activity.</param>
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "Ownership transfer: every node built here is appended to a parent Node, and Una.Drawing's node tree disposes its children. Disposing them here would tear down the live popup.")]
     public McpPopup(bool agentsFocused = false)
     {
         _defaultShowServer = !agentsFocused;
@@ -290,6 +293,8 @@ public sealed class McpPopup : WidgetPopup
 
     protected override Node Node { get; }
 
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "Ownership transfer: Umbra takes these config variables and owns their lifetime; the widget must not dispose them.")]
     public override IEnumerable<IWidgetConfigVariable> GetConfigVariables() =>
     [
         new BooleanWidgetConfigVariable(CvarShowServer, "Show server details",
@@ -465,6 +470,8 @@ public sealed class McpPopup : WidgetPopup
         private readonly Node _fill = N("fill");
         private float _fillWidth = -1;
 
+        [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership transfer: every node built here is appended to a parent Node, and Una.Drawing's node tree disposes its children. Disposing them here would tear down the live popup.")]
         public AgentRow()
         {
             Root = N("row");

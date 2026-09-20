@@ -44,6 +44,7 @@ public sealed class FakeGameThread : IGameThread, IDisposable
             return tcs.Task;
         }
 
+        // Not forwarded on purpose: cancelling the caller must not abandon the queued item.
         _queue.Add(() =>
         {
             Gate?.Wait(TimeSpan.FromSeconds(30));
@@ -65,7 +66,7 @@ public sealed class FakeGameThread : IGameThread, IDisposable
             {
                 tcs.TrySetException(ex);
             }
-        });
+        }, CancellationToken.None);
         return tcs.Task;
     }
 
@@ -76,7 +77,14 @@ public sealed class FakeGameThread : IGameThread, IDisposable
             return 0;
         }, cancellationToken);
 
-    public void Dispose() => _queue.CompleteAdding();
+    public void Dispose()
+    {
+        _queue.CompleteAdding();
+
+        // Let the consumer drain and exit before the collection (and its semaphores) go away.
+        _thread.Join(TimeSpan.FromSeconds(5));
+        _queue.Dispose();
+    }
 }
 
 public sealed class FakeHostState : IHostState

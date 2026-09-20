@@ -49,6 +49,8 @@ public sealed class SimulatedFrameworkThread : IGameThread, IDisposable
         }
 
         var registration = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+        // The token cancels the work item, not the enqueue: the queue must accept it so the
+        // registration below is always disposed.
         _queue.Add(() =>
         {
             registration.Dispose();
@@ -66,7 +68,7 @@ public sealed class SimulatedFrameworkThread : IGameThread, IDisposable
             {
                 tcs.TrySetException(ex);
             }
-        });
+        }, CancellationToken.None);
         return tcs.Task;
     }
 
