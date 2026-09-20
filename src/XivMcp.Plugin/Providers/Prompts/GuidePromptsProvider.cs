@@ -20,7 +20,7 @@ public sealed class GuidePromptsProvider
 
     private static readonly CompositeFormat GroundFormat = CompositeFormat.Parse(Ground);
 
-    private static string Rules(string agent) => string.Format(CultureInfo.InvariantCulture, GroundFormat, agent);
+    internal static string Rules(string agent) => string.Format(CultureInfo.InvariantCulture, GroundFormat, agent);
 
     [McpPrompt("character_overview",
         Title = "Character overview",

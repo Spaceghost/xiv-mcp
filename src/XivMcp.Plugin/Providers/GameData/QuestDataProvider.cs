@@ -102,6 +102,13 @@ public sealed class QuestDataProvider
             Rewards(row));
     }
 
+    [McpResourceTemplate("ffxiv://quest/{questId}",
+        Name = "Quest",
+        Description = "Game-data record for a quest id (same content as the get_quest tool).",
+        GameThread = false,
+        RequiresLogin = false)]
+    public QuestDetail QuestResource(uint questId) => GetQuest(questId);
+
     private QuestRewards Rewards(Sheets.Quest row)
     {
         var items = new List<QuestItemReward>();

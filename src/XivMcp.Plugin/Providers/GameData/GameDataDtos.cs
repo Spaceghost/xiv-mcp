@@ -68,7 +68,8 @@ public sealed record RecipeRef(
     int? Quantity = null,
     int? Yield = null);
 
-public sealed record GatheringPointRef(string? Zone, string? Place, int Level, string? Type, uint TerritoryId);
+/// <summary>Timed is "unspoiled" or "ephemeral" for nodes that only appear at set Eorzea hours (get_gathering_info has the windows).</summary>
+public sealed record GatheringPointRef(string? Zone, string? Place, int Level, string? Type, uint TerritoryId, string? Timed = null);
 
 public sealed record GatheringSource(
     uint GatheringItemId,

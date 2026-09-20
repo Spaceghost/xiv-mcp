@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -65,12 +64,21 @@ public sealed class RecipeDataProvider
         var yield = Math.Max(1, (int)recipe.AmountResult);
         var rootCrafts = (quantity + yield - 1) / yield;
 
-        var budget = new StrongBox<int>(MaxTreeNodes);
-        var ingredients = Ingredients(recipe)
-            .Select(i => BuildNode(i.ItemId, i.Amount * rootCrafts, 1, depth, [resultId], budget))
+        var tree = index.TreeRecipe(recipe.RowId)!;
+        var ingredients = RecipeTree.Expand(tree, rootCrafts, depth, MaxTreeNodes, index.TreeRecipeForItem, IsCrystal)
+            .Select(ToIngredientNode)
             .ToList();
 
-        var (raw, crafts) = ShoppingList(recipe, rootCrafts, depth);
+        var totals = RecipeTree.Flatten(tree, rootCrafts, depth, index.TreeRecipeForItem, IsCrystal);
+        var raw = totals.Raw
+            .Select(m => new MaterialLine(m.ItemId, index.ItemName(m.ItemId), RecipeTree.Clamp(m.Quantity), IsCrystal(m.ItemId)))
+            .OrderBy(m => m.IsCrystal)
+            .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var crafts = totals.Crafts
+            .Select(c => new CraftStep(c.ItemId, index.ItemName(c.ItemId), c.Recipe.RecipeId, index.CraftTypeName(c.Recipe.CraftType),
+                c.Recipe.Level, RecipeTree.Clamp(c.Crafts), RecipeTree.Clamp(c.Needed)))
+            .ToList();
 
         var book = recipe.SecretRecipeBook.ValueNullable;
         return new RecipeDetail(
@@ -102,6 +110,13 @@ public sealed class RecipeDataProvider
             crafts,
             alternatives);
     }
+
+    [McpResourceTemplate("ffxiv://recipe/{recipeId}",
+        Name = "Crafting recipe",
+        Description = "Game-data record for a recipe id (same content as the get_recipe tool with default depth and quantity).",
+        GameThread = false,
+        RequiresLogin = false)]
+    public RecipeDetail RecipeResource(uint recipeId) => GetRecipe(recipeId: recipeId);
 
     [McpTool("search_recipes",
         Availability = ToolAvailability.Static,
@@ -188,118 +203,11 @@ public sealed class RecipeDataProvider
         return null;
     }
 
-    private static List<(uint ItemId, int Amount)> Ingredients(Sheets.Recipe recipe)
-    {
-        var list = new List<(uint, int)>(8);
-        for (var i = 0; i < recipe.Ingredient.Count; i++)
-        {
-            var item = recipe.Ingredient[i].RowId;
-            var amount = recipe.AmountIngredient[i];
-            if (item != 0 && amount > 0) list.Add((item, amount));
-        }
-
-        return list;
-    }
-
-    private Sheets.Recipe? RecipeFor(uint itemId) =>
-        index.Recipes.ByResult.TryGetValue(itemId, out var ids) && ids.Length > 0 ? index.Row<Sheets.Recipe>(ids[0]) : null;
-
     private bool IsCrystal(uint itemId) => index.Item(itemId)?.IsCrystal ?? false;
 
-    private IngredientNode BuildNode(uint itemId, int quantity, int level, int depth, HashSet<uint> path, StrongBox<int> budget)
-    {
-        budget.Value--;
-        var name = index.ItemName(itemId);
-        var crystal = IsCrystal(itemId);
-        if (level > depth || crystal || budget.Value <= 0 || path.Contains(itemId) || RecipeFor(itemId) is not { } sub)
-            return new IngredientNode(itemId, name, quantity, crystal);
-
-        var yield = Math.Max(1, (int)sub.AmountResult);
-        var crafts = (quantity + yield - 1) / yield;
-        var childPath = new HashSet<uint>(path) { itemId };
-        var children = new List<IngredientNode>();
-        foreach (var (childId, amount) in Ingredients(sub))
-        {
-            children.Add(BuildNode(childId, amount * crafts, level + 1, depth, childPath, budget));
-        }
-
-        return new IngredientNode(itemId, name, quantity, false, sub.RowId, index.CraftTypeName(sub.CraftType.RowId), crafts,
-            yield > 1 ? yield : null, children);
-    }
-
-    /// <summary>
-    /// Pools demand across the whole tree: discovers intermediates expandable within <paramref name="depth"/> (BFS, so the
-    /// shallowest occurrence decides), orders them topologically, then converts demand into synth counts respecting yields.
-    /// </summary>
-    private (List<MaterialLine> Raw, List<CraftStep> Crafts) ShoppingList(Sheets.Recipe root, int rootCrafts, int depth)
-    {
-        var expand = new Dictionary<uint, Sheets.Recipe>();
-        var edges = new Dictionary<uint, List<(uint Child, int Amount)>>();
-        var queue = new Queue<(uint Item, int Level)>();
-        var seen = new HashSet<uint> { root.ItemResult.RowId };
-        foreach (var (item, _) in Ingredients(root))
-        {
-            if (seen.Add(item)) queue.Enqueue((item, 1));
-        }
-
-        while (queue.Count > 0)
-        {
-            var (item, level) = queue.Dequeue();
-            if (level > depth || IsCrystal(item) || RecipeFor(item) is not { } sub) continue;
-            expand[item] = sub;
-            var children = Ingredients(sub);
-            edges[item] = children;
-            foreach (var (child, _) in children)
-            {
-                if (seen.Add(child)) queue.Enqueue((child, level + 1));
-            }
-        }
-
-        // Kahn's algorithm over expanded nodes; any node left over sits on a cycle and is treated as raw.
-        var indegree = expand.Keys.ToDictionary(k => k, _ => 0);
-        foreach (var (_, children) in edges)
-        foreach (var (child, _) in children)
-        {
-            if (indegree.TryGetValue(child, out var n)) indegree[child] = n + 1;
-        }
-
-        var ready = new Queue<uint>(indegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));
-        var order = new List<uint>();
-        while (ready.Count > 0)
-        {
-            var node = ready.Dequeue();
-            order.Add(node);
-            foreach (var (child, _) in edges[node])
-            {
-                if (indegree.ContainsKey(child) && --indegree[child] == 0) ready.Enqueue(child);
-            }
-        }
-
-        var ordered = order.ToHashSet();
-        var demand = new Dictionary<uint, long>();
-        foreach (var (item, amount) in Ingredients(root)) demand[item] = demand.GetValueOrDefault(item) + (long)amount * rootCrafts;
-
-        var crafts = new List<CraftStep>();
-        foreach (var item in order)
-        {
-            var need = demand.GetValueOrDefault(item);
-            if (need <= 0) continue;
-            var sub = expand[item];
-            var yield = Math.Max(1, (int)sub.AmountResult);
-            var synths = (need + yield - 1) / yield;
-            demand.Remove(item);
-            crafts.Add(new CraftStep(item, index.ItemName(item), sub.RowId, index.CraftTypeName(sub.CraftType.RowId),
-                sub.RecipeLevelTable.ValueNullable?.ClassJobLevel ?? 0, (int)synths, (int)need));
-            foreach (var (child, amount) in edges[item]) demand[child] = demand.GetValueOrDefault(child) + amount * synths;
-        }
-
-        var raw = demand
-            .Where(kv => kv.Value > 0 && !ordered.Contains(kv.Key))
-            .Select(kv => new MaterialLine(kv.Key, index.ItemName(kv.Key), (int)Math.Min(kv.Value, int.MaxValue), IsCrystal(kv.Key)))
-            .OrderBy(m => m.IsCrystal)
-            .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        crafts.Reverse(); // deepest sub-crafts first: the order to actually craft them
-        return (raw, crafts);
-    }
+    private IngredientNode ToIngredientNode(RecipeTree.Node node) => node.Used is { } used
+        ? new IngredientNode(node.ItemId, index.ItemName(node.ItemId), RecipeTree.Clamp(node.Quantity), false, used.RecipeId,
+            index.CraftTypeName(used.CraftType), RecipeTree.Clamp(node.Crafts), used.Yield > 1 ? used.Yield : null,
+            node.Children.Select(ToIngredientNode).ToList())
+        : new IngredientNode(node.ItemId, index.ItemName(node.ItemId), RecipeTree.Clamp(node.Quantity), node.IsCrystal);
 }
