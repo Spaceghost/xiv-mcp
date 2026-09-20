@@ -595,6 +595,9 @@ public sealed class ServerHost : IDisposable
 
         lock (providers)
             providers.Clear();
+
+        // Last: everything that could take the gate has finished above.
+        lifecycle.Dispose();
     }
 
     private void WaitBounded(Func<Task> action, string what)

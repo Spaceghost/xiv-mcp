@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
@@ -100,7 +101,7 @@ public sealed class ItemCompareProvider
             throw new McpToolException("Give at least two different item ids to compare.");
         }
 
-        var names = items.ToDictionary(i => i.ItemId, i => i.Name ?? i.ItemId.ToString());
+        var names = items.ToDictionary(i => i.ItemId, i => i.Name ?? i.ItemId.ToString(CultureInfo.InvariantCulture));
         var allStats = items.SelectMany(i => i.Stats.Keys).Distinct().OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
         var differences = new List<StatDiffDto>();
         var same = new List<string>();

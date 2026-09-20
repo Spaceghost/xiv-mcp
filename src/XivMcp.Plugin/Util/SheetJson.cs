@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
@@ -301,9 +302,9 @@ public static class SheetJson
             case bool b:
                 return b;
             case sbyte or byte or short or ushort or int or uint or long:
-                return JsonValue.Create(Convert.ToInt64(value));
+                return JsonValue.Create(Convert.ToInt64(value, CultureInfo.InvariantCulture));
             case ulong ul:
-                return ul <= long.MaxValue ? JsonValue.Create((long)ul) : JsonValue.Create(ul.ToString());
+                return ul <= long.MaxValue ? JsonValue.Create((long)ul) : JsonValue.Create(ul.ToString(CultureInfo.InvariantCulture));
             case float f:
                 return float.IsFinite(f) ? JsonValue.Create(Math.Round(f, 4)) : null;
             case double d:

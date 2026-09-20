@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Providers.GameData;
@@ -11,11 +12,13 @@ public sealed unsafe class HousingProvider
 {
     private readonly GameDataIndex index;
     private readonly IClientState clientState;
+    private readonly IObjectTable objects;
 
-    public HousingProvider(IDataManager data, IClientState clientState)
+    public HousingProvider(IDataManager data, IClientState clientState, IObjectTable objects)
     {
         index = GameDataIndex.For(data);
         this.clientState = clientState;
+        this.objects = objects;
     }
 
     public sealed record HousingResult(
@@ -48,7 +51,7 @@ public sealed unsafe class HousingProvider
         var manager = CsHousingManager.Instance();
         var territory = clientState.TerritoryType;
         var zone = index.TerritoryName(territory);
-        var fcTag = SafeString(() => clientState.LocalPlayer?.CompanyTag.TextValue);
+        var fcTag = SafeString(() => objects.LocalPlayer?.CompanyTag.TextValue);
 
         if (manager == null)
         {
@@ -60,7 +63,7 @@ public sealed unsafe class HousingProvider
         var plot = SafeInt(() => manager->GetCurrentPlot());
         var division = SafeInt(() => manager->GetCurrentDivision());
         var room = SafeInt(() => manager->GetCurrentRoom());
-        var houseId = SafeLong(() => (long)manager->GetCurrentHouseId());
+        var houseId = SafeLong(() => (long)(ulong)manager->GetCurrentHouseId());
         var inside = SafeBool(() => manager->IsInside());
         var outside = SafeBool(() => manager->IsOutside());
         var workshop = SafeBool(() => manager->IsInWorkshop());
@@ -75,7 +78,7 @@ public sealed unsafe class HousingProvider
             plot is > 0 ? plot : null,
             division is > 0 ? division : null,
             room is > 0 ? room : null,
-            houseId is > 0 ? houseId.Value.ToString() : null,
+            houseId is > 0 ? houseId.Value.ToString(CultureInfo.InvariantCulture) : null,
             inside,
             outside,
             workshop,

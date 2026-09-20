@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 
@@ -72,7 +73,7 @@ public sealed class BridgeRegistry
             var api = definition.ProbeKind switch
             {
                 BridgeProbeKind.IntPair => Describe(pluginInterface.GetIpcSubscriber<(int Breaking, int Feature)>(definition.ProbeGate).InvokeFunc()),
-                BridgeProbeKind.Int => pluginInterface.GetIpcSubscriber<int>(definition.ProbeGate).InvokeFunc().ToString(),
+                BridgeProbeKind.Int => pluginInterface.GetIpcSubscriber<int>(definition.ProbeGate).InvokeFunc().ToString(CultureInfo.InvariantCulture),
                 _ => pluginInterface.GetIpcSubscriber<string>(definition.ProbeGate).InvokeFunc(),
             };
 

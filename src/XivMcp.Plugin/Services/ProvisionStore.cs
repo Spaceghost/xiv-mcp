@@ -53,8 +53,10 @@ public sealed class ProvisionStore
     public bool HasChecked => everRead;
 
     /// <summary>
-    /// Re-reads the file when it looks changed (or when <paramref name="force"/> is set) and returns true
-    /// when the effective settings changed, so the caller can restart the listener. Never throws.
+    /// Re-reads the file when it looks changed and returns true when the effective settings changed, so
+    /// the caller can restart the listener. <paramref name="force"/> skips the poll interval (used on
+    /// load and when the owner asks), not the change check: a file that has not been written is not
+    /// re-read, so provisioning costs nothing per tick. Never throws.
     /// </summary>
     public bool Poll(Configuration config, bool force = false)
     {
@@ -72,7 +74,7 @@ public sealed class ProvisionStore
             nextPollTicks = now + (long)interval.TotalMilliseconds;
 
             var current = stat(path);
-            if (!force && everRead && current == lastSeen)
+            if (everRead && current == lastSeen)
                 return false;
             lastSeen = current;
             everRead = true;
