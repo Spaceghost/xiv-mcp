@@ -167,7 +167,7 @@ public class ExtensionTests
     {
         await using var s = await TestServer.StartAsync();
         s.Server.ControlHandler = static request => Task.FromResult<ControlResponse?>(
-            request.SubPath == "host" ? new ControlResponse(200, new JsonObject { ["method"] = request.Method, ["loopback"] = request.FromLoopback, ["echo"] = request.Body?["a"]?.GetValue<int>() }) : null);
+            request.SubPath == "host" ? new ControlResponse(200, new JsonObject { ["method"] = request.Method, ["loopback"] = request.FromThisMachine, ["echo"] = request.Body?["a"]?.GetValue<int>() }) : null);
 
         using var anonymous = new HttpClient();
         using var refused = await anonymous.GetAsync(new Uri(s.Endpoint + "/host"));

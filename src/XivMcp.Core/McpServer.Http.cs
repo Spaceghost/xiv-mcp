@@ -128,7 +128,7 @@ public sealed partial class McpServer
             }
 
             if (ControlHandler is { } handler)
-                response = await handler(new ControlRequest(request.Method, subPath, request.AuthenticatedClient, connection.RemoteEndPoint is System.Net.IPEndPoint { Address: var peer } && System.Net.IPAddress.IsLoopback(peer), body)).ConfigureAwait(false);
+                response = await handler(new ControlRequest(request.Method, subPath, request.AuthenticatedClient, connection.PeerIsThisMachine, body)).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

@@ -52,11 +52,16 @@ internal sealed class HttpServer : IDisposable
             foreach (var address in addresses)
             {
                 var listener = new TcpListener(address, port);
-                if (!OperatingSystem.IsWindows())
+                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
                 {
-                    // Linux: allow rebinding while old connections sit in TIME_WAIT (does not allow two listeners).
+                    // Allow rebinding while old connections sit in TIME_WAIT, but never two listeners on one port.
+                    // .NET's ReuseAddress also sets SO_REUSEPORT on Unix, which lets a second process bind the same
+                    // port and split the connections; the plugin/standalone hand-off depends on that bind failing.
+                    // So: exclusive (TcpListener.Start then leaves the options alone) plus the raw SO_REUSEADDR.
                     // Not set on Windows/Wine, where SO_REUSEADDR has port-sharing semantics.
-                    listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    listener.ExclusiveAddressUse = true;
+                    var (level, name) = OperatingSystem.IsLinux() ? (1, 2) : (0xffff, 4);
+                    listener.Server.SetRawSocketOption(level, name, BitConverter.GetBytes(1));
                 }
 
                 if (address.AddressFamily == AddressFamily.InterNetworkV6 && !address.Equals(IPAddress.IPv6Any))

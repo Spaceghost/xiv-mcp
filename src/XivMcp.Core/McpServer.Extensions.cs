@@ -49,9 +49,9 @@ public sealed class ExternalTool
 /// <param name="Method">HTTP method, upper case.</param>
 /// <param name="SubPath">The part after the endpoint path, without the leading slash, e.g. "host".</param>
 /// <param name="AuthenticatedClient">Per-client token name, or null for the main token (or no token when none is required).</param>
-/// <param name="FromLoopback">The TCP peer is a loopback address.</param>
+/// <param name="FromThisMachine">The TCP peer is on this machine (loopback, or the same address it connected to).</param>
 /// <param name="Body">Request body parsed as JSON when there was one and it parsed; otherwise null.</param>
-public sealed record ControlRequest(string Method, string SubPath, string? AuthenticatedClient, bool FromLoopback, JsonNode? Body);
+public sealed record ControlRequest(string Method, string SubPath, string? AuthenticatedClient, bool FromThisMachine, JsonNode? Body);
 
 /// <summary>What a <see cref="McpServer.ControlHandler"/> answers.</summary>
 public sealed record ControlResponse(int Status, JsonNode Body);
