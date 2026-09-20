@@ -1,0 +1,4 @@
+# actionlint: labels of this repository's self-hosted runners (docs/CI.md)
+self-hosted-runner:
+  labels:
+    - xiv-mcp

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Game.Chat;
 using Dalamud.Game.Text;
 using Dalamud.Plugin.Services;
@@ -310,7 +311,7 @@ public sealed class ChatLogProvider : IDisposable
     private static ChatEntryDto ToDto(Entry e) => new(
         e.Sequence,
         e.Timestamp,
-        Enum.IsDefined(e.Type) ? e.Type.ToString() : ((ushort)e.Type).ToString(),
+        Enum.IsDefined(e.Type) ? e.Type.ToString() : ((ushort)e.Type).ToString(CultureInfo.InvariantCulture),
         (ushort)e.Type,
         e.Sender.Length > 0 ? e.Sender : null,
         e.Message,

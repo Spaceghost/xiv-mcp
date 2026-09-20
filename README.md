@@ -424,6 +424,9 @@ more:
 An entry keeps its `beta` until the thing it describes has been observed working in the game. Say
 what is unverified in the entry itself rather than writing around it.
 
+CI runs the same tests and build through one script, `tools/ci/run.sh` (locally: `tools/ci/local.sh`):
+[docs/CI.md](docs/CI.md).
+
 ## Troubleshooting
 
 - **"Could not start on http://127.0.0.1:41800/mcp: ... address already in use"** — another process

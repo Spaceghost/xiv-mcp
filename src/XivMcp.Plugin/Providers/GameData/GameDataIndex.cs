@@ -15,7 +15,7 @@ namespace XivMcp.Plugin.Providers.GameData;
 /// built once on first use (on whichever thread asks, which for data tools is never the framework
 /// thread) and then shared by every provider.
 /// </summary>
-internal sealed class GameDataIndex
+internal sealed class GameDataIndex : IDisposable
 {
     private static readonly object Gate = new();
     private static GameDataIndex? current;
@@ -84,9 +84,13 @@ internal sealed class GameDataIndex
             Name = "XivMcp game data index warmup",
         };
         thread.Start();
+        warmupThread = thread;
     }
 
+    // warmupCancel's token is waited on through token.WaitHandle, so the source owns a real OS
+    // wait handle: leaving it undisposed leaks a handle on every plugin reload.
     private readonly CancellationTokenSource warmupCancel = new();
+    private Thread? warmupThread;
 
     /// <summary>
     /// Drops the shared index and stops background warmup (called when the plugin unloads its providers) so no
@@ -94,20 +98,44 @@ internal sealed class GameDataIndex
     /// </summary>
     public static void Release()
     {
+        GameDataIndex? released;
         lock (Gate)
         {
-            if (current == null) return;
-            try
-            {
-                current.warmupCancel.Cancel();
-            }
-            catch
-            {
-                // Already disposed.
-            }
-
+            released = current;
             current = null;
         }
+
+        released?.Dispose();
+    }
+
+    /// <summary>
+    /// Stops the warmup thread and releases its wait handle. Public so the unload path (and the
+    /// leak tests) can assert the handle is gone; <see cref="Release"/> is the normal caller.
+    /// </summary>
+    public void Dispose()
+    {
+        try
+        {
+            warmupCancel.Cancel();
+        }
+        catch (Exception)
+        {
+            // Already cancelled or disposed; the join and dispose below still apply.
+        }
+
+        // The thread is waiting on warmupCancel's wait handle: let it observe the cancel before
+        // the source (and with it the handle) is disposed.
+        var thread = Interlocked.Exchange(ref warmupThread, null);
+        try
+        {
+            thread?.Join(TimeSpan.FromSeconds(2));
+        }
+        catch (Exception)
+        {
+            // A thread that will not join must not block plugin unload.
+        }
+
+        warmupCancel.Dispose();
     }
 
     public ExcelModule Module { get; }

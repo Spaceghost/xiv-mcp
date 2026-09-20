@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Dalamud.Game.Inventory.InventoryEventArgTypes;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -41,6 +42,10 @@ public sealed unsafe class InventoryProvider : IDisposable
         ("other", 45691), // Lunar Credit
         ("other", 21172), // Achievement Certificate
     ];
+    // The index is a process-wide shared singleton handed out by GameDataIndex.For; the
+    // providers borrow it and GameDataIndex.Release() owns its teardown on unload.
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Shared singleton owned by GameDataIndex.Release(), not by this provider.")]
 
     private readonly GameDataIndex index;
     private readonly IPlayerState playerState;

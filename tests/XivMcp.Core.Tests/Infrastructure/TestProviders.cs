@@ -94,8 +94,9 @@ public sealed class BasicProvider
 [McpProvider("slow")]
 public sealed class SlowProvider
 {
-    public static TaskCompletionSource<bool> CancelObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    public static TaskCompletionSource<bool> Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public static TaskCompletionSource<bool> CancelObserved { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public static TaskCompletionSource<bool> Started { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public static void Reset()
     {
