@@ -1,6 +1,33 @@
-# xiv-mcp
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/readme/hero-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/readme/hero-light.png">
+    <img src="images/readme/hero-dark.png" width="100%" alt="XivMcp: your game, for your AI assistant. A crystal plug wired to glass cards reading resources/read, tools/call get_item, prompts/get gear_audit, and an approve action? card with allow and deny.">
+  </picture>
+</p>
 
-![XivMcp: your game, for your AI assistant](images/banner.png)
+<h1 align="center">XivMcp</h1>
+
+<p align="center"><em>Your game, for your AI assistant: a loopback MCP server inside FINAL FANTASY XIV, with in-game approval.</em></p>
+
+<p align="center">
+  <a href="https://github.com/Spaceghost/xivmcp-dalamud/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Spaceghost/xivmcp-dalamud/ci.yml?branch=master&style=flat-square&labelColor=0b1226&label=CI"></a>
+  <a href="https://github.com/Spaceghost/xivmcp-dalamud/actions/workflows/quality.yml"><img alt="quality" src="https://img.shields.io/github/actions/workflow/status/Spaceghost/xivmcp-dalamud/quality.yml?branch=master&style=flat-square&labelColor=0b1226&label=quality"></a>
+  <a href="https://github.com/Spaceghost/xivmcp-dalamud/actions/workflows/battery.yml"><img alt="battery" src="https://img.shields.io/github/actions/workflow/status/Spaceghost/xivmcp-dalamud/battery.yml?branch=master&style=flat-square&labelColor=0b1226&label=battery"></a>
+  <a href="https://github.com/Spaceghost/xivmcp-dalamud/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://img.shields.io/github/actions/workflow/status/Spaceghost/xivmcp-dalamud/codeql.yml?branch=master&style=flat-square&labelColor=0b1226&label=CodeQL"></a>
+  <a href="https://github.com/Spaceghost/xivmcp-dalamud/actions/workflows/scorecard.yml"><img alt="scorecard" src="https://img.shields.io/github/actions/workflow/status/Spaceghost/xivmcp-dalamud/scorecard.yml?branch=master&style=flat-square&labelColor=0b1226&label=scorecard"></a>
+  <br>
+  <a href="https://github.com/Spaceghost/xivmcp-dalamud/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Spaceghost/xivmcp-dalamud?include_prereleases&sort=semver&style=flat-square&labelColor=0b1226&color=3a9be0&label=release"></a>
+  <a href="https://github.com/goatcorp/Dalamud"><img alt="Dalamud API level 15" src="https://img.shields.io/badge/Dalamud-API_15-d6a854?style=flat-square&labelColor=0b1226"></a>
+  <a href="https://spacegho.st/mods/ffxiv/plugins/"><img alt="Install from the plugin repository" src="https://img.shields.io/badge/install-testing_builds-d6a854?style=flat-square&labelColor=0b1226"></a>
+  <a href="#install"><img alt="Platform: Linux (Wine)" src="https://img.shields.io/badge/platform-Linux_(Wine)-3a9be0?style=flat-square&labelColor=0b1226"></a>
+</p>
+
+<p align="center">
+  <a href="https://spacegho.st/mods/ffxiv/xivmcp/">Minisite</a> &nbsp;·&nbsp; <a href="#install">Install</a> &nbsp;·&nbsp; <a href="#connect-a-client">Connect a client</a> &nbsp;·&nbsp; <a href="#tool-catalog">Tool catalog</a> &nbsp;·&nbsp; <a href="docs/">Docs</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">Changelog</a> &nbsp;·&nbsp; <a href="https://spacegho.st/mods/ffxiv/term/vote/">Vote</a>
+</p>
+
+<p align="center"><img src="images/readme/divider.svg" width="320" alt=""></p>
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that runs **inside FINAL FANTASY XIV** as a
 Dalamud plugin. MCP clients such as Claude Code connect to it over Streamable HTTP on loopback
@@ -8,46 +35,118 @@ Dalamud plugin. MCP clients such as Claude Code connect to it over Streamable HT
 player's UI and — only when the player opts in — actions and chat. An optional Umbra toolbar widget
 shows server status and the agent board.
 
+> [!IMPORTANT]
 > **Status.** The plugin builds against Dalamud API 15 (Dalamud 15.0.3.4, .NET 10). The MCP runtime and
 > the plugin logic that needs no game (confirmation service, chat rules, IPC payloads, map maths) have host-side
 > tests, but **the plugin has not yet been observed running in the game**. Nothing below about in-game behaviour
-> has been observed; treat it as the design, not as verified results.
+> has been observed; treat it as the design, not as verified results. [What is verified](#what-is-verified) has the table.
+
+## At a glance
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**A real MCP server, in the game process**<br>
+Streamable HTTP on `127.0.0.1:41800/mcp` with a 256-bit bearer token. 65 tools, 12 resources and templates, 6 prompts, generated into the [catalog](#tool-catalog) from the code.
+
+</td>
+<td width="50%" valign="top">
+
+**Off until you say so**<br>
+Four tiers: **Read** and **Ui** on, **Action** and **Chat** off. Every Action or Chat call waits for an Allow / Deny window in game.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Approve later**<br>
+An agent that runs while you are away files a ticket with `request_action`; it waits, across restarts, until you approve or deny it.
+
+</td>
+<td width="50%" valign="top">
+
+**See what your agents are doing**<br>
+Agents call `post_status`; their progress shows on the agent board in the `/xivmcp` window, the server info bar and the Umbra widget.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Objectives the game understands**<br>
+Agents post goals with an Eorzea time window, weather, a place and a radius; they sit under the Duty List and flag the map on click.
+
+</td>
+<td width="50%" valign="top">
+
+**One hub for local models**<br>
+Settings → *Local model* records an OpenAI-compatible server once; Almanac and Ghostty's `/ask` read it over Dalamud IPC.
+
+</td>
+</tr>
+</table>
 
 ## How it fits together
 
-```
-MCP client (Claude Code, ...)  --HTTP POST/GET/DELETE /mcp, Bearer token-->  XivMcp plugin (in game, under Wine)
-                                                                               |- McpServer (XivMcp.Core, TcpListener, no ASP.NET)
-                                                                               |- providers: [McpProvider] classes -> tools/resources/prompts
-                                                                               |- IGameThread -> IFramework (game memory only on the framework thread)
-                                                                               |- /xivmcp window, confirmation prompt, DTR entry
-                                                                               '- Dalamud IPC  <-- XivMcp.Umbra widget
+```mermaid
+flowchart TB
+  client["<b>MCP client</b><br/>Claude Code, Codex, curl, ..."]
+  client -- "POST / GET / DELETE /mcp · Authorization: Bearer" --> plugin
+  subgraph game["FINAL FANTASY XIV + Dalamud, under Wine"]
+    subgraph plugin["XivMcp plugin"]
+      direction LR
+      server["<b>McpServer</b><br/>XivMcp.Core<br/>TcpListener, no ASP.NET"]
+      tiers{"tier on?<br/>approved<br/>in game?"}
+      providers["<b>Providers</b><br/>tools · resources<br/>prompts"]
+      thread["<b>IGameThread</b><br/>IFramework: game memory<br/>only on the framework thread"]
+      ui["/xivmcp window<br/>confirmation prompt<br/>DTR entry"]
+      server --> tiers -- yes --> providers --> thread
+      tiers -. "Action / Chat" .-> ui
+    end
+    umbra["XivMcp.Umbra widget"] -- "Dalamud IPC" --> plugin
+    friends["Almanac · Ghostty /ask"] -- "IPC: GetLocalModel · ConnectClient" --> plugin
+  end
+  friends -. "their own connection" .-> model["<b>Local model server</b><br/>Ollama · LM Studio · llama.cpp · KoboldCpp"]
 ```
 
 Wine maps `127.0.0.1` inside the game to the host's loopback, so host-side clients reach the plugin
-directly. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+directly. XivMcp does not run a model; it only records where yours is. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Install (from the plugin repository)
+## Install
 
-XivMcp is listed in the author's own third-party Dalamud repository, next to the
-other FFXIV mods there. In game:
+Two paths, both supported. The plugin repository is one click; building it yourself is the path the author develops on, and
+it stays supported for friends and strangers who want to read the code first.
+
+### One click (plugin repository)
+
+XivMcp is listed in the author's own third-party Dalamud repository, next to the other FFXIV mods there.
+
+In game:
 
 1. `/xlsettings` → **Experimental** → **Custom Plugin Repositories** → paste
-   `https://spacegho.st/mods/ffxiv/plugins.json` → **+** → **Save and close**.
+
+   ```
+   https://spacegho.st/mods/ffxiv/plugins.json
+   ```
+
+   → **+** → **Save and close**.
 2. `/xlplugins` → **All Plugins** → search **XivMcp** → **Install**.
 
-While XivMcp only has test builds, it shows up only for players who opted in:
-`/xlsettings` → **Experimental** → **Get plugin testing builds**. Once it has a
-stable release, ticking testing on its own entry is enough to get test builds early.
-<https://spacegho.st/mods/ffxiv/plugins/> walks through the same steps. It is a
-third-party repository: Dalamud will say nobody but the author reviewed it, which is
-true. Releases are built on GitHub Actions from a tag (`.github/workflows/release.yml`);
-`v1.2.3` is a stable release, `v1.2.3-test.1` moves the floating `testing` release.
+> [!NOTE]
+> **XivMcp is testing-only until its first stable release.** It appears in `/xlplugins` only after you tick
+> `/xlsettings` → **Experimental** → **Get plugin testing builds**. The same is true of the other mods in the
+> repository except Almanac, which has a stable release.
 
-You do not need any of that to run it: building it yourself, below, is the path the
-author develops on, and it stays supported for anyone who wants to read the code first.
+<https://spacegho.st/mods/ffxiv/plugins/> walks through the same steps and says what every mod in the repository is. It is a
+third-party repository, not the official Dalamud one: Dalamud will warn you that nobody but the author has reviewed it,
+which is true.
 
-## Install (dev plugin)
+Releases are built on GitHub Actions from a tag (`.github/workflows/release.yml`); `v1.2.3` is a stable release,
+`v1.2.3-test.1` moves the floating `testing` release.
+
+### Build it yourself (dev plugin)
 
 Requirements: XIVLauncher.Core with Dalamud 15.0.3.5 (API 15), the .NET 10 SDK on the host (`~/.dotnet/dotnet`
 is picked up automatically). Reference assemblies come from `~/.xlcore/dalamud/Hooks/dev/`; rebuild after every
@@ -123,7 +222,159 @@ curl -s http://127.0.0.1:41800/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}'
 ```
 
-## Where the server listens
+## Permission model
+
+Every tool declares one tier. Each tier is a separate toggle (Settings → Permissions); disabled tiers
+and categories are hidden from `tools/list` and rejected on call.
+
+| Tier | Default | Meaning |
+| --- | --- | --- |
+| **Read** | on | Observe game state and static game data. |
+| **Ui** | on | Local-only visible effects: echo to your own chat log, toasts, map flags, opening windows, the agent board. |
+| **Action** | **off** | Changes your client: targeting, gearsets, teleport, arbitrary slash commands. |
+| **Chat** | **off** | Sends text other players can see (say, party, tells, FC, ...). |
+
+> [!WARNING]
+> **Game automation through XivMcp is limited to what you approve**: a click, a session you opened, or a rule you
+> wrote. Combat rotations, movement and input automation of any kind are out of scope. The confirmation window, the
+> Approvals tab and their buttons are **unverified in game**; the server-side hook and the service logic are covered by
+> host tests.
+
+```mermaid
+flowchart LR
+  agent(["agent"]) -- "tools/call" --> covered{"session, rule or<br/>10-min grant?"}
+  covered -- yes --> run["runs in game, logged"]
+  covered -- no --> window["confirmation window<br/>auto-deny after N s"]
+  window -- Allow --> run
+  window -- "Deny / timeout" --> denied["isError: denied"]
+  agent -- "request_action" --> ticket["ticket: pending, saved"]
+  ticket -- "you: Approve" --> run
+  ticket -- "you: Deny" --> denied
+  run --> result["result on the call or the ticket;<br/>the agent resumes"]
+```
+
+<details>
+<summary><b>Confirmation, tickets, categories, network rules</b> — the full permission rules</summary>
+<br>
+
+- **Confirmation.** *Ask me before every Action/Chat call* (default on): each Action or Chat call waits for the
+  in-game confirmation window, which shows the tool, the client-reported name and the pretty-printed arguments, with
+  **Allow**, **Deny** and **Allow this tool for 10 min** (same tool, tier and client name; revoked when permissions
+  change, listed under Settings). Unanswered calls are denied after *Auto-deny after (s)* (default 20). The client
+  gets `isError` "denied in game by the player" or "not confirmed in game within N s", and the tool did not run.
+  `execute_command` lines that post chat are shown and granted as Chat. Turning confirmation off makes Action/Chat
+  follow their tier toggles directly. **Unverified in game:** the window and its buttons have not been exercised
+  inside FINAL FANTASY XIV yet; the server-side hook and the service logic are covered by host tests.
+- **Approve later (ticket queue).** An agent that may run while you are away calls `request_action` instead of the
+  tool: the call becomes a ticket in the **Approvals** tab and waits, across reloads and game restarts, until you
+  approve or deny it. Approved tickets run with the normal checks and call timeout, and the agent picks up the result
+  with `get_ticket`/`list_tickets` or a resource subscription and resumes its plan. From a ticket you can also
+  **Allow everything from this client for 5 min** (1–60 in Settings; Chat only with a separate checkbox; banner with
+  countdown and Revoke; never saved). For unattended CI, a **client token** plus **auto-approve rules** pre-approve
+  exact command prefixes for that token only. Details, diagrams and the client resume contract:
+  [docs/APPROVALS.md](docs/APPROVALS.md). **Game automation through XivMcp is limited to what you approve**: a click,
+  a session you opened, or a rule you wrote. **Unverified in game**, like the confirmation window.
+
+- **Categories** (character, chat, gamedata, ui, meta, prompts, ...) can be switched off individually.
+- **Resources** follow the Read tier as well as their category; prompts only return text and follow their category.
+- **Network.** The listener binds `127.0.0.1` by default. Any bind that reaches past this machine is
+  shown with a red warning and **forces the bearer token on**; the server refuses to start such a bind
+  without one. Requests carrying an `Origin` header are accepted only from loopback origins or the
+  configured allow-list, and the `Host` header must name loopback, an address the server actually bound,
+  or its MagicDNS name (DNS-rebinding defence). See [Where the server listens](#where-the-server-listens).
+- **Out of scope:** combat rotations, movement, and input automation of any kind.
+
+</details>
+
+**Local model and companion plugins.** *Settings → Local model* records an OpenAI-compatible local server (Ollama, LM
+Studio, llama.cpp, KoboldCpp) with **Detect** and **Test** buttons. XivMcp does not run the model; companion plugins
+(Almanac, the Ghostty terminal's `/ask`) read it over Dalamud IPC (`XivMcp.GetLocalModel`) and can connect themselves
+with `XivMcp.ConnectClient`, which issues a per-client token (switch: *Let other plugins connect themselves*). Game
+actions from those clients still need your in-game approval. Gates and payloads:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ipc-plugin--umbra).
+
+All settings: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## In game
+
+| Command | What it does |
+| --- | --- |
+| `/xivmcp` | toggles the window |
+| `/xivmcp start` · `stop` · `restart` · `status` · `settings` | controls the server, prints its state, opens Settings |
+| `/xivmcp quests ...` | custom objectives, e.g. `/xivmcp quests load <file>` |
+
+- **Status**: running state, endpoint, sessions, bind errors, provider load failures, masked token,
+  client snippets. **Agents**: the agent board with state colours and progress bars. **Approvals** (with the
+  pending count): queued tickets to approve or deny, approval sessions and recent results. **Activity**: live
+  request feed with filter; failures highlighted. **Tools**: every registered tool by category with its
+  tier and whether it is currently available. **Settings**: everything configurable.
+- Server info bar entry `MCP ● n` (n = active sessions; `?` when a confirmation is waiting). Click to
+  open the window.
+- The agent board: agents call `post_status` to show "what I'm doing" in game (and in the Umbra
+  widget); a notification appears when an agent posts `done` or `failed`.
+- Custom objectives ("quests"): agents call `post_objective` / `update_objective` (or you load a quest pack with
+  `/xivmcp quests load <file>`), and each one appears under the game's Duty List with its current step and a live
+  *Ready now* / *Next window in N min* line from its zone, spot, Eorzea time window and weather. Click one to flag it
+  on the map. They are **not** Journal quests (those are server-side and cannot be added); they are an overlay drawn to
+  match the Duty List. Details and the in-game checklist: [docs/OBJECTIVES.md](docs/OBJECTIVES.md).
+
+## Screens
+
+Nothing has been captured yet, because nothing has been seen in game yet. These are the named slots from the
+[minisite](https://spacegho.st/mods/ffxiv/xivmcp/)'s media manifest; a real capture replaces the placeholder of the same
+id in `docs/media/` and nothing else moves.
+
+<table>
+<tr>
+<td width="50%" valign="top"><img src="docs/media/status-window.svg" width="100%" alt="Placeholder for 'The Server at a Glance' (screenshot): not captured yet"><br><sub><b>The Server at a Glance</b> · <code>status-window</code></sub></td>
+<td width="50%" valign="top"><img src="docs/media/approval-prompt.svg" width="100%" alt="Placeholder for 'Ask Me First' (screenshot + gif): not captured yet"><br><sub><b>Ask Me First</b> · <code>approval-prompt</code></sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/media/agent-board.svg" width="100%" alt="Placeholder for 'What My Agents Are Doing' (gif): not captured yet"><br><sub><b>What My Agents Are Doing</b> · <code>agent-board</code></sub></td>
+<td width="50%" valign="top"><img src="docs/media/tools-tab.svg" width="100%" alt="Placeholder for 'Every Tool and Its Tier' (screenshot): not captured yet"><br><sub><b>Every Tool and Its Tier</b> · <code>tools-tab</code></sub></td>
+</tr>
+</table>
+
+<details>
+<summary><b>The other 3 planned shots</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><img src="docs/media/claude-code-session.svg" width="100%" alt="Placeholder for 'Claude Code Meets Eorzea' (video): not captured yet"><br><sub><b>Claude Code Meets Eorzea</b> · <code>claude-code-session</code></sub></td>
+<td width="50%" valign="top"><img src="docs/media/permissions.svg" width="100%" alt="Placeholder for 'Off Until You Say So' (screenshot): not captured yet"><br><sub><b>Off Until You Say So</b> · <code>permissions</code></sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/media/umbra-widget.svg" width="100%" alt="Placeholder for 'In the Toolbar' (screenshot): not captured yet"><br><sub><b>In the Toolbar</b> · <code>umbra-widget</code></sub></td>
+<td width="50%"></td>
+</tr>
+</table>
+
+</details>
+
+## What is verified
+
+● yes &nbsp;·&nbsp; ◐ partly &nbsp;·&nbsp; ○ no &nbsp;·&nbsp; — does not apply. **Seen in game** means observed on that build in a running game; a passing host test never earns it.
+
+| Area | Built | Host tests | Seen in game | Notes |
+| --- | :---: | :---: | :---: | --- |
+| MCP runtime: protocol, Streamable HTTP transport, sessions, security and hardening | ● | ● | ○ | `tests/XivMcp.Core.Tests`; no Dalamud needed |
+| Plugin logic that needs no game: confirmation service, chat rules, IPC payloads, map maths, bind modes, provisioning, objectives | ● | ● | ○ | `tests/XivMcp.Plugin.Tests`; needs the Dalamud dev hooks |
+| The plugin loaded in FINAL FANTASY XIV | ● | — | ○ | builds against API 15; **not yet observed running in the game** |
+| Providers reading live game state | ● | ○ | ○ | design, not a result |
+| Confirmation window, Approvals tab, approval sessions | ● | ◐ | ○ | service logic tested; the windows and buttons are unexercised |
+| Tailnet bind modes, provisioning file | ● | ◐ | ○ | resolution and parsing tested; no real tailnet client observed |
+| Custom objectives under the Duty List | ● | ◐ | ○ | conditions and store tested; the overlay is unverified, see [docs/OBJECTIVES.md](docs/OBJECTIVES.md) |
+| Umbra widgets (`Umbra.XivMcp.dll`) | ● | ◐ | ○ | payload parsing and a stylesheet parse; never loaded in Umbra, see [docs/UMBRA.md](docs/UMBRA.md) |
+
+Host tests prove only what they run; nothing in them loads the plugin in FINAL FANTASY XIV. The
+[changelog](CHANGELOG.md) keeps every entry at **BETA** until it has been seen working in the game.
+
+## Reference
+
+<details>
+<summary><a name="where-the-server-listens"></a><b>Where the server listens</b> — loopback (default), your tailnet, or a custom address</summary>
+<br>
 
 Settings → **Server** → *Where the server listens*. Changing it applies without reloading the plugin:
 **Apply and restart server** stops the listener and binds the new addresses in place.
@@ -165,7 +416,11 @@ that works from any tailnet machine.
 > Action/Chat confirmation on, and treat the token like a password: regenerate it (Settings → Advanced) if
 > it leaks, and remember that tailnet ACLs are what decide who can even reach the port.
 
-## Provisioning file (optional)
+</details>
+
+<details>
+<summary><a name="provisioning-file-optional"></a><b>Provisioning file</b> — optional, read-only overrides for unattended machines</summary>
+<br>
 
 For config management and unattended machines, the plugin reads an optional file that **overrides** the
 saved settings while it exists. The plugin only ever reads it — it is never written back, and removing it
@@ -207,83 +462,45 @@ Its contents are never logged — the log records the path, which settings it pr
 error, nothing else. A malformed file keeps the last values that loaded, shows the error in Settings and
 in the log, and never falls back to a wider bind.
 
-## Permission model
+</details>
 
-Every tool declares one tier. Each tier is a separate toggle (Settings → Permissions); disabled tiers
-and categories are hidden from `tools/list` and rejected on call.
+<details>
+<summary><a name="troubleshooting"></a><b>Troubleshooting</b> — port in use, a provider failed to load, missing tools, Claude Code cannot connect</summary>
+<br>
 
-| Tier | Default | Meaning |
-| --- | --- | --- |
-| **Read** | on | Observe game state and static game data. |
-| **Ui** | on | Local-only visible effects: echo to your own chat log, toasts, map flags, opening windows, the agent board. |
-| **Action** | **off** | Changes your client: targeting, gearsets, teleport, arbitrary slash commands. |
-| **Chat** | **off** | Sends text other players can see (say, party, tells, FC, ...). |
+- **"Could not start on http://127.0.0.1:41800/mcp: ... address already in use"** — another process
+  (or a previous plugin instance that did not unload) holds the port. Change the port in Settings or
+  restart the game.
+- **A provider shows "failed to load"** — the Status and Tools tabs list the exception; the other
+  providers keep working. `/xllog` has the stack trace.
+- **Action/Chat tools missing** — they are off by default (Settings → Permissions). `get_server_info` reports the
+  enabled tiers. With confirmation on, a call that nobody approves in game fails after the auto-deny time.
+- **Claude Code says the connection failed** — the helper exits non-zero if the plugin config does not
+  exist yet (load the plugin once) or has no token. Run
+  `~/.local/share/xiv-mcp/headers-helper >/dev/null && echo ok` to check without printing the token.
 
-- **Confirmation.** *Ask me before every Action/Chat call* (default on): each Action or Chat call waits for the
-  in-game confirmation window, which shows the tool, the client-reported name and the pretty-printed arguments, with
-  **Allow**, **Deny** and **Allow this tool for 10 min** (same tool, tier and client name; revoked when permissions
-  change, listed under Settings). Unanswered calls are denied after *Auto-deny after (s)* (default 20). The client
-  gets `isError` "denied in game by the player" or "not confirmed in game within N s", and the tool did not run.
-  `execute_command` lines that post chat are shown and granted as Chat. Turning confirmation off makes Action/Chat
-  follow their tier toggles directly. **Unverified in game:** the window and its buttons have not been exercised
-  inside FINAL FANTASY XIV yet; the server-side hook and the service logic are covered by host tests.
-- **Approve later (ticket queue).** An agent that may run while you are away calls `request_action` instead of the
-  tool: the call becomes a ticket in the **Approvals** tab and waits, across reloads and game restarts, until you
-  approve or deny it. Approved tickets run with the normal checks and call timeout, and the agent picks up the result
-  with `get_ticket`/`list_tickets` or a resource subscription and resumes its plan. From a ticket you can also
-  **Allow everything from this client for 5 min** (1–60 in Settings; Chat only with a separate checkbox; banner with
-  countdown and Revoke; never saved). For unattended CI, a **client token** plus **auto-approve rules** pre-approve
-  exact command prefixes for that token only. Details, diagrams and the client resume contract:
-  [docs/APPROVALS.md](docs/APPROVALS.md). **Game automation through XivMcp is limited to what you approve**: a click,
-  a session you opened, or a rule you wrote. **Unverified in game**, like the confirmation window.
+</details>
 
-```
-agent --request_action--> ticket (pending, saved) --you: Approve--> runs in game --> result on the ticket --> agent resumes
-                                                  \--you: Deny----> denied (agent does not retry)
-agent --tools/call-------> confirmation window (auto-deny after N s)  [unchanged]
-session / rule / 10-min grant covers the call --> runs without a prompt, logged
-```
-- **Categories** (character, chat, gamedata, ui, meta, prompts, ...) can be switched off individually.
-- **Resources** follow the Read tier as well as their category; prompts only return text and follow their category.
-- **Network.** The listener binds `127.0.0.1` by default. Any bind that reaches past this machine is
-  shown with a red warning and **forces the bearer token on**; the server refuses to start such a bind
-  without one. Requests carrying an `Origin` header are accepted only from loopback origins or the
-  configured allow-list, and the `Host` header must name loopback, an address the server actually bound,
-  or its MagicDNS name (DNS-rebinding defence). See [Where the server listens](#where-the-server-listens).
-- **Out of scope:** combat rotations, movement, and input automation of any kind.
-
-**Local model and companion plugins.** *Settings → Local model* records an OpenAI-compatible local server (Ollama, LM
-Studio, llama.cpp, KoboldCpp) with **Detect** and **Test** buttons. XivMcp does not run the model; companion plugins
-(Almanac, the Ghostty terminal's `/ask`) read it over Dalamud IPC (`XivMcp.GetLocalModel`) and can connect themselves
-with `XivMcp.ConnectClient`, which issues a per-client token (switch: *Let other plugins connect themselves*). Game
-actions from those clients still need your in-game approval. Gates and payloads:
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ipc-plugin--umbra).
-
-All settings: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
-## In game
-
-- `/xivmcp` toggles the window; `/xivmcp start|stop|restart|status|settings`; `/xivmcp quests ...` for custom objectives.
-- **Status**: running state, endpoint, sessions, bind errors, provider load failures, masked token,
-  client snippets. **Agents**: the agent board with state colours and progress bars. **Approvals** (with the
-  pending count): queued tickets to approve or deny, approval sessions and recent results. **Activity**: live
-  request feed with filter; failures highlighted. **Tools**: every registered tool by category with its
-  tier and whether it is currently available. **Settings**: everything configurable.
-- Server info bar entry `MCP ● n` (n = active sessions; `?` when a confirmation is waiting). Click to
-  open the window.
-- The agent board: agents call `post_status` to show "what I'm doing" in game (and in the Umbra
-  widget); a notification appears when an agent posts `done` or `failed`.
-- Custom objectives ("quests"): agents call `post_objective` / `update_objective` (or you load a quest pack with
-  `/xivmcp quests load <file>`), and each one appears under the game's Duty List with its current step and a live
-  *Ready now* / *Next window in N min* line from its zone, spot, Eorzea time window and weather. Click one to flag it
-  on the map. They are **not** Journal quests (those are server-side and cannot be added); they are an overlay drawn to
-  match the Duty List. Details and the in-game checklist: [docs/OBJECTIVES.md](docs/OBJECTIVES.md).
+| Document | What is in it |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | threads, providers, IPC gates and payloads |
+| [docs/PROTOCOL.md](docs/PROTOCOL.md) | the MCP surface the server implements |
+| [docs/APPROVALS.md](docs/APPROVALS.md) | tickets, sessions, client tokens, auto-approve rules, the client resume contract |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | every setting |
+| [docs/OBJECTIVES.md](docs/OBJECTIVES.md) | custom objectives, quest packs, the in-game checklist |
+| [docs/PROVIDERS.md](docs/PROVIDERS.md) | writing a provider |
+| [docs/UMBRA.md](docs/UMBRA.md) | the optional Umbra widgets |
+| [docs/CI.md](docs/CI.md) | what CI runs, and how to run it locally |
 
 ## Tool catalog
 
 Generated from the `[McpTool]`, `[McpResource]`, `[McpResourceTemplate]` and `[McpPrompt]` attributes of the built
 plugin by `tools/catalog` (`dotnet run --project tools/catalog -c Release -- readme --write README.md` after building);
 do not edit the block by hand.
+
+<details>
+<summary><b>Open the catalog</b> — 65 tools, 12 resources and templates, 6 prompts</summary>
+<br>
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
@@ -396,6 +613,8 @@ Prompts only return instructions; every game interaction still goes through tool
 
 <!-- END GENERATED CATALOG -->
 
+</details>
+
 ## Development
 
 ```sh
@@ -414,7 +633,12 @@ source tree. Writing a provider: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
 Host tests prove only what they run; nothing in them loads the plugin in FINAL FANTASY XIV.
 
-### Changelog
+CI runs the same tests and build through one script, `tools/ci/run.sh` (locally: `tools/ci/local.sh`):
+[docs/CI.md](docs/CI.md).
+
+<details>
+<summary><a name="changelog"></a><b>Changelog convention</b> — one source, `changelog.json`; what SOON, BETA and NEW mean</summary>
+<br>
 
 `changelog.json` at the top of the repository is the changelog, and the only place entries are
 written. Both places a user reads it come from that one file: the plugin embeds it
@@ -444,18 +668,43 @@ more:
 An entry keeps its `beta` until the thing it describes has been observed working in the game. Say
 what is unverified in the entry itself rather than writing around it.
 
-CI runs the same tests and build through one script, `tools/ci/run.sh` (locally: `tools/ci/local.sh`):
-[docs/CI.md](docs/CI.md).
+</details>
 
-## Troubleshooting
+## The family
 
-- **"Could not start on http://127.0.0.1:41800/mcp: ... address already in use"** — another process
-  (or a previous plugin instance that did not unload) holds the port. Change the port in Settings or
-  restart the game.
-- **A provider shows "failed to load"** — the Status and Tools tabs list the exception; the other
-  providers keep working. `/xllog` has the stack trace.
-- **Action/Chat tools missing** — they are off by default (Settings → Permissions). `get_server_info` reports the
-  enabled tiers. With confirmation on, a call that nobody approves in game fails after the auto-deny time.
-- **Claude Code says the connection failed** — the helper exits non-zero if the plugin config does not
-  exist yet (load the plugin once) or has no token. Run
-  `~/.local/share/xiv-mcp/headers-helper >/dev/null && echo ok` to check without printing the token.
+Four mods, one plugin repository, one look. They work alone and better together.
+
+<table>
+<tr>
+<td width="96" align="center"><a href="https://github.com/Spaceghost/ghostty-dalamud"><img src="images/readme/family/ghostty.png" width="72" height="72" alt="Ghostty for FFXIV icon"></a></td>
+<td valign="top"><b><a href="https://github.com/Spaceghost/ghostty-dalamud">Ghostty for FFXIV</a></b><br>A real terminal in the game: a glass dropdown, tabs, and screens you pin in the world.<br><sub><a href="https://spacegho.st/mods/ffxiv/term/">minisite</a> · <a href="https://github.com/Spaceghost/ghostty-dalamud"><code>Spaceghost/ghostty-dalamud</code></a></sub></td>
+</tr>
+<tr>
+<td width="96" align="center"><a href="https://github.com/Spaceghost/xivmcp-dalamud"><img src="images/readme/family/xivmcp.png" width="72" height="72" alt="XivMcp icon"></a></td>
+<td valign="top"><b><a href="https://github.com/Spaceghost/xivmcp-dalamud">XivMcp</a></b> &nbsp;<sub>(you are here)</sub><br>An MCP server inside the game, so your own AI client can read it and, with your approval, act.<br><sub><a href="https://spacegho.st/mods/ffxiv/xivmcp/">minisite</a> · <a href="https://github.com/Spaceghost/xivmcp-dalamud"><code>Spaceghost/xivmcp-dalamud</code></a></sub></td>
+</tr>
+<tr>
+<td width="96" align="center"><a href="https://github.com/Spaceghost/xivdesktop-dalamud"><img src="images/readme/family/xivdesktop.png" width="72" height="72" alt="XivDesktop icon"></a></td>
+<td valign="top"><b><a href="https://github.com/Spaceghost/xivdesktop-dalamud">XivDesktop</a></b><br>A launcher, workspaces and a taskbar for Linux desktop apps shown as panels in the world.<br><sub><a href="https://spacegho.st/mods/ffxiv/xivdesktop/">minisite</a> · <a href="https://github.com/Spaceghost/xivdesktop-dalamud"><code>Spaceghost/xivdesktop-dalamud</code></a></sub></td>
+</tr>
+<tr>
+<td width="96" align="center"><a href="https://github.com/Spaceghost/almanac-dalamud"><img src="images/readme/family/almanac.png" width="72" height="72" alt="Almanac icon"></a></td>
+<td valign="top"><b><a href="https://github.com/Spaceghost/almanac-dalamud">Almanac</a></b><br>A model on your own GPU, in game chat, with XivMcp's tools and a community benchmark.<br><sub><a href="https://spacegho.st/mods/ffxiv/almanac/about/">minisite</a> · <a href="https://github.com/Spaceghost/almanac-dalamud"><code>Spaceghost/almanac-dalamud</code></a></sub></td>
+</tr>
+</table>
+
+<p align="center"><img src="images/readme/divider.svg" width="320" alt=""></p>
+
+<p align="center">
+  <a href="https://spacegho.st/mods/ffxiv/">All mods</a> &nbsp;·&nbsp;
+  <a href="https://spacegho.st/mods/ffxiv/xivmcp/">XivMcp minisite</a> &nbsp;·&nbsp;
+  <a href="https://spacegho.st/mods/ffxiv/plugins/">Plugin repository</a> &nbsp;·&nbsp;
+  <a href="https://spacegho.st/mods/ffxiv/term/vote/">Vote on features</a> &nbsp;·&nbsp;
+  <a href="https://spacegho.st/mods/ffxiv/term/gallery/">Gallery</a> &nbsp;·&nbsp;
+  <a href="https://spacegho.st/mods/ffxiv/almanac/">Model leaderboard</a> &nbsp;·&nbsp;
+  <a href="https://github.com/Spaceghost/xivmcp-dalamud/blob/master/CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center"><sub>Made by <b>Johnneylee Jack Rollins</b> · <a href="https://github.com/Spaceghost">github.com/Spaceghost</a><br>
+FINAL FANTASY XIV © SQUARE ENIX CO., LTD. These are independent fan projects, not affiliated with or endorsed by Square Enix, Dalamud or XIVLauncher.</sub></p>
+

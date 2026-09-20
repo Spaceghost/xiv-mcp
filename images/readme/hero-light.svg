@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <title>XivMcp: your game, for your AI assistant</title>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9f0fb"/><stop offset="0.55" stop-color="#f7eedb"/><stop offset="1" stop-color="#f5d9ac"/></linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9dcf2"/><stop offset="1" stop-color="#8fb0dc"/></linearGradient>
+    <radialGradient id="horizon" cx="72%" cy="100%" r="60%"><stop offset="0" stop-color="#ffcf7a" stop-opacity="0.75"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#8fe3ff" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#4fb0f0" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#4fb0f0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c99a4b"/><stop offset="0.5" stop-color="#94682c"/><stop offset="1" stop-color="#5a3d14"/></linearGradient>
+    <linearGradient id="goldX" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8a6128"/>
+      <stop offset="0.35" stop-color="#f6e2a4"/>
+      <stop offset="1" stop-color="#9a6e2e"/>
+    </linearGradient>
+    <linearGradient id="goldH" gradientUnits="userSpaceOnUse" x1="84" y1="0" x2="520" y2="0">
+      <stop offset="0" stop-color="#d6a854" stop-opacity="0"/>
+      <stop offset="0.15" stop-color="#d6a854"/>
+      <stop offset="0.85" stop-color="#d6a854"/>
+      <stop offset="1" stop-color="#d6a854" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d4f7ff"/><stop offset="1" stop-color="#3a9be0"/></linearGradient>
+    <linearGradient id="fB" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cd0f8"/><stop offset="1" stop-color="#1a5aa0"/></linearGradient>
+    <linearGradient id="fC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f86cf"/><stop offset="1" stop-color="#0f3a72"/></linearGradient>
+    <radialGradient id="amberHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffc861" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffb13b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c3a70" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#071230" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="glare" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="refl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fe3ff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#8fe3ff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="blur"><feGaussianBlur stdDeviation="3"/></filter>
+    <g id="node">
+      <circle r="22" fill="url(#amberHalo)"/>
+      <circle r="9" fill="#ffd27a" stroke="#fff3d0" stroke-width="3"/>
+    </g>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#sky)"/>
+  <g fill="#c99a4b" opacity="0.55">
+      <circle cx="579" cy="166" r="1.3" opacity="0.64"/>
+      <circle cx="1094" cy="29" r="1.6" opacity="0.66"/>
+      <circle cx="786" cy="29" r="1.3" opacity="0.55"/>
+      <circle cx="116" cy="300" r="2.1" opacity="0.76"/>
+      <circle cx="762" cy="95" r="1.3" opacity="0.78"/>
+      <circle cx="788" cy="22" r="0.8" opacity="0.89"/>
+      <circle cx="81" cy="2" r="1" opacity="0.74"/>
+      <circle cx="996" cy="70" r="1.6" opacity="0.90"/>
+      <circle cx="664" cy="206" r="1.3" opacity="0.35"/>
+      <circle cx="109" cy="213" r="1.3" opacity="1.00"/>
+      <circle cx="1274" cy="318" r="2.1" opacity="0.52"/>
+      <circle cx="970" cy="144" r="0.8" opacity="0.40"/>
+      <circle cx="981" cy="97" r="1.1" opacity="0.60"/>
+      <circle cx="1226" cy="322" r="0.8" opacity="0.49"/>
+      <circle cx="1187" cy="4" r="1.3" opacity="0.99"/>
+      <circle cx="509" cy="6" r="2.1" opacity="0.48"/>
+      <circle cx="864" cy="74" r="1.1" opacity="0.57"/>
+      <circle cx="1234" cy="270" r="0.8" opacity="0.44"/>
+      <circle cx="905" cy="0" r="1.3" opacity="0.87"/>
+      <circle cx="227" cy="166" r="1.3" opacity="0.68"/>
+      <circle cx="1261" cy="276" r="1.3" opacity="0.77"/>
+      <circle cx="149" cy="105" r="1" opacity="0.35"/>
+      <circle cx="1106" cy="403" r="1.6" opacity="0.55"/>
+      <circle cx="1133" cy="35" r="1.3" opacity="1.00"/>
+      <circle cx="771" cy="174" r="0.8" opacity="0.99"/>
+      <circle cx="273" cy="48" r="1.6" opacity="0.56"/>
+      <circle cx="379" cy="6" r="0.8" opacity="0.49"/>
+      <circle cx="815" cy="1" r="1.1" opacity="0.59"/>
+      <circle cx="580" cy="393" r="1.3" opacity="0.89"/>
+      <circle cx="174" cy="92" r="2.1" opacity="0.45"/>
+      <circle cx="1163" cy="304" r="1" opacity="0.82"/>
+      <circle cx="203" cy="200" r="1.6" opacity="0.48"/>
+      <circle cx="1216" cy="344" r="1.6" opacity="0.40"/>
+      <circle cx="61" cy="12" r="1.6" opacity="0.98"/>
+      <circle cx="305" cy="240" r="1.1" opacity="0.62"/>
+      <circle cx="1158" cy="135" r="1.6" opacity="0.46"/>
+      <circle cx="922" cy="6" r="1" opacity="0.66"/>
+      <circle cx="836" cy="193" r="0.8" opacity="0.53"/>
+      <circle cx="1174" cy="33" r="0.8" opacity="0.39"/>
+      <circle cx="527" cy="45" r="0.8" opacity="0.46"/>
+      <circle cx="472" cy="172" r="1" opacity="0.41"/>
+      <circle cx="177" cy="117" r="1.1" opacity="0.78"/>
+      <circle cx="885" cy="178" r="1" opacity="0.73"/>
+      <circle cx="1182" cy="128" r="1.1" opacity="0.81"/>
+      <circle cx="1232" cy="1" r="2.1" opacity="0.40"/>
+      <circle cx="86" cy="65" r="1" opacity="1.00"/>
+      <circle cx="96" cy="160" r="2.1" opacity="0.38"/>
+      <circle cx="1198" cy="258" r="1" opacity="0.87"/>
+      <circle cx="1171" cy="79" r="2.1" opacity="0.66"/>
+      <circle cx="99" cy="328" r="0.8" opacity="0.91"/>
+      <circle cx="733" cy="198" r="1.3" opacity="0.60"/>
+      <circle cx="16" cy="6" r="0.8" opacity="0.77"/>
+      <circle cx="1271" cy="342" r="2.1" opacity="0.56"/>
+      <circle cx="1196" cy="234" r="1.3" opacity="0.64"/>
+      <circle cx="1073" cy="8" r="1.6" opacity="0.37"/>
+      <circle cx="770" cy="130" r="1" opacity="0.97"/>
+      <circle cx="144" cy="282" r="2.1" opacity="0.95"/>
+      <circle cx="327" cy="0" r="1.1" opacity="0.44"/>
+      <circle cx="783" cy="147" r="1.1" opacity="0.78"/>
+      <circle cx="566" cy="350" r="1.1" opacity="0.61"/>
+      <circle cx="321" cy="203" r="1" opacity="0.92"/>
+      <circle cx="492" cy="177" r="1.1" opacity="0.49"/>
+      <circle cx="172" cy="79" r="0.8" opacity="0.81"/>
+      <circle cx="1216" cy="54" r="1" opacity="0.42"/>
+      <circle cx="603" cy="371" r="1.3" opacity="0.60"/>
+      <circle cx="666" cy="222" r="2.1" opacity="0.90"/>
+      <circle cx="1257" cy="118" r="0.8" opacity="0.89"/>
+      <circle cx="356" cy="189" r="2.1" opacity="0.81"/>
+      <circle cx="730" cy="64" r="1.6" opacity="0.36"/>
+      <circle cx="174" cy="119" r="0.8" opacity="0.85"/>
+      <circle cx="341" cy="282" r="0.8" opacity="0.99"/>
+      <circle cx="148" cy="12" r="1.6" opacity="0.78"/>
+      <circle cx="1033" cy="392" r="2.1" opacity="0.48"/>
+      <circle cx="1055" cy="47" r="2.1" opacity="0.36"/>
+      <circle cx="604" cy="245" r="1" opacity="0.50"/>
+      <circle cx="997" cy="157" r="1.6" opacity="0.68"/>
+      <circle cx="1276" cy="22" r="2.1" opacity="0.94"/>
+      <circle cx="112" cy="376" r="2.1" opacity="0.60"/>
+      <circle cx="577" cy="31" r="0.8" opacity="0.59"/>
+      <circle cx="728" cy="342" r="1.1" opacity="0.65"/>
+      <circle cx="834" cy="33" r="2.1" opacity="0.91"/>
+      <circle cx="1022" cy="370" r="0.8" opacity="0.49"/>
+      <circle cx="1152" cy="407" r="1.1" opacity="0.70"/>
+      <circle cx="1012" cy="68" r="2.1" opacity="0.91"/>
+      <circle cx="446" cy="8" r="1.3" opacity="0.57"/>
+      <circle cx="539" cy="53" r="0.8" opacity="0.49"/>
+      <circle cx="1110" cy="108" r="0.8" opacity="0.46"/>
+      <circle cx="429" cy="287" r="1" opacity="0.66"/>
+      <circle cx="1280" cy="355" r="1.6" opacity="0.90"/>
+      <circle cx="882" cy="384" r="1.3" opacity="0.73"/>
+      <circle cx="882" cy="270" r="1.3" opacity="0.69"/>
+      <circle cx="371" cy="253" r="2.1" opacity="0.46"/>
+      <circle cx="658" cy="359" r="1.1" opacity="0.55"/>
+      <circle cx="488" cy="321" r="1.6" opacity="0.49"/>
+      <circle cx="1089" cy="399" r="1.6" opacity="0.53"/>
+      <circle cx="637" cy="101" r="0.8" opacity="0.68"/>
+      <circle cx="775" cy="1" r="0.8" opacity="0.69"/>
+      <circle cx="513" cy="295" r="1.6" opacity="0.43"/>
+      <circle cx="119" cy="24" r="1.6" opacity="0.65"/>
+      <circle cx="1179" cy="294" r="1.3" opacity="0.52"/>
+      <circle cx="606" cy="15" r="1.3" opacity="0.94"/>
+      <circle cx="1198" cy="368" r="1.6" opacity="0.56"/>
+      <circle cx="245" cy="194" r="1.1" opacity="0.43"/>
+      <circle cx="997" cy="1" r="1" opacity="0.45"/>
+      <circle cx="15" cy="56" r="2.1" opacity="0.58"/>
+      <circle cx="793" cy="11" r="2.1" opacity="0.73"/>
+      <circle cx="1090" cy="197" r="2.1" opacity="0.48"/>
+      <circle cx="679" cy="112" r="1.3" opacity="0.76"/>
+      <circle cx="1056" cy="193" r="1.6" opacity="0.48"/>
+      <circle cx="808" cy="205" r="1.6" opacity="0.49"/>
+  </g>
+  <rect y="300" width="1280" height="160" fill="url(#horizon)"/>
+  <rect y="458" width="1280" height="182" fill="url(#sea)"/>
+  <path d="M0 458 L1280 458" stroke="#5f8fc8" stroke-opacity="0.6" stroke-width="2"/>
+  <g stroke="#ffffff" stroke-linecap="round" opacity="0.7" stroke-width="2">
+    <path d="M140 500 h120 M320 530 h80 M60 560 h160 M420 590 h110 M250 612 h60"/>
+  </g>
+
+  <!-- crystal plug, centred at x=930 -->
+  <circle cx="930" cy="250" r="230" fill="url(#halo)"/>
+  <ellipse cx="930" cy="590" rx="34" ry="150" fill="url(#refl)" filter="url(#blur)"/>
+  <g stroke="#ffd27a" stroke-linecap="round" opacity="0.45" stroke-width="3">
+    <path d="M896 488 h68 M880 518 h100 M906 550 h48 M890 584 h80"/>
+  </g>
+
+  <!-- links from the crystal to the cards -->
+  <g stroke="#ffc861" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8">
+    <path d="M858 200 C820 190 810 150 788 142"/>
+    <path d="M858 200 C820 240 800 300 782 330"/>
+    <path d="M1002 200 C1040 180 1060 150 1090 138"/>
+    <path d="M1002 200 C1050 250 1060 300 1092 330"/>
+  </g>
+
+  <g transform="translate(930 0) scale(0.8) translate(-256 12)">
+    <g filter="url(#bigglow)">
+      <path d="M256 52 L166 214 L256 244 Z" fill="url(#fA)"/>
+      <path d="M256 52 L346 214 L256 244 Z" fill="url(#fB)"/>
+      <path d="M166 214 L256 244 L226 346 L206 346 Z" fill="url(#fB)"/>
+      <path d="M346 214 L256 244 L286 346 L306 346 Z" fill="url(#fC)"/>
+      <path d="M256 244 L226 346 L286 346 Z" fill="url(#fA)" opacity="0.9"/>
+    </g>
+    <g stroke="#e8fbff" stroke-width="3" stroke-linejoin="round" fill="none" opacity="0.9">
+      <path d="M256 52 L166 214 L256 244 L346 214 Z"/>
+      <path d="M256 52 L256 244"/>
+      <path d="M166 214 L206 346 M346 214 L306 346 M256 244 L226 346 M256 244 L286 346"/>
+    </g>
+    <rect x="186" y="340" width="140" height="40" rx="12" fill="url(#goldX)" stroke="#fbe9b8" stroke-width="3"/>
+    <path d="M200 380 L312 380 L300 404 L212 404 Z" fill="url(#gold)"/>
+    <rect x="222" y="400" width="18" height="58" rx="6" fill="url(#gold)" stroke="#fbe9b8" stroke-width="2"/>
+    <rect x="272" y="400" width="18" height="58" rx="6" fill="url(#gold)" stroke="#fbe9b8" stroke-width="2"/>
+    <use href="#node" x="256" y="52"/>
+    <use href="#node" x="166" y="214"/>
+    <use href="#node" x="346" y="214"/>
+    <use href="#node" x="256" y="244"/>
+  </g>
+
+  <!-- floating cards -->
+  <g font-family="'Fira Code','Source Code Pro','DejaVu Sans Mono',monospace" font-size="15">
+    <g transform="translate(590 96) rotate(-3)" filter="url(#glow)">
+      <path d="M0 8 Q100 -4 200 8 L200 92 Q100 104 0 92 Z" fill="url(#glass)" stroke="#6fd6ff" stroke-width="2.5"/>
+      <path d="M6 14 Q100 3 194 14 L194 40 Q100 30 6 40 Z" fill="url(#glare)"/>
+      <text x="14" y="36" fill="#8ff0ff">resources/read</text>
+      <text x="14" y="60" fill="#cfe4ff">player: Lv 90</text>
+      <text x="14" y="82" fill="#9fb8e0">zone: Limsa Lominsa</text>
+    </g>
+    <g transform="translate(604 290) rotate(2)" filter="url(#glow)">
+      <path d="M0 8 Q90 -4 180 8 L180 92 Q90 104 0 92 Z" fill="url(#glass)" stroke="#6fd6ff" stroke-width="2.5"/>
+      <path d="M6 14 Q90 3 174 14 L174 40 Q90 30 6 40 Z" fill="url(#glare)"/>
+      <text x="14" y="36" fill="#8ff0ff">tools/call</text>
+      <text x="14" y="60" fill="#cfe4ff">get_item</text>
+      <text x="14" y="82" fill="#9fb8e0">"Darksteel Ore"</text>
+    </g>
+    <g transform="translate(1086 96) rotate(4)" filter="url(#glow)">
+      <path d="M0 8 Q80 -4 160 8 L160 92 Q80 104 0 92 Z" fill="url(#glass)" stroke="#6fd6ff" stroke-width="2.5"/>
+      <path d="M6 14 Q80 3 154 14 L154 40 Q80 30 6 40 Z" fill="url(#glare)"/>
+      <text x="14" y="36" fill="#8ff0ff">prompts/get</text>
+      <text x="14" y="60" fill="#cfe4ff">gear_audit</text>
+      <rect x="14" y="72" width="110" height="9" rx="3" fill="#6fd6ff" opacity="0.5"/>
+    </g>
+    <!-- approval card in amber -->
+    <g transform="translate(1076 290) rotate(-3)" filter="url(#glow)">
+      <path d="M0 8 Q84 -4 168 8 L168 112 Q84 124 0 112 Z" fill="url(#glass)" stroke="#ffc861" stroke-width="2.5"/>
+      <path d="M6 14 Q84 3 162 14 L162 40 Q84 30 6 40 Z" fill="url(#glare)"/>
+      <text x="14" y="36" fill="#ffd27a">approve action?</text>
+      <text x="14" y="60" fill="#cfe4ff">execute_command</text>
+      <rect x="14" y="76" width="64" height="26" rx="6" fill="#d6a854"/>
+      <text x="26" y="94" fill="#0a1430" font-weight="700">allow</text>
+      <rect x="88" y="76" width="64" height="26" rx="6" fill="none" stroke="#9fb8e0" stroke-width="1.5"/>
+      <text x="103" y="94" fill="#9fb8e0">deny</text>
+    </g>
+  </g>
+
+  <!-- title block -->
+  <text x="82" y="262" font-family="'Noto Serif','STIX Two Text',Georgia,serif" font-size="120" font-weight="700" fill="url(#gold)" letter-spacing="2">XivMcp</text>
+  <path d="M84 300 H520" stroke="url(#goldH)" stroke-width="2"/>
+  <path d="M302 292 l8 8 l-8 8 l-8 -8 Z" fill="#d6a854"/>
+  <text x="86" y="350" font-family="'Noto Serif','STIX Two Text',Georgia,serif" font-size="30" font-style="italic" fill="#3d2f14">your game, for your AI assistant</text>
+  <text x="86" y="398" font-family="'Fira Code','Source Code Pro','DejaVu Sans Mono',monospace" font-size="19" fill="#17577d">loopback MCP · in-game approval</text>
+
+  <rect x="14" y="14" width="1252" height="612" rx="18" fill="none" stroke="url(#gold)" stroke-width="3" opacity="0.8"/>
+</svg>
