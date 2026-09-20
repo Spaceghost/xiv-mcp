@@ -169,6 +169,14 @@ public static class BridgeCatalog
                 new("XivDesktop.v1.ListApps", "apps", "Installed desktop applications JSON.", BridgeGateKind.String),
             ]),
         new(
+            "almanac",
+            "Almanac",
+            ["Almanac"],
+            "Hand a question to the in-game assistant (needs in-game approval); the answer appears in Almanac's own window.",
+            "Almanac.ApiVersion",
+            BridgeProbeKind.Int,
+            []),
+        new(
             "umbra",
             "Umbra",
             ["Umbra"],
