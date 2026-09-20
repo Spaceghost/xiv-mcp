@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Package a built XivMcp plugin for Dalamud, and write the one-entry plugin
+# repository listing that spacegho.st/mods/ffxiv/plugins.json is assembled from.
+# Publishes nothing: the release workflow attaches what this writes.
+#
+#   dotnet build XivMcp.slnx -c Release && tools/package.sh
+#
+# Output, all under $OUT (default ../xiv-mcp-build/release):
+#   latest.zip                  the plugin folder as Dalamud installs it (XivMcp.json,
+#                               XivMcp.dll, XivMcp.Core.dll, no .pdb). The name is stable on purpose, so
+#                               .../releases/latest/download/latest.zip never changes.
+#   XivMcp-<version>.zip       the same bytes under a self-describing name
+#   pluginmaster.json           stable-channel listing (one entry, a JSON array)
+#   pluginmaster-testing.json   testing-channel listing, when TESTING=1
+#
+# Environment:
+#   BIN                the build output to package (default
+#                      $XIVMCP_ARTIFACTS/bin/XivMcp.Plugin/release, else
+#                      ../xiv-mcp-build/artifacts/bin/XivMcp.Plugin/release)
+#   OUT                where to write (default ../xiv-mcp-build/release)
+#   REPO               owner/name on GitHub (default $GITHUB_REPOSITORY, else
+#                      Spaceghost/xivmcp-dalamud)
+#   TESTING            1 to write pluginmaster-testing.json instead of pluginmaster.json
+#   SOURCE_DATE_EPOCH  timestamp for the zip entries and LastUpdate (default: the last
+#                      commit's time, else 0), so the same build packs to the same bytes
+#
+# Exit codes: 0 done, 1 nothing to package or a missing file, 127 a missing tool.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+command -v zip >/dev/null || { echo "error: zip is required" >&2; exit 127; }
+command -v python3 >/dev/null || { echo "error: python3 is required" >&2; exit 127; }
+
+ARTIFACTS="${XIVMCP_ARTIFACTS:-$ROOT/../xiv-mcp-build/artifacts}"
+BIN="${BIN:-$ARTIFACTS/bin/XivMcp.Plugin/release}"
+OUT="${OUT:-$ROOT/../xiv-mcp-build/release}"
+REPO="${REPO:-${GITHUB_REPOSITORY:-Spaceghost/xivmcp-dalamud}}"
+MANIFEST="$ROOT/src/XivMcp.Plugin/XivMcp.json"
+
+[[ -f "$BIN/XivMcp.dll" ]] || {
+  echo "error: $BIN/XivMcp.dll missing; run: dotnet build XivMcp.slnx -c Release" >&2
+  exit 1
+}
+[[ -f "$MANIFEST" ]] || { echo "error: $MANIFEST missing" >&2; exit 1; }
+
+VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["AssemblyVersion"])' "$MANIFEST")"
+[[ -n "$VERSION" ]] || { echo "error: no AssemblyVersion in $MANIFEST" >&2; exit 1; }
+if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
+  SOURCE_DATE_EPOCH="$(git -C "$ROOT" log -1 --format=%ct 2>/dev/null || echo 0)"
+fi
+
+STAGE="${TMPDIR:-/tmp}/xivmcp-package-$$"
+trap 'rm -rf "$STAGE"' EXIT
+rm -rf "$STAGE"
+mkdir -p "$STAGE/XivMcp" "$OUT"
+
+# Everything the built plugin needs and nothing else: the managed assemblies and the
+# manifest. Dalamud provides its own assemblies (the SDK keeps those out of the output),
+# .pdb and .deps.json are for developers, and DalamudPackager leaves its own zip and
+# staging folder in the output.
+( cd "$BIN" && find . -type f -print0 | while IFS= read -r -d '' f; do
+    # A case pattern's * matches slashes too, so the narrow paths come first.
+    case "$f" in
+      ./runtimes/win-x64/native/*) ;;                                  # native code for the game's process, if any
+      ./runtimes/* | ./XivMcp/*) continue ;;                          # other platforms; DalamudPackager's own staging copy
+      ./*.deps.json | ./*.runtimeconfig.json | *.pdb | *.zip) continue ;;
+      ./*/*) continue ;;                                               # nothing else from a subfolder
+      ./*.dll | ./*.json) ;;
+      *) continue ;;
+    esac
+    mkdir -p "$STAGE/XivMcp/$(dirname "$f")"
+    cp "$f" "$STAGE/XivMcp/$f"
+  done )
+cp "$MANIFEST" "$STAGE/XivMcp/XivMcp.json"
+
+# Dalamud unpacks the zip straight into the plugin folder, so the files sit at the root.
+find "$STAGE/XivMcp" -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
+rm -f "$OUT/latest.zip" "$OUT/XivMcp-$VERSION.zip"
+( cd "$STAGE/XivMcp" && find . -type f | LC_ALL=C sort | sed 's|^\./||' |
+    TZ=UTC zip -X -D -q "$OUT/latest.zip" -@ )
+cp "$OUT/latest.zip" "$OUT/XivMcp-$VERSION.zip"
+echo "== $OUT/latest.zip"
+unzip -l "$OUT/latest.zip" | tail -n 3
+# What Dalamud opens the zip for. A missing manifest installs a plugin that cannot load.
+for want in XivMcp.dll XivMcp.json; do
+  unzip -l "$OUT/latest.zip" | grep -qF " $want" || { echo "error: $want is not in the zip" >&2; exit 1; }
+done
+
+# The listing: the shipped manifest plus the fields a plugin repository adds.
+CHANNEL=stable
+LISTING="$OUT/pluginmaster.json"
+if [[ "${TESTING:-0}" == 1 ]]; then CHANNEL=testing; LISTING="$OUT/pluginmaster-testing.json"; fi
+python3 "$ROOT/tools/pluginmaster.py" \
+  --manifest "$MANIFEST" --repo "$REPO" --channel "$CHANNEL" \
+  --last-update "$SOURCE_DATE_EPOCH" --out "$LISTING"
+echo "== $LISTING"
+cat "$LISTING"

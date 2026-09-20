@@ -32,7 +32,7 @@ public sealed class MarketProvider : IDisposable
     {
         index = GameDataIndex.For(data);
         this.objects = objects;
-        client = new UniversalisClient("XivMcp/0.1 (+https://github.com/Spaceghost/xiv-mcp)");
+        client = new UniversalisClient("XivMcp/0.1 (+https://github.com/Spaceghost/xivmcp-dalamud)");
     }
 
     public sealed record ListingDto(
