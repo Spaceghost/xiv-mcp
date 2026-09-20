@@ -8,7 +8,7 @@ using XivMcp.Plugin.Services;
 
 namespace XivMcp.Plugin.Windows;
 
-/// <summary>Main window: Status, Agents, Activity, Tools and Settings tabs.</summary>
+/// <summary>Main window: Status, Agents, Activity, Tools, Settings and What's new tabs.</summary>
 public sealed partial class MainWindow : Window
 {
     private readonly IDalamudPluginInterface pluginInterface;
@@ -68,6 +68,7 @@ public sealed partial class MainWindow : Window
         DrawTab("Activity", DrawActivityTab);
         DrawTab("Tools", DrawToolsTab);
         DrawTab(SettingsTab, DrawSettingsTab);
+        DrawTab(WhatsNewTab, DrawWhatsNewTab);
         requestedTab = null;
 
         ImGui.EndTabBar();
