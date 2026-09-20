@@ -5,8 +5,21 @@ namespace XivMcp.Core;
 
 public sealed class McpServerOptions
 {
-    /// <summary>Loopback only by default. Anything else must be an explicit user choice.</summary>
+    /// <summary>Loopback only by default. Anything else must be an explicit user choice. Ignored when <see cref="Hosts"/> is non-empty.</summary>
     public string Host { get; set; } = "127.0.0.1";
+
+    /// <summary>
+    /// Addresses to bind, one listener each on <see cref="Port"/>. Empty (the default) binds
+    /// <see cref="Host"/> alone. Every entry must be an address literal or a resolvable name;
+    /// binding several addresses is how "loopback plus tailnet" is served.
+    /// </summary>
+    public List<string> Hosts { get; set; } = [];
+
+    /// <summary>
+    /// Extra names accepted in the <c>Host</c> header on top of loopback names and the bound
+    /// addresses (DNS-rebinding defence) — a MagicDNS name, for instance.
+    /// </summary>
+    public List<string> AllowedHostNames { get; set; } = [];
 
     public int Port { get; set; } = 41800;
 

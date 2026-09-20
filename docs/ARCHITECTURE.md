@@ -44,19 +44,87 @@ already created, because Dalamud does not call `Dispose` on a failed load.
 
 `ServerHost` creates a single `McpServer` and keeps it for the whole plugin lifetime, so providers and
 the notifier survive restarts. Start/stop/restart are serialized with a semaphore and run on the
-thread pool. Before each start the host copies configuration into `McpServer.Options` (host, port,
-token, allowed origins, call timeout, instructions). Failures to start, including bind errors, go to
+thread pool. Before each start the host copies configuration into `McpServer.Options` (bind addresses, allowed host
+names, port, path, token, allowed origins, call timeout, instructions). Failures to start, including bind errors, go to
 `ServerHost.LastError` and appear in the window, `/xivmcp status` and the DTR tooltip. Nothing is
 thrown into Dalamud.
 
 After a settings change, `ServerHost.ApplyConfigAsync()`:
 - updates the call timeout and the approval timeout in place (no restart);
-- restarts a running server if the host, port, token or origins changed;
+- restarts a running server if the bind plan, port, path, token or origins changed;
 - sends `tools/list_changed`, `prompts/list_changed` and `resources/list_changed` and revokes temporary
   confirmation grants if tiers, categories or the confirmation toggle changed, so connected clients re-list.
 
-Safety check: `StartCoreAsync` refuses to listen on a non-loopback host unless a bearer token is
-required.
+Safety check: `StartCoreAsync` refuses to start a bind that reaches past this machine unless a bearer
+token is required and set.
+
+### Where it listens (bind modes)
+
+`Configuration.BindMode` replaced the schema-2 `Host` string. `BindPlanner.Resolve(mode, customHost,
+tailnet)` is pure and turns the mode plus the detected tailnet address into a `BindPlan`: the ordered
+address list, the preferred address for an off-machine client, the extra names the `Host` header check
+must accept, and whether the bearer token is mandatory. `ServerHost.Plan` / `.Endpoints` /
+`.PreferredEndpoint` / `.LoopbackEndpoint` are the **single source of truth** for "where does this server
+listen" — the window, the Status snippets and the IPC payload all read them instead of deriving their own
+URL.
+
+| Mode | Addresses | Token |
+| --- | --- | --- |
+| `Loopback` (default) | `127.0.0.1` | optional |
+| `LoopbackAndTailnet` | `127.0.0.1` + the tailnet address | required |
+| `TailnetOnly` | the tailnet address | required |
+| `Custom` | the configured address | required unless it is loopback |
+
+A tailnet mode with no detected address falls back to `127.0.0.1` and reports a notice; it never fails to
+start, and it never binds something wider than the mode asked for.
+
+**Detection** (`Core/Net/Tailnet.cs`, BCL only, host-tested through a fake adapter list): an address in
+`100.64.0.0/10` or `fd7a:115c:a1e0::/48`, preferring an adapter whose name or description says Tailscale
+(`tailscale0`, `ts0`, "Tailscale Tunnel") and one that is up, IPv4 before IPv6. Three routes in order:
+
+1. `NetworkInterface.GetAllNetworkInterfaces()`. **Verified under the XIVLauncher Wine prefix**
+   (wine-xiv-staging 10.8, .NET 10 win-x64 console probe): Wine passes the Linux interfaces through with
+   their names intact — `Name` and `Description` are both `tailscale0`, and both the CGNAT and the ULA
+   address are listed. `NetworkInterfaceType` is reported as `Ppp`, so the type is never used to decide.
+2. the local endpoint of a connectionless UDP socket aimed at `100.100.100.100` (no packet is sent), kept
+   only when that address is itself a tailnet address. Also observed working under Wine.
+3. the `tailscale` CLI. **Not reachable from inside Wine**: executing the Linux binary through `Z:` with
+   redirected stdio fails with `E_HANDLE`, so this route only serves native hosts.
+
+The MagicDNS name is a reverse lookup of the detected address (MagicDNS answers PTR, and the resolver is
+reachable from inside the prefix), falling back to `tailscale status --json`. It is best effort; nothing
+depends on it. `TailnetProbe` caches the result for 20 s. Detection runs on server start and when the
+settings window opens, on a background task — never in the draw loop.
+
+### Listening on several addresses
+
+`HttpServer.Start(IReadOnlyList<IPAddress>, port)` binds **one real `TcpListener` per address**, all on
+the same port, and runs one accept loop each into the same connection handling (so `LoopbackAndTailnet`
+is two listeners, not a wildcard bind with a filter — nothing ever binds `0.0.0.0` unless the owner
+explicitly asks for it). With port 0 the first bind picks the port and the rest follow. A bind that fails
+part-way closes everything this call opened and rethrows, so a partial bind cannot leave the server up on
+some addresses only.
+
+The DNS-rebinding defence moved with it: the `Host` header must name a loopback name, an address the
+server actually bound, a name in `McpServerOptions.AllowedHostNames` (the MagicDNS name) or the host of
+an allowed origin. It used to run only for a loopback bind; it now runs for every bind except a wildcard
+one, where there is no address list to check against. Browser `Origin` is unchanged: loopback origins or
+the allow-list, so a browser on another tailnet machine needs its origin listed.
+
+### Provisioning file
+
+`ProvisionFile` + `ProvisionStore` read an optional outside file (`$XIVMCP_PROVISION`, else
+`$XDG_CONFIG_HOME/xiv-mcp/provision.json`, else `$HOME/.config/xiv-mcp/provision.json`; Unix paths are
+mapped onto Wine's `Z:` drive the way objective packs are). Its values overlay the saved configuration:
+`Configuration`'s provisionable settings read `Provision?.X ?? stored`, while Newtonsoft serializes the
+**stored** field, so a provisioned value is never written into `XivMcp.json` and removing the file
+restores the owner's own values exactly.
+
+The file is read-only to the plugin and polled (every 3 s, from the 1 Hz framework tick) rather than
+watched, because `FileSystemWatcher` across Wine's view of the Linux filesystem is not dependable. A
+malformed file keeps the last good document, surfaces the message in Settings and the log, and is retried
+on the next tick. Contents are never logged — only the path, the provisioned key names and parse errors.
+A change that affects the bind restarts the listener through `ApplyConfigAsync`, with no plugin reload.
 
 ### Provider discovery and DI
 
@@ -145,7 +213,7 @@ Gates from `IpcContract` with their type parameters (a subscriber must use the s
 | Gate | Provider type | Payload |
 | --- | --- | --- |
 | `XivMcp.ApiVersion` | `<int>` func | `IpcContract.Version` |
-| `XivMcp.GetStatus` | `<string>` func | `{running, endpoint, activeSessions, totalRequests, failedRequests, lastError, connectedClients[], permissions{read,ui,action,chat}, agents, confirmActions}`. `permissions` holds the tier toggles. |
+| `XivMcp.GetStatus` | `<string>` func | `{running, endpoint, endpoints[], activeSessions, totalRequests, failedRequests, lastError, connectedClients[], permissions{read,ui,action,chat}, agents, confirmActions}`. `permissions` holds the tier toggles. `endpoint` is the address to hand a client (the tailnet address when it is bound, else loopback); `endpoints` lists every bound address in bind order. |
 | `XivMcp.GetActivity` | `<int, string>` func | newest N (clamped 1..500) activity entries |
 | `XivMcp.GetAgentBoard` | `<string>` func | `[{agent, status, state, progress, detail, clientName, updatedAt}]`, newest first |
 | `XivMcp.SetRunning` | `<bool, bool>` func | starts/stops on the thread pool without blocking the caller; returns the running state at call time (`Changed` follows when the transition finishes) |

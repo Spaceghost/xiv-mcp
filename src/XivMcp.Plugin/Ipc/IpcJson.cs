@@ -16,13 +16,26 @@ public static class IpcJson
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
-    /// <summary>GetStatus. <c>permissions</c> are the effective tier toggles.</summary>
-    public static string Status(bool running, string endpoint, ServerStatus status, string? hostError, IHostState permissions, int agents, bool confirmActions) =>
+    /// <summary>
+    /// GetStatus. <c>permissions</c> are the effective tier toggles. <c>endpoint</c> is the address to hand a
+    /// client — with the tailnet bound that is the tailnet address, which works both on and off this machine —
+    /// and <c>endpoints</c> lists every address the server answers on, in bind order.
+    /// </summary>
+    public static string Status(
+        bool running,
+        string endpoint,
+        ServerStatus status,
+        string? hostError,
+        IHostState permissions,
+        int agents,
+        bool confirmActions,
+        IReadOnlyList<string>? endpoints = null) =>
         JsonSerializer.Serialize(
             new
             {
                 running,
                 endpoint,
+                endpoints = endpoints ?? [endpoint],
                 activeSessions = status.ActiveSessions,
                 totalRequests = status.TotalRequests,
                 failedRequests = status.FailedRequests,

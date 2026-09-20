@@ -39,11 +39,13 @@ public sealed partial class McpServer
 
         var headers = new List<KeyValuePair<string, string>>(6);
 
-        // DNS-rebinding defence: a loopback-bound server only answers to loopback Host names.
-        if (_loopbackBind && request.Headers.Get("Host") is { } hostHeader && !IsAllowedHost(hostHeader))
+        // DNS-rebinding defence: answer only to Host headers naming loopback, an address this server
+        // actually bound, or a name the owner allowed (its MagicDNS name, say). Switched off only for a
+        // wildcard bind, where there is no address list to check against.
+        if (_checkHostHeader && request.Headers.Get("Host") is { } hostHeader && !IsAllowedHost(hostHeader))
         {
             RecordRejection(request, started, "403", $"Host '{hostHeader}' is not allowed");
-            await SendJsonErrorAsync(connection, request, 403, null, JsonRpcCodes.InvalidRequest, "Forbidden: Host header is not a loopback name", headers).ConfigureAwait(false);
+            await SendJsonErrorAsync(connection, request, 403, null, JsonRpcCodes.InvalidRequest, "Forbidden: Host header is not an address this server listens on", headers).ConfigureAwait(false);
             return true;
         }
 
@@ -103,22 +105,31 @@ public sealed partial class McpServer
     private void RecordRejection(HttpRequest request, long started, string status, string reason) =>
         RecordActivity(null, null, "http " + request.Method, status, false, reason, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
 
-    private bool IsAllowedHost(string hostHeader)
+    private bool IsAllowedHost(string hostHeader) => IsAllowedHostHeader(hostHeader, _allowedHosts);
+
+    /// <summary>
+    /// The DNS-rebinding rule, split out so it can be tested per bind mode: strip the port, then accept
+    /// a loopback name or a name in <paramref name="allowed"/> (the bound addresses, the owner's extra
+    /// names and the hosts of the allowed origins).
+    /// </summary>
+    internal static bool IsAllowedHostHeader(string hostHeader, IReadOnlySet<string> allowed)
+    {
+        var host = StripPort(hostHeader);
+        return IsLoopbackHostName(host) || allowed.Contains(host);
+    }
+
+    /// <summary>The host part of a <c>Host</c> header value, without the port and without IPv6 brackets.</summary>
+    internal static string StripPort(string hostHeader)
     {
         var host = hostHeader.Trim();
         if (host.StartsWith('['))
         {
             var end = host.IndexOf(']');
-            host = end > 0 ? host[1..end] : host;
-        }
-        else
-        {
-            var colon = host.LastIndexOf(':');
-            if (colon > 0)
-                host = host[..colon];
+            return end > 0 ? host[1..end] : host;
         }
 
-        return IsLoopbackHostName(host) || _allowedHosts.Contains(host);
+        var colon = host.LastIndexOf(':');
+        return colon > 0 ? host[..colon] : host;
     }
 
     private bool IsAllowedOrigin(string origin)

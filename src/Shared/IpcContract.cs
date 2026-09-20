@@ -13,7 +13,7 @@ public static class IpcContract
 
     /// <summary>
     /// Func&lt;string&gt;: JSON object
-    /// { running, endpoint, activeSessions, totalRequests, failedRequests, lastError, connectedClients: string[],
+    /// { running, endpoint, endpoints: string[], activeSessions, totalRequests, failedRequests, lastError, connectedClients: string[],
     ///   permissions: { read, ui, action, chat } }
     /// </summary>
     public const string GetStatus = "XivMcp.GetStatus";

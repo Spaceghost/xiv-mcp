@@ -13,26 +13,32 @@ version 1) are dropped on the first save.
 
 ## Settings tab layout
 
-- **Server** (always visible): Enabled, Port.
+- **Server** (always visible): Enabled, and *Where the server listens* — bind mode, custom address, port,
+  endpoint path, the detected Tailscale address and the endpoint URLs the mode produces.
 - **What clients may do**: the four tiers, *Ask me in game before Action/Chat calls*, and its auto-deny timeout.
 - **Categories** (collapsed): per-category switches.
-- **Advanced** (collapsed): listen host, allowed origins, require token, regenerate token, call timeout,
+- **Advanced** (collapsed): allowed origins, require token, regenerate token, call timeout,
   chat buffer, activity log verbosity, server info bar entry, agent notifications, agent board expiry, custom objectives.
 
-Every change is saved and applied at once, except port, host and origins: they are edited as a draft
-(so typing does not restart the server per keystroke) and applied with **Apply and restart server**,
-which stops the listener and binds the new endpoint.
+Every change is saved and applied at once, except the bind settings (mode, address, port, path, origins):
+they are edited as a draft, so typing does not restart the server per keystroke, and applied with
+**Apply and restart server**, which stops the listener and binds the new endpoints. Everything is
+editable in game; nothing needs the file to be edited by hand, and a hand-edited file is not picked up
+until the plugin reloads.
 
 ## Server
 
 | Key | Default | Effect | Applied |
 | --- | --- | --- | --- |
 | `Enabled` | `true` | Run the server. Ticking it starts the server, unticking stops it, and the choice holds on the next load. The Start/Stop buttons and `/xivmcp start\|stop` are temporary and do not change it. | immediately |
-| `Port` | `41800` (1–65535) | TCP port; the endpoint is `http://<Host>:<Port>/mcp`. | Apply (restarts a running server) |
-| `Host` | `127.0.0.1` | Listen address (Advanced). Anything that is not loopback (`127.0.0.0/8`, `::1`, `localhost`) shows a red warning, and the server refuses to start on it unless `RequireToken` is on. Under Wine, `127.0.0.1` in game is the host's loopback. | Apply (restarts) |
+| `Port` | `41800` (1–65535) | TCP port; the endpoint is `http://<address>:<Port><Path>`. | Apply (restarts a running server) |
+| `BindMode` | `Loopback` | Which addresses are bound: `Loopback` (`127.0.0.1` only), `LoopbackAndTailnet` (also this machine's Tailscale address), `TailnetOnly`, `Custom` (uses `CustomHost`). Anything that reaches past this machine shows a red warning and forces `RequireToken` on. A tailnet mode with no Tailscale address falls back to `127.0.0.1` with a notice rather than failing to start. Under Wine, `127.0.0.1` in game is the host's loopback. | Apply (restarts) |
+| `CustomHost` | `127.0.0.1` | Address bound by `BindMode: Custom`; ignored otherwise. | Apply (restarts) |
+| `Host` | `127.0.0.1` | **Legacy (schema 2).** Kept in step with the mode so an older build still starts; not read once `Version` is 3. Migration: `127.0.0.1`/`localhost`/`::1` → `Loopback`, anything else → `Custom` with that address. | — |
+| `Path` | `/mcp` | Endpoint path. Clients must use the same one. | Apply (restarts) |
 | `BearerToken` | random | 256-bit random value, unpadded base64url (43 chars), generated on first run. Clients send `Authorization: Bearer <token>`. Never logged; hidden in the UI until revealed. **Regenerate token…** (Advanced) replaces it. | immediately (restarts) |
-| `RequireToken` | `true` | When off, requests need no token. Any local program can then call every enabled tool. | immediately (restarts) |
-| `AllowedOrigins` | `[]` | Extra `Origin` values accepted for browser requests (DNS-rebinding defence). Loopback origins are always accepted; requests without `Origin` are not affected. One per line. | Apply (restarts) |
+| `RequireToken` | `true` | When off, requests need no token. Any local program can then call every enabled tool. Held on, and not editable, whenever the bind reaches past this machine. | immediately (restarts) |
+| `AllowedOrigins` | `[]` | Extra `Origin` values accepted for browser requests (DNS-rebinding defence). Loopback origins are always accepted, a tailnet origin is **not** — list it here if a browser on another tailnet machine needs access. Requests without `Origin` are not affected. One per line. | Apply (restarts) |
 | `CallTimeoutSeconds` | `30` (5–600) | Upper bound for one tool/resource/prompt call. For Action/Chat calls it starts after in-game approval. | immediately, no restart |
 
 ## Permissions
@@ -84,10 +90,34 @@ is pressed. `tools/claude-mcp-add.sh` registers the same server without storing 
 
 ## Security notes
 
-- Keep `Host` on loopback. The server exposes your game session. With Action or Chat enabled, a caller
-  can act on your behalf.
+- Keep the bind on loopback unless you mean otherwise. The server exposes your game session. With Action
+  or Chat enabled, a caller can act on your behalf — and on the tailnet that means anyone with the token
+  on any machine in your tailnet, so the tailnet ACL is part of your security boundary.
+- The `Host` header must name loopback, an address the server actually bound, or its MagicDNS name;
+  anything else is rejected with 403, which is what stops a web page from rebinding DNS onto the bind.
 - The token protects against other local users and processes, not against software running as you.
   Regenerate it if it leaks. Clients registered through `tools/claude-mcp-add.sh` read the new token on
   their next connection.
 - `pluginConfigs/XivMcp.json` contains the token. Do not publish it or commit it. Client tokens are stored only as
   hashes, but each one grants the same access as the main token while it exists; revoke those you no longer use.
+
+## Provisioning file
+
+An optional outside file overrides these settings while it exists. See
+[the README](../README.md#provisioning-file-optional) for the schema and an example.
+
+- **Path:** `$XIVMCP_PROVISION`, else `$XDG_CONFIG_HOME/xiv-mcp/provision.json`, else
+  `$HOME/.config/xiv-mcp/provision.json`. Unix paths are reached through Wine's `Z:` drive from inside
+  the game.
+- **Read-only.** The plugin never writes it. The values it provides are never copied into
+  `XivMcp.json` either, so removing the file restores what you had configured in game.
+- **Provisionable keys:** `Enabled`, `BindMode`, `CustomHost`, `Port`, `Path`, `RequireToken`,
+  `BearerToken`, `AllowedOrigins`, `CallTimeoutSeconds`, `ConfirmTimeoutSeconds`, `DisabledCategories`.
+  Every one is optional; unknown keys are ignored. Permission tiers are deliberately **not**
+  provisionable — granting Action or Chat stays a decision made in game.
+- **Applied live.** Re-read within a few seconds of a change; a bind change restarts the listener with no
+  plugin reload. Settings greys out the provisioned controls and names the file.
+- **Mode 0600**, because it may carry `BearerToken`. Its contents are never logged: only the path, the
+  provisioned key names and parse errors.
+- **A malformed file keeps the last good values**, shows the error in Settings and the log, and never
+  falls back to a wider bind.

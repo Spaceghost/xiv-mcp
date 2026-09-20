@@ -2,6 +2,7 @@ using System.Reflection;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
+using XivMcp.Core.Net;
 
 namespace XivMcp.Plugin.Services;
 
@@ -31,7 +32,10 @@ public sealed class ServerHost : IDisposable
     private readonly List<ProviderInfo> providers = [];
     private readonly DateTimeOffset loadedAt = DateTimeOffset.UtcNow;
 
+    private readonly TailnetProbe tailnetProbe;
+
     private string appliedFingerprint = "";
+    private BindPlan appliedPlan;
     private string permissionFingerprint;
     private volatile ServerStatus status;
     private volatile bool running;
@@ -57,6 +61,8 @@ public sealed class ServerHost : IDisposable
         HostState = hostState;
 
         PluginVersion = typeof(ServerHost).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        tailnetProbe = new TailnetProbe(OnServerLog);
+        appliedPlan = ResolvePlan();
         var options = new McpServerOptions();
         ApplyOptions(options);
         Server = new McpServer(options, gameThread, hostState, OnServerLog) { Approver = confirmations };
@@ -85,10 +91,45 @@ public sealed class ServerHost : IDisposable
 
     public DateTimeOffset LoadedAt => loadedAt;
 
+    /// <summary>
+    /// The bind plan in force: what the running server was started with, or what a start would use now.
+    /// This is the one place that turns <see cref="Configuration.BindMode"/> plus live tailnet detection
+    /// into addresses; the window, the status payload and IPC all read it instead of deriving their own.
+    /// </summary>
+    public BindPlan Plan => running ? appliedPlan : ResolvePlan();
+
+    /// <summary>Every endpoint URL the server answers on (or would), in bind order.</summary>
+    public IReadOnlyList<string> Endpoints => BindPlanner.Endpoints(Plan, config.Port, config.Path);
+
+    /// <summary>
+    /// The endpoint to hand a client. With the tailnet bound this is the tailnet address, which is the one
+    /// that works from another machine as well as from this one; otherwise it is loopback.
+    /// </summary>
+    public string PreferredEndpoint => BindPlanner.Endpoint(Plan.PreferredHost, config.Port, config.Path);
+
+    /// <summary>The loopback endpoint, or null in tailnet-only mode where loopback is not bound.</summary>
+    public string? LoopbackEndpoint =>
+        Plan.LoopbackHost is { } host ? BindPlanner.Endpoint(host, config.Port, config.Path) : null;
+
+    /// <summary>The detected tailnet address, without probing. Null before the first probe or when there is none.</summary>
+    public TailnetAddress? TailnetAddress => tailnetProbe.Cached();
+
+    /// <summary>True once tailnet detection has run at least once, so the UI can say "none" rather than "unknown".</summary>
+    public bool TailnetProbed => tailnetProbe.HasProbed;
+
+    /// <summary>
+    /// Probes for the tailnet address again and returns it. Blocking (adapter enumeration, possibly a
+    /// reverse lookup): call it from a background task, not from the draw loop.
+    /// </summary>
+    public TailnetAddress? RefreshTailnet() => tailnetProbe.Refresh();
+
     /// <summary>Endpoint the running server was started with (or would start with).</summary>
-    public string Endpoint => running ? RunningEndpoint : config.EndpointUrl;
+    public string Endpoint => running ? RunningEndpoint : PreferredEndpoint;
 
     private string RunningEndpoint { get; set; } = "";
+
+    /// <summary>The plan the current configuration and the last detection result produce.</summary>
+    private BindPlan ResolvePlan() => config.ResolveBindPlan(tailnetProbe.Cached());
 
     /// <summary>Increments on every handled request (cheap change detection for UIs).</summary>
     public long ActivityVersion => Interlocked.Read(ref activityVersion);
@@ -279,21 +320,28 @@ public sealed class ServerHost : IDisposable
         if (running || disposed)
             return;
 
-        if (!config.HostIsLoopback && (!config.RequireToken || string.IsNullOrEmpty(config.BearerToken)))
+        // Detect the tailnet afresh on every start: the address survives reboots but not always a
+        // Tailscale restart, and the plugin outlives both.
+        tailnetProbe.Refresh();
+        var plan = ResolvePlan();
+
+        if (plan.RequiresToken && (!config.RequireToken || string.IsNullOrEmpty(config.BearerToken)))
         {
-            LastError = $"Refusing to listen on non-loopback host {config.Host} without a bearer token. Enable 'Require token' or use 127.0.0.1.";
+            LastError =
+                $"Refusing to listen on {BindPlanner.Describe(plan)} without a bearer token: anyone who can reach that address could drive the game. "
+                + "Switch 'Require bearer token' on, or use the loopback-only bind mode.";
             return;
         }
 
-        ApplyOptions(Server.Options);
+        ApplyOptions(Server.Options, plan);
         try
         {
             await Server.StartAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            LastError = $"Could not start on {config.EndpointUrl}: {Describe(ex)}";
-            log.Error(ex, "MCP server failed to start on {Host}:{Port}", config.Host, config.Port);
+            LastError = $"Could not start on {BindPlanner.Describe(plan)}:{config.Port}: {Describe(ex)}";
+            log.Error(ex, "MCP server failed to start on {Hosts}:{Port}", BindPlanner.Describe(plan), config.Port);
             try
             {
                 await Server.StopAsync().ConfigureAwait(false);
@@ -308,11 +356,14 @@ public sealed class ServerHost : IDisposable
 
         running = true;
         startedAt = DateTimeOffset.UtcNow;
+        appliedPlan = plan;
         appliedFingerprint = EndpointFingerprint();
-        RunningEndpoint = config.EndpointUrl;
+        RunningEndpoint = BindPlanner.Endpoint(plan.PreferredHost, config.Port, config.Path);
         LastError = null;
-        if (!config.HostIsLoopback)
-            log.Warning("MCP server is listening on NON-LOOPBACK host {Host}:{Port}", config.Host, config.Port);
+        if (plan.Notice is { } notice)
+            log.Warning("MCP bind: {Notice}", notice);
+        if (plan.RequiresToken)
+            log.Warning("MCP server is listening OFF THIS MACHINE on {Hosts}:{Port}", BindPlanner.Describe(plan), config.Port);
         else
             log.Information("MCP server listening on {Endpoint}", RunningEndpoint);
     }
@@ -333,11 +384,18 @@ public sealed class ServerHost : IDisposable
         }
     }
 
-    private void ApplyOptions(McpServerOptions options)
+    private void ApplyOptions(McpServerOptions options) => ApplyOptions(options, ResolvePlan());
+
+    private void ApplyOptions(McpServerOptions options, BindPlan plan)
     {
-        options.Host = config.Host.Trim();
+        options.Host = plan.Hosts[0];
+        options.Hosts = plan.Hosts.ToList();
+
+        // The DNS-rebinding check accepts loopback names plus the bound addresses; the MagicDNS name is
+        // the one extra name a tailnet client is likely to put in the Host header.
+        options.AllowedHostNames = plan.AllowedHostNames.ToList();
         options.Port = config.Port;
-        options.Path = "/mcp";
+        options.Path = config.Path;
         options.BearerToken = config.RequireToken ? config.BearerToken : null;
         options.AllowedOrigins = config.AllowedOrigins.Where(o => !string.IsNullOrWhiteSpace(o)).Select(o => o.Trim()).ToList();
         options.ClientTokens = config.ClientTokenHashes();
@@ -349,12 +407,18 @@ public sealed class ServerHost : IDisposable
         options.ApprovalTimeout = TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds);
     }
 
-    private string EndpointFingerprint() => string.Join(
-        '',
-        config.Host.Trim(),
-        config.Port,
-        config.RequireToken ? config.BearerToken : "",
-        string.Join(',', config.AllowedOrigins));
+    private string EndpointFingerprint()
+    {
+        var plan = ResolvePlan();
+        return string.Join(
+            '',
+            string.Join(',', plan.Hosts),
+            string.Join(',', plan.AllowedHostNames),
+            config.Port,
+            config.Path,
+            config.RequireToken ? config.BearerToken : "",
+            string.Join(',', config.AllowedOrigins));
+    }
 
     private string PermissionFingerprint() => string.Join(
         '',

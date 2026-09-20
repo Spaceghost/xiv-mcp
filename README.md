@@ -72,6 +72,10 @@ This registers `xiv-mcp` at **user** scope with `"type": "http"` and a
 Code connects. The token is never printed and never stored in Claude's config, and regenerating it in
 game only needs a reconnect (`/mcp` in Claude Code).
 
+Pass `--url http://<tailnet-ip>:41800/mcp` to register the tailnet endpoint instead of loopback (see
+[Where the server listens](#where-the-server-listens)); on another machine the helper cannot read the
+plugin config, so use the generic JSON below with the token instead.
+
 ### Anything else
 
 The Status tab has copy buttons for a `claude mcp add --header ...` command and a generic
@@ -98,6 +102,90 @@ curl -s http://127.0.0.1:41800/mcp \
   -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}'
 ```
+
+## Where the server listens
+
+Settings → **Server** → *Where the server listens*. Changing it applies without reloading the plugin:
+**Apply and restart server** stops the listener and binds the new addresses in place.
+
+| Mode | Binds | Who can connect |
+| --- | --- | --- |
+| **This machine only** (default) | `127.0.0.1` | Only this computer. Under Wine that includes clients on the Linux host. |
+| **This machine + my tailnet** | `127.0.0.1` **and** this machine's Tailscale address | This computer, plus anything on your tailnet that has the bearer token. |
+| **Tailnet only** | the Tailscale address | Your tailnet only; local clients must use that address too. |
+| **Custom address…** | whatever you type | Whatever that address is reachable from. |
+
+The plugin finds the Tailscale address itself: it looks for an address in `100.64.0.0/10` (CGNAT) or
+`fd7a:115c:a1e0::/48` on the machine's network adapters, preferring an adapter named `tailscale0`/`ts*`.
+Detection runs when the server starts and whenever the settings window opens, so a Tailscale restart or a
+changed address is picked up. The detected address and, when it can be read, the MagicDNS name are shown
+live in Settings along with the endpoint URLs the mode produces.
+
+**If Tailscale is not running or has no address, a tailnet mode falls back to `127.0.0.1`** and says so
+in Settings, the Status tab and the log. The server always starts; it never silently binds something
+wider than you asked for.
+
+### Reaching the server from another tailnet machine
+
+```sh
+curl -s http://<tailnet-ip>:41800/mcp \
+  -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}'
+```
+
+The MagicDNS name works in place of the address (`http://<machine>.<tailnet>.ts.net:41800/mcp`) when the
+plugin was able to read it — that name is added to the accepted `Host` headers. The Status tab's copy
+buttons already use the tailnet address when it is bound, so pasting from there gives a client config
+that works from any tailnet machine.
+
+> **Security.** Binding the tailnet means *anyone on your tailnet who has the bearer token can drive your
+> game*: every tool tier you have enabled, including Action and Chat if you turned those on, and chat is
+> visible to other players. The token is mandatory off loopback and the checkbox is held on. Keep
+> Action/Chat confirmation on, and treat the token like a password: regenerate it (Settings → Advanced) if
+> it leaks, and remember that tailnet ACLs are what decide who can even reach the port.
+
+## Provisioning file (optional)
+
+For config management and unattended machines, the plugin reads an optional file that **overrides** the
+saved settings while it exists. The plugin only ever reads it — it is never written back, and removing it
+restores exactly what you had configured in game.
+
+Location, in order: `$XIVMCP_PROVISION`, else `$XDG_CONFIG_HOME/xiv-mcp/provision.json`, else
+`$HOME/.config/xiv-mcp/provision.json`. (Inside the game these Unix paths are reached through Wine's `Z:`
+drive automatically.) It is re-read within a few seconds of changing, and a change to the bind settings
+restarts the listener without a plugin reload.
+
+```json
+{
+  "Enabled": true,
+  "BindMode": "LoopbackAndTailnet",
+  "CustomHost": "198.51.100.7",
+  "Port": 41800,
+  "Path": "/mcp",
+  "RequireToken": true,
+  "BearerToken": "REPLACE_WITH_A_43_CHAR_BASE64URL_TOKEN",
+  "AllowedOrigins": ["http://192.0.2.10:3000"],
+  "CallTimeoutSeconds": 30,
+  "ConfirmTimeoutSeconds": 20,
+  "DisabledCategories": ["chat"]
+}
+```
+
+Every key is optional: only the keys present override anything, and Settings greys out exactly those and
+names the file they come from. `BindMode` accepts `Loopback`, `LoopbackAndTailnet`, `TailnetOnly` or
+`Custom` (`CustomHost` only matters for `Custom`). Unknown keys are ignored.
+
+Because it can carry the bearer token, **write it with mode 0600**:
+
+```sh
+install -d -m 700 ~/.config/xiv-mcp
+install -m 600 /dev/null ~/.config/xiv-mcp/provision.json   # then write the JSON into it
+```
+
+Its contents are never logged — the log records the path, which settings it provisioned and any parse
+error, nothing else. A malformed file keeps the last values that loaded, shows the error in Settings and
+in the log, and never falls back to a wider bind.
 
 ## Permission model
 
@@ -137,9 +225,11 @@ session / rule / 10-min grant covers the call --> runs without a prompt, logged
 ```
 - **Categories** (character, chat, gamedata, ui, meta, prompts, ...) can be switched off individually.
 - **Resources** follow the Read tier as well as their category; prompts only return text and follow their category.
-- **Network.** The listener binds `127.0.0.1` by default. Any other host is shown with a red warning,
-  and the server refuses to start on a non-loopback host without a bearer token. Requests carrying an
-  `Origin` header are accepted only from loopback origins or the configured allow-list.
+- **Network.** The listener binds `127.0.0.1` by default. Any bind that reaches past this machine is
+  shown with a red warning and **forces the bearer token on**; the server refuses to start such a bind
+  without one. Requests carrying an `Origin` header are accepted only from loopback origins or the
+  configured allow-list, and the `Host` header must name loopback, an address the server actually bound,
+  or its MagicDNS name (DNS-rebinding defence). See [Where the server listens](#where-the-server-listens).
 - **Out of scope:** combat rotations, movement, and input automation of any kind.
 
 All settings: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).

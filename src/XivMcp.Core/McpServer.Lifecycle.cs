@@ -33,9 +33,10 @@ public sealed partial class McpServer
     private byte[]? _tokenHash;
     private HashSet<string> _allowedOrigins = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _allowedHosts = new(StringComparer.OrdinalIgnoreCase);
-    private bool _loopbackBind;
+    private bool _checkHostHeader;
     private string _path = "/mcp";
     private string _endpoint = "";
+    private string[] _endpoints = [];
 
     private long _totalRequests;
     private long _failedRequests;
@@ -44,6 +45,12 @@ public sealed partial class McpServer
 
     /// <summary>The TCP port actually bound (useful when <see cref="McpServerOptions.Port"/> is 0), or 0 when stopped.</summary>
     public int ListeningPort => _http?.Port ?? 0;
+
+    /// <summary>
+    /// Every endpoint URL the running server answers on, one per bound address, in bind order.
+    /// Empty when stopped. <see cref="ServerStatus.Endpoint"/> is the first of these.
+    /// </summary>
+    public IReadOnlyList<string> Endpoints => _http is null ? [] : _endpoints;
 
     /// <summary>Test hook: replaces the HTTP limits derived from options at the next StartAsync.</summary>
     internal HttpLimits? HttpLimitsOverride { get; set; }
@@ -118,8 +125,7 @@ public sealed partial class McpServer
             if (_http is not null)
                 return;
 
-            var address = ResolveAddress(Options.Host);
-            _loopbackBind = IPAddress.IsLoopback(address);
+            var addresses = ResolveAddresses();
             _tokenHash = string.IsNullOrEmpty(Options.BearerToken) ? null : SHA256.HashData(Encoding.UTF8.GetBytes(Options.BearerToken));
             _allowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _allowedHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -130,6 +136,20 @@ public sealed partial class McpServer
                     _allowedOrigins.Add(normalized.Origin);
                     _allowedHosts.Add(normalized.Host);
                 }
+            }
+
+            // DNS-rebinding defence. Every bound address answers only to a Host header naming a
+            // loopback name, one of the addresses actually bound, or a name the owner allowed (the
+            // MagicDNS name of this machine, say). A wildcard bind cannot be checked this way, so the
+            // check is switched off there rather than guessed at.
+            _checkHostHeader = !addresses.Any(a => a.Equals(IPAddress.Any) || a.Equals(IPAddress.IPv6Any));
+            foreach (var address in addresses)
+                _allowedHosts.Add(address.ToString());
+            foreach (var name in Options.AllowedHostNames)
+            {
+                var trimmed = name?.Trim().Trim('[', ']');
+                if (!string.IsNullOrEmpty(trimmed))
+                    _allowedHosts.Add(trimmed);
             }
 
             var path = string.IsNullOrWhiteSpace(Options.Path) ? "/mcp" : Options.Path.Trim();
@@ -146,7 +166,7 @@ public sealed partial class McpServer
             {
                 try
                 {
-                    http.Start(address, Options.Port);
+                    http.Start(addresses, Options.Port);
                     break;
                 }
                 catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse && Environment.TickCount64 < deadline && Options.Port != 0)
@@ -157,10 +177,8 @@ public sealed partial class McpServer
             }
 
             _http = http;
-            var hostText = address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]" : address.ToString();
-            if (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any))
-                hostText = "127.0.0.1";
-            _endpoint = $"http://{hostText}:{http.Port}{_path}";
+            _endpoints = addresses.Select(a => $"http://{UrlHost(a)}:{http.Port}{_path}").ToArray();
+            _endpoint = _endpoints[0];
             _gateSignature = ComputeGateSignature();
 
             _housekeepingCts = new CancellationTokenSource();
@@ -293,7 +311,8 @@ public sealed partial class McpServer
 
     private string BuildIdleEndpoint()
     {
-        var host = Options.Host is "0.0.0.0" or "*" or "::" ? "127.0.0.1" : Options.Host;
+        var configured = Options.Hosts.Count > 0 ? Options.Hosts[0] : Options.Host;
+        var host = configured is "0.0.0.0" or "*" or "::" ? "127.0.0.1" : configured;
         if (host.Contains(':') && !host.StartsWith('['))
             host = "[" + host + "]";
         var path = string.IsNullOrWhiteSpace(Options.Path) ? "/mcp" : Options.Path;
@@ -302,6 +321,30 @@ public sealed partial class McpServer
 
     private static string ClientLabel(string? name, string? version) =>
         string.IsNullOrWhiteSpace(name) ? "(unnamed client)" : string.IsNullOrWhiteSpace(version) ? name : $"{name} {version}";
+
+    /// <summary>The bind addresses for the current options: <see cref="McpServerOptions.Hosts"/>, or <see cref="McpServerOptions.Host"/> alone. Duplicates are dropped.</summary>
+    private List<IPAddress> ResolveAddresses()
+    {
+        var hosts = Options.Hosts.Count > 0 ? Options.Hosts : [Options.Host];
+        var addresses = new List<IPAddress>(hosts.Count);
+        foreach (var host in hosts)
+        {
+            var address = ResolveAddress(host);
+            if (!addresses.Contains(address))
+                addresses.Add(address);
+        }
+
+        if (addresses.Count == 0)
+            addresses.Add(IPAddress.Loopback);
+        return addresses;
+    }
+
+    private static string UrlHost(IPAddress address)
+    {
+        if (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any))
+            return "127.0.0.1";
+        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]" : address.ToString();
+    }
 
     private static IPAddress ResolveAddress(string host)
     {
