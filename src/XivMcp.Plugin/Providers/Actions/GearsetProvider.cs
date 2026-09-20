@@ -54,7 +54,7 @@ public sealed unsafe class GearsetProvider
 
     [McpTool("equip_gearset",
         Sources = ["client:RaptureGearsetModule"],
-        ApprovalSummary = "Change to gear set {id} {name} (this can also change your job).",
+        ApprovalSummary = "Change to your gear set number {id} / named {name} (only one of the two is given); this can also change your job.",
         Title = "Equip gear set",
         Description =
             "Equips one of the character's saved gear sets (which also changes class/job when the set belongs to another job), exactly like /gearset change. " +
