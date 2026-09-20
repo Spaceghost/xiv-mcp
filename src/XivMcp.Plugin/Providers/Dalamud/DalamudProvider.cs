@@ -32,10 +32,11 @@ public sealed unsafe class DalamudProvider
     }
 
     [McpTool("list_plugins",
-        Sources = ["dalamud:InstalledPlugins"],
+        Sources = ["dalamud:InstalledPlugins", "dalamud:internal.PluginManager"],
         Title = "List Dalamud plugins",
         Description =
-            "Lists the Dalamud plugins installed in this game client. Each entry: internalName, name, version, author, loaded (currently running), isDev (local dev plugin), isThirdParty (from a custom repository), isTesting, isOutdated, isBanned/isOrphaned/isDecommissioned (only when true), hasMainUi/hasConfigUi, apiLevel. " +
+            "Lists the Dalamud plugins installed in this game client. Each entry: internalName, name, version, author, loaded (currently running), isDev (local dev plugin), isThirdParty (from a custom repository), isTesting, isOutdated, isBanned/isOrphaned/isDecommissioned (only when true), hasMainUi/hasConfigUi, apiLevel, installedFromUrl (the repository the plugin was installed from: a custom repository URL, scrubbed of credentials, or Dalamud's markers OFFICIAL / DEVPLUGIN), projectUrl (the manifest's source link), " +
+            "state (Dalamud's load state: Loaded, Unloaded, LoadError, UnloadError, Loading, Unloading, DependencyResolutionFailed) and updateAvailable. state and updateAvailable come from Dalamud's plugin manager, which is not public API: they are omitted when this Dalamud build does not expose them, and updateAvailable only reflects the repository data Dalamud last fetched (what its installer shows), not a fresh check. " +
             "Use to check whether a plugin the user mentions is installed and enabled before suggesting its commands. Sorted by name; truncated=true when more match than limit.",
         Permission = ToolPermission.Read, GameThread = false, RequiresLogin = false)]
     public PluginListResult ListPlugins(
@@ -45,6 +46,10 @@ public sealed unsafe class DalamudProvider
     {
         limit = Math.Clamp(limit, 1, 500);
         var all = new List<PluginInfo>();
+        var states = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in DalamudInternals.GetPlugins() ?? [])
+            states[p.InternalName] = states.TryGetValue(p.InternalName, out var other) && other == "Loaded" ? other : p.State;
+        var updatable = DalamudInternals.GetUpdatableInternalNames();
         foreach (var plugin in pluginInterface.InstalledPlugins)
         {
             if (loadedOnly && !plugin.IsLoaded)
@@ -56,10 +61,13 @@ public sealed unsafe class DalamudProvider
 
             string? author = null;
             int? apiLevel = null;
+            string? installedFrom = null, projectUrl = null;
             try
             {
                 author = plugin.Manifest?.Author;
                 apiLevel = plugin.Manifest?.DalamudApiLevel;
+                installedFrom = plugin.Manifest?.InstalledFromUrl;
+                projectUrl = plugin.Manifest?.RepoUrl;
             }
             catch
             {
@@ -81,7 +89,11 @@ public sealed unsafe class DalamudProvider
                 plugin.IsDecommissioned ? true : null,
                 plugin.HasMainUi,
                 plugin.HasConfigUi,
-                apiLevel));
+                apiLevel,
+                CleanUrl(installedFrom),
+                CleanUrl(projectUrl),
+                states.GetValueOrDefault(plugin.InternalName),
+                updatable is null ? null : updatable.Contains(plugin.InternalName)));
         }
 
         all.Sort(static (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
@@ -90,16 +102,16 @@ public sealed unsafe class DalamudProvider
     }
 
     [McpTool("get_dalamud_info",
-        Sources = ["dalamud:IDalamudPluginInterface", "lumina:GameData.Repositories"],
+        Sources = ["dalamud:IDalamudPluginInterface", "dalamud:internal.PluginManager", "lumina:GameData.Repositories"],
         Title = "Dalamud and client info",
         Description =
-            "Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamudUiLanguage, " +
+            "Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, dalamudTrack (the beta track name, or \"release\" when Dalamud reports none), clientStructsGitHash, pluginSafeMode (plugins were not loaded this session; read from Dalamud's plugin manager, which is not public API, so it is omitted when unreachable), gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamudUiLanguage, " +
             "loggedIn, isPvP, inGpose, inCutscene, gameUiHidden, globalUiScale (the game's UI scale factor), colorTheme (System Configuration theme: dark, light, classicFF, clearBlue) and hasModifiedGameDataFiles, plus plugin counts. " +
             "Use for troubleshooting or to adapt behaviour to the client's language and state.",
         Permission = ToolPermission.Read, RequiresLogin = false)]
     public DalamudInfoResult GetDalamudInfo()
     {
-        string? dalamudVersion = null, scm = null, gitHash = null, beta = null;
+        string? dalamudVersion = null, scm = null, gitHash = null, beta = null, clientStructsHash = null;
         try
         {
             var info = pluginInterface.GetDalamudVersion();
@@ -107,6 +119,7 @@ public sealed unsafe class DalamudProvider
             scm = info.ScmVersion;
             gitHash = info.GitHash;
             beta = info.BetaTrack;
+            clientStructsHash = info.GitHashClientStructs;
         }
         catch
         {
@@ -185,7 +198,19 @@ public sealed unsafe class DalamudProvider
             theme,
             dataManager.HasModifiedGameDataFiles,
             plugins.Count,
-            plugins.Count(p => p.IsLoaded));
+            plugins.Count(p => p.IsLoaded),
+            string.IsNullOrEmpty(beta) ? "release" : beta,
+            string.IsNullOrEmpty(clientStructsHash) ? null : clientStructsHash,
+            DalamudInternals.IsSafeMode());
+    }
+
+    /// <summary>A manifest URL with credentials and tokens removed, capped.</summary>
+    internal static string? CleanUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+        var clean = LogScrubber.Scrub(url.Trim());
+        return clean.Length > 300 ? clean[..300] : clean;
     }
 
     public sealed record PluginInfo(
@@ -203,7 +228,11 @@ public sealed unsafe class DalamudProvider
         bool? IsDecommissioned,
         bool HasMainUi,
         bool HasConfigUi,
-        int? ApiLevel);
+        int? ApiLevel,
+        string? InstalledFromUrl = null,
+        string? ProjectUrl = null,
+        string? State = null,
+        bool? UpdateAvailable = null);
 
     public sealed record PluginListResult(IReadOnlyList<PluginInfo> Plugins, int Total, bool Truncated);
 
@@ -226,5 +255,8 @@ public sealed unsafe class DalamudProvider
         string? ColorTheme,
         bool HasModifiedGameDataFiles,
         int InstalledPlugins,
-        int LoadedPlugins);
+        int LoadedPlugins,
+        string? DalamudTrack = null,
+        string? ClientStructsGitHash = null,
+        bool? PluginSafeMode = null);
 }
