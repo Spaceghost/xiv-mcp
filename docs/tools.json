@@ -2,6 +2,202 @@
   "catalogueVersion": 2,
   "tools": [
     {
+      "name": "apply_terminal_layout",
+      "title": "Apply a saved terminal layout",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Apply GhosttyDalamud's saved layout \"{name}\": panels move, and missing ones (terminals or programs the layout names) are opened.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call#layout.set"
+      ],
+      "description": "Applies a saved layout by name: existing panels move to their saved places and missing ones are opened (which may start the programs the layout names); nothing is closed. NEEDS A NEWER GhosttyDalamud: written against the proposed layout.set verb, it fails with unavailable, naming the verb, until that ships. Read the layout first with get_terminal_layouts. GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Layout name from get_terminal_layouts.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "name": "ask_almanac",
+      "title": "Ask Almanac",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Open Almanac's chat window and ask its model this (new conversation: {newThread}): {question}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "dataSources": [
+        "ipc:Almanac.Ask",
+        "ipc:Almanac.v1.Call#ask",
+        "ipc:Almanac.v1.Call#thread.new"
+      ],
+      "description": "Hands a question to Almanac: its chat window opens on the player's screen and its configured model (possibly a remote service) starts answering. Returns accepted (false when Almanac is busy or not set up), NOT the answer: with today's Almanac (via=ask) the answer only appears in its window. With an Almanac that offers the JSON gate (via=call) threadId and turn come back and get_almanac_turn reads the answer. newThread=true starts a fresh conversation first and needs that newer Almanac.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "description": "The question, shown verbatim to the player (up to 4000 bytes).",
+            "type": "string"
+          },
+          "newThread": {
+            "description": "Start a new conversation instead of continuing the current one (needs the JSON gate).",
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "via": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "turn": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accepted"
+        ]
+      }
+    },
+    {
+      "name": "ask_npc_assistant",
+      "title": "Ask the NPC assistant",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Send this to XivDesktop's NPC assistant (it summons a speaker on your screen and starts a model generation): {text}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Ask"
+      ],
+      "description": "What follows XivDesktop's /ask: a question (summons the speaker if needed and asks it), \"\" (only summon), \"bye\" (dismiss), or \"as <preset|npc:ID|minion:ID|mount:ID|pet:ID|self> [question]\" to switch speaker first. The answer streams into the in-game dialogue window for the PLAYER; it is NOT returned here (the gate answers only ok or error). The text goes to whichever model the player configured, which may be a remote service. Only the player sees the speaker; nothing is sent to game chat.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "description": "The /ask argument, shown verbatim to the player.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "gate": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
+    {
       "name": "cancel_ticket",
       "title": "Cancel a pending approval ticket",
       "category": "approvals",
@@ -134,6 +330,196 @@
         },
         "required": [
           "createdAt"
+        ]
+      }
+    },
+    {
+      "name": "capture_terminal_clip",
+      "title": "Record a clip through GhosttyDalamud",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Have GhosttyDalamud record {seconds} seconds of the game as {format} into its capture folder (focused panel only: {panel}, game UI hidden: {clean}).",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Post",
+        "ipc:GhosttyDalamud.v1.Call#capture.clip"
+      ],
+      "description": "Asks GhosttyDalamud to record a short clip (1-30 seconds, gif or mp4) of the game frame, or of the focused panel only, optionally with the game's own UI hidden. Writes a file on the player's computer. Posted today as \"/term clip …\" with no result (via=post): completion cannot be confirmed until GhosttyDalamud adds capture.clip; once it does, get_terminal_capture_status shows the finished file.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "seconds": {
+            "description": "Length in seconds (1-30).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 6
+          },
+          "format": {
+            "description": "File format.",
+            "type": "string",
+            "enum": [
+              "gif",
+              "mp4"
+            ],
+            "default": "gif"
+          },
+          "panel": {
+            "description": "Record only the focused panel.",
+            "type": "boolean",
+            "default": false
+          },
+          "clean": {
+            "description": "Hide the game's own UI while recording.",
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "name": "capture_terminal_screenshot",
+      "title": "Screenshot through GhosttyDalamud",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Have GhosttyDalamud save a screenshot to its capture folder (target: {target}, game UI hidden: {clean}).",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Post",
+        "ipc:GhosttyDalamud.v1.Call#capture.shot"
+      ],
+      "description": "Asks GhosttyDalamud for a PNG of the frame the game just drew, including its world panels: target full (the whole frame) or panel (just the focused terminal's window); clean=true hides the game's own UI for that frame. It writes a file on the player's computer, hence Action tier. Today this is posted as the chat command \"/term shot …\", which returns nothing: the result says via=post and completion CANNOT be confirmed until GhosttyDalamud adds a capture.shot IPC verb (then via=call with path, width, height). To look at the screen yourself use take_screenshot and get_latest_screenshot, which return the image.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "description": "What to capture.",
+            "type": "string",
+            "enum": [
+              "full",
+              "panel"
+            ],
+            "default": "full"
+          },
+          "clean": {
+            "description": "Hide the game's own UI for the capture.",
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
         ]
       }
     },
@@ -349,6 +735,88 @@
         },
         "required": [
           "hadTarget"
+        ]
+      }
+    },
+    {
+      "name": "close_terminal_panel",
+      "title": "Close a terminal panel",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Close GhosttyDalamud panel {id}. A terminal's shell, and anything running in it, ends with it.",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "Closes a panel as its close button does (panel.close): a terminal's shell and every program in it END, a remote window's stream stops, an adopted plugin window goes back to its plugin and the chat back to the game. Not undoable for terminals. To get a panel out of the way without losing it use set_terminal_panel_hidden. GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Panel id from list_terminal_panels.",
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
         ]
       }
     },
@@ -775,6 +1243,83 @@
       }
     },
     {
+      "name": "desktop_window_action",
+      "title": "Act on a desktop window",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Desktop window {id}: {action} (pin: {pin}, workspace: {workspace}). \"close\" closes the application's window.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.WindowAction"
+      ],
+      "description": "One action on a desktop window panel: focus, close (closes the window's stream and panel), pet (make it a pet), pin (pin it where the character stands), toggle (pet ↔ pin in place), place (needs pin, as /term pin takes it: \"orbit 3.5\", \"hud 0.85 0.2\" …) or move (needs workspace 1-9). id is from list_desktop_windows; 0 means the focused, else last focused, window. pin and workspace are refused with other actions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "description": "What to do.",
+            "type": "string",
+            "enum": [
+              "focus",
+              "close",
+              "pet",
+              "pin",
+              "toggle",
+              "place",
+              "move"
+            ]
+          },
+          "id": {
+            "description": "Window id from list_desktop_windows; 0 = the focused (else last focused) window.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "pin": {
+            "description": "Placement for action place, e.g. \"orbit 3.5\".",
+            "type": "string"
+          },
+          "workspace": {
+            "description": "Workspace for action move (1-9).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9,
+            "default": 0
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "gate": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
+    {
       "name": "equip_gearset",
       "title": "Equip gear set",
       "category": "actions",
@@ -1164,6 +1709,88 @@
           "total",
           "returned",
           "truncated"
+        ]
+      }
+    },
+    {
+      "name": "focus_terminal_panel",
+      "title": "Focus a terminal panel",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Give GhosttyDalamud panel {id} the keyboard and bring it forward.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "Gives a panel the keyboard and brings it forward (panel.focus): a hidden panel is shown, a dropdown tab opens the dropdown, a minimized terminal is restored. Always sent with fly=false, so the character is NOT walked up to the panel and the camera is not turned (XivMcp does not move the character). The game stops receiving keys until the player presses Esc twice or clicks the world. GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Panel id from list_terminal_panels.",
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
         ]
       }
     },
@@ -1587,6 +2214,440 @@
       }
     },
     {
+      "name": "get_almanac_benchmark",
+      "title": "Almanac benchmark progress or result",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:Almanac.v1.Call#bench.status",
+        "ipc:Almanac.v1.Call#bench.result"
+      ],
+      "description": "For a runId from run_almanac_benchmark: its progress (state, done, total, currentTask) while it runs, or once done the results summary (score, successRate, toolCallValidity, tokensPerSecond, ttftMs and per-task rows). runId \"last\" (default) returns the most recent finished run. NEEDS A NEWER Almanac: written against the proposed Almanac.v1.Call gate; fails with unavailable, naming the missing verb, until Almanac ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "description": "Run id, or \"last\".",
+            "type": "string",
+            "default": "last"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_almanac_model_status",
+      "title": "Almanac model status",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:Almanac.v1.Call#model.status",
+        "ipc:Almanac.v1.Call#backends.status"
+      ],
+      "description": "Which model answers in Almanac: setupComplete, model, source, baseUrlHost (host and port only, never a key), toolMode, xivMcpLinked (whether it uses this XivMcp server for tools), busy; plus backends (each model server's reachability from Almanac's last check). NEEDS A NEWER Almanac: written against the proposed Almanac.v1.Call gate; fails with unavailable, naming the missing verb, until Almanac ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "backends": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_almanac_status",
+      "title": "Almanac status",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:InstalledPlugins",
+        "ipc:Almanac.ApiVersion",
+        "ipc:Almanac.v1.Call#api.version"
+      ],
+      "description": "Whether Almanac (the in-game assistant plugin) is installed, loaded and answering IPC, its ApiVersion, whether ask_almanac can work (askGate) and whether it offers the JSON call gate the thread, turn, benchmark and model tools need (callGate, with its verb list in api). Never fails for an absent plugin: bridge.unavailable says why.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "installed": {
+                "type": "boolean"
+              },
+              "loaded": {
+                "type": "boolean"
+              },
+              "version": {
+                "type": "string"
+              },
+              "ipcAvailable": {
+                "type": "boolean"
+              },
+              "apiVersion": {
+                "type": "string"
+              },
+              "unavailable": {
+                "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "installed",
+              "loaded",
+              "ipcAvailable",
+              "verified"
+            ]
+          },
+          "askGate": {
+            "type": "boolean"
+          },
+          "callGate": {
+            "type": "boolean"
+          },
+          "api": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "askGate",
+          "callGate"
+        ]
+      }
+    },
+    {
+      "name": "get_almanac_thread",
+      "title": "Read an Almanac conversation",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:Almanac.v1.Call#threads.get"
+      ],
+      "description": "The turns of one Almanac conversation (role, text capped at 8000 characters, state, tools called, time), newest last. NEEDS A NEWER Almanac: written against the proposed Almanac.v1.Call gate; fails with unavailable, naming the missing verb, until Almanac ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Thread id from list_almanac_threads.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum turns (1-100).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_almanac_turn",
+      "title": "Read an Almanac answer",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:Almanac.v1.Call#turn.status"
+      ],
+      "description": "The state of one Almanac turn (queued|running|done|failed) and its answer text so far, by the threadId and turn ask_almanac returned. Poll it every second or two until done. NEEDS A NEWER Almanac: written against the proposed Almanac.v1.Call gate; fails with unavailable, naming the missing verb, until Almanac ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "description": "Thread id from ask_almanac.",
+            "type": "string"
+          },
+          "turn": {
+            "description": "Turn number from ask_almanac.",
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "threadId",
+          "turn"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
       "name": "get_attributes",
       "title": "Get character attributes",
       "category": "character",
@@ -1722,6 +2783,7 @@
               "deliveroo",
               "ghostty",
               "xivdesktop",
+              "almanac",
               "umbra"
             ]
           },
@@ -2277,6 +3339,147 @@
           "hasModifiedGameDataFiles",
           "installedPlugins",
           "loadedPlugins"
+        ]
+      }
+    },
+    {
+      "name": "get_desktop_panels",
+      "title": "Desktop launcher state",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Panels"
+      ],
+      "description": "What the player currently sees in XivDesktop: the launcher (open, search text, view, category, page, selected and visible app ids), favourites in order, whether the palette is open and the assistant's state (summoned, speaker, busy). NEEDS A NEWER XivDesktop: written against the proposed XivDesktop.v1.Panels gate; fails with unavailable, naming it, until it ships.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_desktop_status",
+      "title": "Desktop bridge status",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Status",
+        "ipc:XivDesktop.v1.ApiVersion"
+      ],
+      "description": "XivDesktop's health: ghostty (launching is possible), ghosttyStatus, apps (catalogue size), scanning, scannedAt, lastLaunch, lastError, summary, plus apiVersion (null until XivDesktop offers an ApiVersion gate). Check ghostty=true before launch_desktop_app.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
         ]
       }
     },
@@ -9076,6 +10279,567 @@
       }
     },
     {
+      "name": "get_terminal_capture_status",
+      "title": "Terminal capture status",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call#capture.status"
+      ],
+      "description": "Whether GhosttyDalamud is recording, and its last screenshot or clip (kind, path, size, time, error). This is how a capture_terminal_* call is confirmed. NEEDS A NEWER GhosttyDalamud: fails with unavailable, naming the proposed capture.status verb, until it ships.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_terminal_layout",
+      "title": "Describe the terminal layout",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "The current arrangement of GhosttyDalamud panels as a layout description: per panel its view, pet order and, where the snapshot allows, the pin argument that would put a panel there again (pin, for place_terminal_panel/open_terminal), with reproducible and a how sentence. This is RECONSTRUCTED: GhosttyDalamud has no layout.get, and its snapshot omits the numbers behind a place (a pin's world position, an orbit's distance, a HUD dock's X/Y), so only pets are exact. For saved, named layouts use get_terminal_layouts (needs a newer GhosttyDalamud).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rev": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "reproducible": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "panels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "profile": {
+                  "type": "string"
+                },
+                "app": {
+                  "type": "string"
+                },
+                "view": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "integer"
+                },
+                "pin": {
+                  "type": "string"
+                },
+                "reproducible": {
+                  "type": "boolean"
+                },
+                "how": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "reproducible"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "reproducible",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_terminal_layouts",
+      "title": "Saved terminal layouts",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call#layout.get"
+      ],
+      "description": "GhosttyDalamud's saved, named layouts (panels with kind, profile or run/match, view, exact pin arguments, order, size) and which is current; name narrows to one. NEEDS A NEWER GhosttyDalamud: it reads the proposed layout.get verb and fails with unavailable, naming that verb, until GhosttyDalamud ships it. Until then get_terminal_layout reconstructs the current arrangement approximately.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Only this layout. Omit for all.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_terminal_leakwatch_report",
+      "title": "Terminal leak-watch report",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call#leakwatch.report"
+      ],
+      "description": "GhosttyDalamud's leak watch: memory samples per core load and the growth per load. NEEDS A NEWER GhosttyDalamud: today this goes to the plugin log only; fails with unavailable, naming the proposed leakwatch.report verb, until it ships.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_terminal_request",
+      "title": "Look up a terminal change",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "The outcome of a queued GhosttyDalamud change, by the request id a terminal tool returned: state done (with result, e.g. {id: panel}), failed (with GhosttyDalamud's error text) or unknown (not run yet, or no longer among the last 16 outcomes it keeps). Only needed when a change tool came back with completed=false.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "description": "Request id as returned in a change tool's request field (digits).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_terminal_selftest_report",
+      "title": "Terminal self-test report",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call#selftest.report"
+      ],
+      "description": "GhosttyDalamud's last self-test report (build stamp, per-suite pass/fail/skip counts, failed cases) and whether a run is in progress. NEEDS A NEWER GhosttyDalamud: the report is a file on the player's disk today; this fails with unavailable, naming the proposed selftest.report verb, until it ships.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "get_terminal_status",
+      "title": "Terminal bridge status",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call",
+        "ipc:GhosttyDalamud.v1.Status",
+        "ipc:GhosttyDalamud.v1.Call#api.version"
+      ],
+      "description": "GhosttyDalamud's health in one call: status (its one-line text, e.g. \"ghostty 3\"), agent (the desktop agent that streams windows: connected, version, windows_ok, agent address, window_lists), focus (the world panel with the keyboard, {id: 0} when none) and api (its verb list; null until GhosttyDalamud offers api.version). Check agent.windows_ok before open_terminal with run. Fails with unavailable when it is not loaded.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "agent": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "focus": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "api": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
       "name": "get_ticket",
       "title": "Get an approval ticket",
       "category": "approvals",
@@ -9663,6 +11427,57 @@
       }
     },
     {
+      "name": "launch_desktop_app",
+      "title": "Launch a desktop application",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Launch this application on your computer: {app}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Launch"
+      ],
+      "description": "Starts an application on the player's computer through XivDesktop and shows its window as a panel in game. app is a desktop-file id from list_desktop_apps (\"org.gnome.TextEditor\", with or without \".desktop\") or search text, in which case XivDesktop launches its BEST MATCH, so prefer an exact id. Only catalogued applications can be started, never an arbitrary command line. Success means the launch was handed over, not that a window appeared; check list_desktop_windows. Fails with XivDesktop's own reason (no match, GhosttyDalamud missing).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "description": "Desktop-file id (preferred) or search text; shown verbatim to the player.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "gate": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
+    {
       "name": "list_addons",
       "title": "List game UI windows",
       "category": "ui",
@@ -9923,6 +11738,168 @@
       }
     },
     {
+      "name": "list_almanac_benchmarks",
+      "title": "List Almanac benchmark runs",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:Almanac.v1.Call#bench.list"
+      ],
+      "description": "Earlier benchmark runs, newest first: runId, mode, model, finishedAt, score, successRate, state. Use get_almanac_benchmark for one run's rows. NEEDS A NEWER Almanac: written against the proposed Almanac.v1.Call gate; fails with unavailable, naming the missing verb, until Almanac ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "description": "Maximum runs (1-50).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "list_almanac_threads",
+      "title": "List Almanac conversations",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:Almanac.v1.Call#threads.list"
+      ],
+      "description": "Almanac's conversations, newest first: id, title, turns, updatedAt and which is current. These are the player's private conversations with their assistant. NEEDS A NEWER Almanac: written against the proposed Almanac.v1.Call gate; fails with unavailable, naming the missing verb, until Almanac ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "description": "Maximum threads (1-100).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 25
+          },
+          "offset": {
+            "description": "Threads to skip.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
       "name": "list_bridges",
       "title": "List plugin bridges",
       "category": "bridges",
@@ -10005,6 +11982,188 @@
         "required": [
           "total",
           "available"
+        ]
+      }
+    },
+    {
+      "name": "list_desktop_apps",
+      "title": "List desktop applications",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.ListApps"
+      ],
+      "description": "The applications XivDesktop can launch on the player's computer, filtered and paged here: id (the desktop-file id launch_desktop_app takes), name, generic name, categories, favourite, terminal (runs in a terminal), launchable and recent (0 = most recently launched). query matches id, name, generic name, keywords and categories, ignoring case. Returns total, matched and truncated. Read-only; nothing is launched. Fails with unavailable when XivDesktop is not loaded.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "description": "Text to match. Omit for everything.",
+            "type": "string"
+          },
+          "favouritesOnly": {
+            "description": "Only the player's favourites.",
+            "type": "boolean",
+            "default": false
+          },
+          "limit": {
+            "description": "Maximum apps returned (1-500).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "offset": {
+            "description": "Apps to skip.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "matched": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "generic": {
+                  "type": "string"
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "favourite": {
+                  "type": "boolean"
+                },
+                "terminal": {
+                  "type": "boolean"
+                },
+                "launchable": {
+                  "type": "boolean"
+                },
+                "recent": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "favourite",
+                "terminal",
+                "launchable"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "matched",
+          "offset",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "list_desktop_windows",
+      "title": "List desktop windows",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Windows"
+      ],
+      "description": "The desktop windows shown as panels in game, as XivDesktop tracks them: available (GhosttyDalamud's call gate is there), rev, workspace (current, 1-9), target (the window id actions without an id apply to) and windows[] with id, title, app, state (pending|live|ended), kind (pet|pin|full|tab), focused, workspace, hidden (on another workspace) and appId. ids are the same panel ids list_terminal_panels returns. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
         ]
       }
     },
@@ -11144,6 +13303,193 @@
       }
     },
     {
+      "name": "list_terminal_panels",
+      "title": "List terminal panels",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "Every GhosttyDalamud panel, oldest first: terminals (in the dropdown, floating, minimized or in the world), remote desktop windows, adopted plugin windows and the chat. Each has id (what every terminal panel tool takes), kind (terminal|window|adopted|chat), title, app, profile and running (terminals), view (tab|dropdown|min|pet|pin|hud|full|hidden), anchor/state/width/height (remote windows only), focused (has the keyboard), hidden and order (a pet's place from 1). Merged from panel.list and window.list, at most one frame old. Use get_terminal_layout for how to reproduce the arrangement, ghostty_query for the raw JSON. Fails with unavailable when GhosttyDalamud is not loaded.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "description": "Maximum panels returned (1-500).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "offset": {
+            "description": "Panels to skip.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rev": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "panels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "app": {
+                  "type": "string"
+                },
+                "profile": {
+                  "type": "string"
+                },
+                "running": {
+                  "type": "boolean"
+                },
+                "view": {
+                  "type": "string"
+                },
+                "anchor": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "integer"
+                },
+                "height": {
+                  "type": "integer"
+                },
+                "focused": {
+                  "type": "boolean"
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "order": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "focused",
+                "hidden"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "list_terminal_themes",
+      "title": "List terminal themes",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call#theme.list"
+      ],
+      "description": "The theme names set_terminal_theme accepts and the current one. NEEDS A NEWER GhosttyDalamud: today themes are listed only into the game's chat log by \"/term theme\", which IPC cannot read, so this fails with unavailable (naming the proposed theme.list verb) until GhosttyDalamud ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
       "name": "list_tickets",
       "title": "List your approval tickets",
       "category": "approvals",
@@ -11559,6 +13905,266 @@
             "type": "boolean"
           }
         }
+      }
+    },
+    {
+      "name": "open_terminal",
+      "title": "Open a terminal panel",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Open a terminal panel in the game (profile: {profile}, placed: {pin}). Run this command on your computer in a new terminal: {run}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "Opens a new GhosttyDalamud panel in the game world. Without run: a terminal (terminal.new) with the given profile (a name from the player's GhosttyDalamud profiles, or its place from 1; default profile when omitted). With run: the desktop agent STARTS THAT COMMAND on the player's computer and streams its window (window.open); a text program needs a terminal emulator in the command, e.g. \"foot htop\". run and profile exclude each other. pin places it as /term pin does: \"pet\" (default, floats beside the character), \"here\", \"me 2 1.7\", \"target\", \"orbit 3.5\", \"hud 0.85 0.2\". Returns request, completed and panelId (the new panel's id) when the outcome arrived. Common failures: \"no player (log in first)\", \"the agent is not connected\", \"no such profile\". run is shown to the player verbatim for approval; there is deliberately no tool that types text into an open shell. GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "description": "Command the desktop agent starts, shown verbatim to the player. Omit for a plain terminal.",
+            "type": "string"
+          },
+          "profile": {
+            "description": "Terminal profile name or place from 1. Not with run.",
+            "type": "string"
+          },
+          "pin": {
+            "description": "Placement as /term pin takes it, e.g. \"pet\", \"here\", \"orbit 3.5\", \"hud 0.85 0.2\". Default: a pet.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "name": "order_terminal_panel",
+      "title": "Reorder a pet panel",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Move GhosttyDalamud pet panel {id} in the lineup to: {to}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "Moves a pet panel within the lineup beside the character (panel.order): to is \"left\" or \"right\" (swap with that neighbour), \"first\", \"last\" or a place from 1. Only shown pets have a place; anything else fails with \"only pets have a place in the order\". GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Panel id from list_terminal_panels.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "to": {
+            "description": "left, right, first, last or a place from 1.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "name": "place_terminal_panel",
+      "title": "Move a terminal panel",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Move GhosttyDalamud panel {id} to: {pin}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "Moves a panel (panel.place): pin is \"pet\", \"here\" (fixed where the character stands), \"me 2 1.7\", \"target\", \"orbit 3.5\", \"hud [X Y [DIST]]\" (docked to the screen, X/Y as 0..1 fractions from the top left), \"hide\" or \"hide off\". A terminal in the dropdown or minimized moves into the world; windows keep their size. id comes from list_terminal_panels. GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Panel id from list_terminal_panels.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "pin": {
+            "description": "Placement, e.g. \"pet\", \"here\", \"orbit 3.5\", \"hud 0.85 0.2\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "pin"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
       }
     },
     {
@@ -12225,6 +14831,217 @@
       }
     },
     {
+      "name": "rescan_desktop_apps",
+      "title": "Rescan desktop applications",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Have XivDesktop rescan the applications installed on your computer.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Rescan"
+      ],
+      "description": "Starts XivDesktop's background scan of installed applications so a newly installed one appears in list_desktop_apps; get_desktop_status shows scanning and scannedAt. NEEDS A NEWER XivDesktop: written against the proposed XivDesktop.v1.Rescan gate; fails with unavailable, naming it, until it ships.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "gate": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
+    {
+      "name": "run_almanac_benchmark",
+      "title": "Run Almanac's benchmark",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Run Almanac's benchmark in {mode} mode with model {model} (tasks: {tasks}). Live mode calls your model for every task. Results stay on this computer.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "dataSources": [
+        "ipc:Almanac.v1.Call#bench.run"
+      ],
+      "description": "Starts Almanac's model benchmark: mode mock (no model is called; checks the harness) or live (the model answers every task, which takes minutes and, with a paid remote model, costs money). model overrides the configured one; tasks limits the run to some task ids. Returns runId and total; follow it with get_almanac_benchmark. Results are stored locally only: nothing here, and no proposed verb, submits to a leaderboard. NEEDS A NEWER Almanac: written against the proposed Almanac.v1.Call gate; fails with unavailable, naming the missing verb, until Almanac ships it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "description": "mock or live.",
+            "type": "string",
+            "enum": [
+              "mock",
+              "live"
+            ],
+            "default": "mock"
+          },
+          "model": {
+            "description": "Model name. Omit for the configured model.",
+            "type": "string"
+          },
+          "tasks": {
+            "description": "Task ids separated by spaces or commas. Omit for all.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "run_terminal_selftest",
+      "title": "Run GhosttyDalamud's self-test",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Run GhosttyDalamud's in-game self-test (suites: {suites}). Test panels may flash on screen while it runs.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Post",
+        "ipc:GhosttyDalamud.v1.Call#selftest.run"
+      ],
+      "description": "Starts GhosttyDalamud's own in-game checks (\"/term selftest SUITES\"): suites is \"all\", \"list\" or suite names separated by spaces. It opens and closes test panels and writes a JSON report into GhosttyDalamud's config folder (selftest/*.json), which its CI reads from disk. Posted as the chat command today, so nothing comes back here (via=post); get_terminal_selftest_report returns the report once GhosttyDalamud offers selftest.report. \"leakwatch\" is refused: it toggles a setting, it is not a suite.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "suites": {
+            "description": "\"all\", \"list\" or suite names separated by spaces.",
+            "type": "string",
+            "default": "all"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
       "name": "search_actions",
       "title": "Search actions",
       "category": "gamedata",
@@ -12333,6 +15150,91 @@
           "total",
           "offset",
           "returned",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "search_desktop_palette",
+      "title": "Search the desktop palette",
+      "category": "bridges",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Palette"
+      ],
+      "description": "XivDesktop's command-palette ranking for a query (at most 10): applications, open windows, actions, calculator results and commands, each with provider, title, subtitle, score, enabled/reason and the command running it would perform. Read-only: nothing is run. Use it to resolve \"open my browser\" to an app id before launch_desktop_app.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "description": "What the player would type into the palette.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum results (1-50; XivDesktop itself returns at most 10).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bridge": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rawPrefix": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
           "truncated"
         ]
       }
@@ -13351,6 +16253,254 @@
       }
     },
     {
+      "name": "set_terminal_panel_hidden",
+      "title": "Hide or show a terminal panel",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "Set GhosttyDalamud world panel {id} hidden: {hidden}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call"
+      ],
+      "description": "Hides or shows a world panel (window.hide): hidden panels are neither drawn nor streamed, lose the keyboard and sleep; hidden=false shows it again where its anchor puts it. Nothing is closed. Only world panels (pet, pin, hud): a terminal in the dropdown is refused by GhosttyDalamud. GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Panel id from list_terminal_panels.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "hidden": {
+            "description": "true hides, false shows.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "name": "set_terminal_theme",
+      "title": "Switch the terminal theme",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Switch GhosttyDalamud's colour theme to: {name}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Post",
+        "ipc:GhosttyDalamud.v1.Call#theme.set"
+      ],
+      "description": "Switches the colours of the terminals and the glass around them to a named theme and saves it, as \"/term theme NAME\" does (names may contain spaces, e.g. \"Gruvbox Light\"). Posted as that chat command today: a misspelt name fails silently in the game's chat log and the result says via=post. With a GhosttyDalamud that offers theme.set the outcome is reported; list_terminal_themes lists the names once theme.list exists.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Theme name as GhosttyDalamud's settings list it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "name": "share_terminal_capture",
+      "title": "Upload a capture to the gallery",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": true,
+      "approvalSummary": "UPLOAD a capture from your computer to GhosttyDalamud's online gallery, where anyone with the link can see it: {path}",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "dataSources": [
+        "ipc:GhosttyDalamud.v1.Call#gallery.share"
+      ],
+      "description": "Uploads one screenshot or clip from GhosttyDalamud's capture folder to its online gallery and returns the link (result.url). path is a file path from get_terminal_capture_status, or \"last\" for the most recent capture. This sends an image of the player's screen to a server, so the player is shown exactly what is uploaded. NEEDS A NEWER GhosttyDalamud: written against the proposed gallery.share verb; fails with unavailable until it ships (\"/term share\" is deliberately not posted blind, since nothing could report what was uploaded). GhosttyDalamud queues the change and runs it at the end of its next frame; this waits at most 2 seconds for the outcome (completed=true) and otherwise returns the request id for get_terminal_request. A change GhosttyDalamud ran and refused fails with its own reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Capture file path, or \"last\" for the most recent capture.",
+            "type": "string",
+            "default": "last"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "panelId": {
+            "type": "integer"
+          },
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
       "name": "show_notification",
       "title": "Show Dalamud notification",
       "category": "ui",
@@ -13479,6 +16629,59 @@
             "type": "boolean"
           }
         }
+      }
+    },
+    {
+      "name": "switch_desktop_workspace",
+      "title": "Switch desktop workspace",
+      "category": "bridges",
+      "permission": "action",
+      "availability": "live",
+      "requiresLogin": false,
+      "needsApproval": true,
+      "approvalSummary": "Switch XivDesktop to workspace {workspace}; window panels on other workspaces are hidden.",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "ipc:XivDesktop.v1.Workspace"
+      ],
+      "description": "Switches XivDesktop's current workspace (1-9): window panels assigned to other workspaces are hidden, this one's are shown. Nothing is closed. The current workspace is in list_desktop_windows.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "description": "Workspace number (1-9).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "gate": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok"
+        ]
       }
     },
     {
