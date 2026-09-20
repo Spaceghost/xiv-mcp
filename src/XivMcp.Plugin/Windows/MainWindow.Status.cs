@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -51,7 +52,7 @@ public sealed partial class MainWindow
                 Row("Tailnet", host.Plan.MagicDnsName is { } dns ? $"{tailnetHost}  ({dns})" : tailnetHost);
             Row("Enabled", config.Enabled ? "yes" : "no (server stays stopped on load)");
             Row("Uptime", host.StartedAt is { } started ? FormatAge(DateTimeOffset.UtcNow - started) : "—");
-            Row("Sessions", status.ActiveSessions.ToString());
+            Row("Sessions", status.ActiveSessions.ToString(CultureInfo.InvariantCulture));
             Row("Requests", $"{status.TotalRequests} total, {status.FailedRequests} failed");
             Row("Clients", status.ConnectedClients.Count == 0 ? "none" : string.Join(", ", status.ConnectedClients));
             Row("Auth", config.RequireToken ? "bearer token required" : "NO TOKEN (any local process can call tools)");

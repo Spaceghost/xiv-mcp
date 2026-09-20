@@ -101,6 +101,7 @@ public sealed class DtrEntry : IDisposable
         try
         {
             entry?.Remove();
+            entry?.Dispose();
         }
         catch
         {

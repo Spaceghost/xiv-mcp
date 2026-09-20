@@ -84,7 +84,7 @@ public sealed record ClientToken(string Name, string Sha256Hex);
 /// </summary>
 public interface ISessionAwareToolCallApprover : IToolCallApprover
 {
-    Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest request, CancellationToken cancellationToken);
+    Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest call, CancellationToken cancellationToken);
 }
 
 /// <summary>Outcome of <see cref="McpServer.ExecuteApprovedToolAsync"/>.</summary>

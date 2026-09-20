@@ -205,8 +205,12 @@ public sealed class LocalModelConfigTests
     public void OldFilesLoadWithDefaults()
     {
         var config = JsonConvert.DeserializeObject<Configuration>("""{"Version":2,"BearerToken":"KEEP_THIS_TOKEN_abcdefghijklmnopqrstuvwxyz0"}""")!;
-        Assert.False(config.Normalize());
+        // True: a schema-2 file is migrated to the bind-mode schema on load. The local model
+        // settings themselves add nothing to normalise — they default to empty.
+        Assert.True(config.Normalize());
         Assert.Equal("", config.LocalModelEndpoint);
+        Assert.Equal("", config.LocalModelName);
+        Assert.Equal("", config.LocalModelApiKey);
         Assert.True(config.AllowIpcClientTokens);
         Assert.Equal(Configuration.CurrentVersion, config.Version);
     }

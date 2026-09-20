@@ -101,6 +101,8 @@ public sealed class SimulatedFrameworkThread : IGameThread, IDisposable
         _stopping = true;
         _queue.Add(() => { });
         _thread.Join(TimeSpan.FromSeconds(1));
+        // After the join the drain loop is gone, so nothing can add to or take from the queue.
+        _queue.Dispose();
     }
 }
 

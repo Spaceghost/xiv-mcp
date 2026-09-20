@@ -1,6 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Nodes;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.DutyState;
 using Dalamud.Game.Inventory;
+using Dalamud.Game.Inventory.InventoryEventArgTypes;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Providers.GameData;
@@ -47,6 +50,10 @@ public sealed class EventsProvider : IDisposable
     private readonly IFramework framework;
     private readonly IMcpNotifier notifier;
     private readonly IPluginLog log;
+    // GameDataIndex.For hands back the per-IDataManager shared index; this provider borrows it and
+    // must not dispose it, so CA2213's "never disposed" is the correct behaviour here.
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Shared GameDataIndex owned by GameDataIndex.For, not by this provider.")]
     private readonly GameDataIndex index;
 
     private readonly object partyGate = new();
@@ -228,7 +235,7 @@ public sealed class EventsProvider : IDisposable
         }
     }
 
-    private void OnTerritoryChanged(ushort territoryId) => Safe(() =>
+    private void OnTerritoryChanged(uint territoryId) => Safe(() =>
     {
         var name = index.TerritoryName(territoryId);
         stream.Append("zone", name is null ? $"Entered territory {territoryId}." : $"Entered {name}.",
@@ -254,15 +261,15 @@ public sealed class EventsProvider : IDisposable
             new JsonObject { ["classJobId"] = classJobId, ["job"] = job?.Abbreviation });
     });
 
-    private void OnDutyStarted(object? sender, ushort territoryId) => Safe(() => Duty("started", territoryId));
+    private void OnDutyStarted(IDutyStateEventArgs args) => Safe(() => Duty("started", args.TerritoryType.RowId));
 
-    private void OnDutyCompleted(object? sender, ushort territoryId) => Safe(() => Duty("completed", territoryId));
+    private void OnDutyCompleted(IDutyStateEventArgs args) => Safe(() => Duty("completed", args.TerritoryType.RowId));
 
-    private void OnDutyWiped(object? sender, ushort territoryId) => Safe(() => Duty("wiped", territoryId));
+    private void OnDutyWiped(IDutyStateEventArgs args) => Safe(() => Duty("wiped", args.TerritoryType.RowId));
 
-    private void OnDutyRecommenced(object? sender, ushort territoryId) => Safe(() => Duty("recommenced", territoryId));
+    private void OnDutyRecommenced(IDutyStateEventArgs args) => Safe(() => Duty("recommenced", args.TerritoryType.RowId));
 
-    private void Duty(string what, ushort territoryId)
+    private void Duty(string what, uint territoryId)
     {
         var name = index.TerritoryName(territoryId);
         stream.Append("duty", $"Duty {what}{(name is null ? "" : $" in {name}")}.",

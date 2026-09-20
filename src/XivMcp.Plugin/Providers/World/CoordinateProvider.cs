@@ -16,11 +16,13 @@ public sealed class CoordinateProvider
 {
     private readonly GameDataIndex index;
     private readonly IClientState clientState;
+    private readonly IObjectTable objects;
 
-    public CoordinateProvider(IDataManager data, IClientState clientState)
+    public CoordinateProvider(IDataManager data, IClientState clientState, IObjectTable objects)
     {
         index = GameDataIndex.For(data);
         this.clientState = clientState;
+        this.objects = objects;
     }
 
     public sealed record CoordinatesDto(
@@ -158,7 +160,7 @@ public sealed class CoordinateProvider
         }
         else
         {
-            var position = clientState.LocalPlayer?.Position
+            var position = objects.LocalPlayer?.Position
                            ?? throw new McpToolException("No point given and no character is logged in. Pass x/y or worldX/worldZ.");
             if (clientState.TerritoryType != territory)
             {

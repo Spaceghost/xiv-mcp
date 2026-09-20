@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
@@ -80,7 +81,7 @@ public sealed partial class MainWindow
                 ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ImGui.GetColorU32(ImGuiColors.ErrorBackground));
 
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(e.Timestamp.ToLocalTime().ToString("HH:mm:ss"));
+            ImGui.TextDisabled(e.Timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture));
 
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(e.ClientName ?? "—");

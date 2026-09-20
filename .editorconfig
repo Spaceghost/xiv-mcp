@@ -51,6 +51,14 @@ dotnet_diagnostic.CA2213.severity = error
 # hint on code that is not hot. Mechanical churn with no correctness value.
 dotnet_diagnostic.CA1822.severity = suggestion
 
+# CA1507 "use nameof instead of a string literal" is wrong for the
+# [JsonProperty] names in Configuration: those strings are the on-disk format of
+# a config file that already exists on players' machines. Tying them to member
+# names would silently rename saved settings the next time a property is
+# renamed, which is exactly what the private Stored* backing properties exist
+# to prevent.
+dotnet_diagnostic.CA1507.severity = none
+
 # CA1716/CA1711/CA1720 naming: satisfying these means renaming public types
 # (ToolPermission, XivMcp.Shared) that the IPC contract and the MCP tool
 # catalogue name on the wire. A rename here is a breaking protocol change.

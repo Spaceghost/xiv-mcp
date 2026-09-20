@@ -10,9 +10,9 @@ public sealed class SessionAwareApprover : ISessionAwareToolCallApprover
 
     public int LegacyCalls;
 
-    public Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest request, CancellationToken cancellationToken)
+    public Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest call, CancellationToken cancellationToken)
     {
-        Requests.Enqueue(request);
+        Requests.Enqueue(call);
         return Task.FromResult(true);
     }
 

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
@@ -18,14 +20,18 @@ public sealed class MarketProvider : IDisposable
 {
     private const int MaxItems = 20;
 
+    // GameDataIndex.For hands back the per-IDataManager shared index; this provider borrows it and
+    // must not dispose it, so CA2213's "never disposed" is the correct behaviour here.
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Shared GameDataIndex owned by GameDataIndex.For, not by this provider.")]
     private readonly GameDataIndex index;
-    private readonly IClientState clientState;
+    private readonly IObjectTable objects;
     private readonly UniversalisClient client;
 
-    public MarketProvider(IDataManager data, IClientState clientState)
+    public MarketProvider(IDataManager data, IObjectTable objects)
     {
         index = GameDataIndex.For(data);
-        this.clientState = clientState;
+        this.objects = objects;
         client = new UniversalisClient("XivMcp/0.1 (+https://github.com/Spaceghost/xiv-mcp)");
     }
 
@@ -199,8 +205,8 @@ public sealed class MarketProvider : IDisposable
         limit = Math.Clamp(limit, 1, 500);
         offset = Math.Max(0, offset);
 
-        var current = SafeWorldName(() => clientState.LocalPlayer?.CurrentWorld.RowId);
-        var home = SafeWorldName(() => clientState.LocalPlayer?.HomeWorld.RowId);
+        var current = SafeWorldName(() => objects.LocalPlayer?.CurrentWorld.RowId);
+        var home = SafeWorldName(() => objects.LocalPlayer?.HomeWorld.RowId);
 
         var all = new List<WorldDto>();
         string? currentDc = null;
@@ -219,7 +225,7 @@ public sealed class MarketProvider : IDisposable
 
             var dc = world.DataCenter.ValueNullable;
             var dcName = dc is { } d ? GameDataIndex.NullIfEmpty(SheetJson.Text(d.Name)) : null;
-            var region = dc is { } d2 ? RegionName(d2.Region) : null;
+            var region = dc is { } d2 ? RegionName((byte)d2.Region.RowId) : null;
             var isCurrent = name.Equals(current, StringComparison.OrdinalIgnoreCase);
             if (isCurrent)
             {
@@ -279,7 +285,7 @@ public sealed class MarketProvider : IDisposable
 
             foreach (var id in requested)
             {
-                if (bag[id.ToString()] is JsonObject item)
+                if (bag[id.ToString(CultureInfo.InvariantCulture)] is JsonObject item)
                 {
                     yield return (id, item);
                 }
@@ -369,7 +375,7 @@ public sealed class MarketProvider : IDisposable
         }
 
         var world = await ctx.Game
-            .InvokeAsync(() => SafeWorldName(() => clientState.LocalPlayer?.CurrentWorld.RowId), ctx.CancellationToken)
+            .InvokeAsync(() => SafeWorldName(() => objects.LocalPlayer?.CurrentWorld.RowId), ctx.CancellationToken)
             .ConfigureAwait(false);
         if (string.IsNullOrEmpty(world))
         {

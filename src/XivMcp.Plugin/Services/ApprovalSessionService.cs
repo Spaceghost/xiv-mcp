@@ -73,8 +73,7 @@ public sealed class ApprovalSessionService : IDisposable
         ApprovalSession[] replaced;
         lock (gate)
         {
-            if (disposed)
-                throw new ObjectDisposedException(nameof(ApprovalSessionService));
+            ObjectDisposedException.ThrowIf(disposed, this);
             replaced = sessions.Where(s => s.ClientName == clientName && s.SessionId == sessionId).ToArray();
             sessions.RemoveAll(s => s.ClientName == clientName && s.SessionId == sessionId);
             sessions.Add(session);

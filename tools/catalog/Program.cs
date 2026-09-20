@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
@@ -81,7 +82,7 @@ var providers = types
 
 if (mode == "serve")
 {
-    var server = new McpServer(new McpServerOptions { Port = port, BearerToken = null, ServerTitle = "xiv-mcp catalog (list only)" }, new InlineGame(), new AllowAll(),
+    using var server = new McpServer(new McpServerOptions { Port = port, BearerToken = null, ServerTitle = "xiv-mcp catalog (list only)" }, new InlineGame(), new AllowAll(),
         (message, ex) => Console.Error.WriteLine(ex is null ? message : $"{message}: {ex.Message}"));
     var failures = 0;
     foreach (var type in providers)
@@ -170,7 +171,7 @@ internal static partial class Catalog
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"{tools.Count} tools, {resources.Count} resources and templates, {prompts.Count} prompts. Tier and category are the in-game switches");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"{tools.Count} tools, {resources.Count} resources and templates, {prompts.Count} prompts. Tier and category are the in-game switches");
         sb.AppendLine("(Settings → Permissions / Categories); *Login* means the call fails at the title screen. Descriptions are the first");
         sb.AppendLine("sentence of what clients see; `tools/list` has the full text and schemas. Behaviour in game is unverified unless");
         sb.AppendLine("stated elsewhere.");
@@ -180,7 +181,7 @@ internal static partial class Catalog
         sb.AppendLine("| Tool | Tier | Category | Login | What it does |");
         sb.AppendLine("| --- | --- | --- | --- | --- |");
         foreach (var t in tools.OrderBy(t => t.Category, StringComparer.Ordinal).ThenBy(t => TierOrder(t.Tier)).ThenBy(t => t.Name, StringComparer.Ordinal))
-            sb.AppendLine($"| `{t.Name}` | {t.Tier} | {t.Category} | {(t.Login ? "yes" : "no")} | {Cell(t.Summary)} |");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"| `{t.Name}` | {t.Tier} | {t.Category} | {(t.Login ? "yes" : "no")} | {Cell(t.Summary)} |");
 
         sb.AppendLine();
         sb.AppendLine("### Resources");
@@ -190,7 +191,7 @@ internal static partial class Catalog
         sb.AppendLine("| URI | Category | Login | What |");
         sb.AppendLine("| --- | --- | --- | --- |");
         foreach (var r in resources.OrderBy(r => r.Category, StringComparer.Ordinal).ThenBy(r => r.Uri, StringComparer.Ordinal))
-            sb.AppendLine($"| `{r.Uri}` | {r.Category} | {(r.Login ? "yes" : "no")} | {Cell(r.Summary)} |");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"| `{r.Uri}` | {r.Category} | {(r.Login ? "yes" : "no")} | {Cell(r.Summary)} |");
 
         sb.AppendLine();
         sb.AppendLine("### Prompts");
@@ -200,7 +201,7 @@ internal static partial class Catalog
         sb.AppendLine("| Prompt | Category | Arguments | Workflow |");
         sb.AppendLine("| --- | --- | --- | --- |");
         foreach (var p in prompts.OrderBy(p => p.Name, StringComparer.Ordinal))
-            sb.AppendLine($"| `{p.Name}` | {p.Category} | {p.Arguments} | {Cell(p.Summary)} |");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"| `{p.Name}` | {p.Category} | {p.Arguments} | {Cell(p.Summary)} |");
         return sb.ToString();
     }
 

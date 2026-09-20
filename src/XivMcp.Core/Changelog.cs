@@ -5,9 +5,14 @@ namespace XivMcp.Core;
 
 /// <summary>One entry in the changelog: what changed, and how far it has been verified.</summary>
 /// <param name="Status">new, fix, beta or next (see <see cref="Changelog.Label"/>).</param>
+/// <param name="Text">The line a player reads.</param>
 public sealed record ChangelogItem(string Status, string Text);
 
 /// <summary>A release, or the unreleased "In the workshop" section when <paramref name="Version"/> is "next".</summary>
+/// <param name="Version">Release number, or "next" for the unreleased section.</param>
+/// <param name="Title">Release title.</param>
+/// <param name="Blurb">One paragraph introducing the release.</param>
+/// <param name="Items">The entries in the release.</param>
 public sealed record ChangelogRelease(string Version, string Title, string Blurb, IReadOnlyList<ChangelogItem> Items)
 {
     public bool Unreleased => Version == "next";
