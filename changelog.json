@@ -10,6 +10,10 @@
       "items": [
         {
           "status": "beta",
+          "text": "Forty new tools in a \"bridges\" category let an assistant see and drive the owner's other mods. Ghostty: list the terminal panels, read a panel's layout and status, open a terminal (the approval prompt shows the command verbatim), place, focus, close, hide or reorder a panel, take a screenshot or a clip, set the theme and run the selftest. XivDesktop: list applications and windows, search the palette, read status, launch an application, act on a window, switch workspace and ask the NPC assistant. Almanac: read its status and ask it something. Everything that changes anything goes through the same approval checkbox. Some of these tools are written against IPC the other mods do not offer yet; those answer with a clear \"unavailable\" that names exactly what is missing, and start working when the sibling ships it — nothing in XivMcp has to change."
+        },
+        {
+          "status": "beta",
           "text": "Four new tools that act, all behind the approval checkbox: open_game_window opens one of the game's own windows (map, journal, a recipe, the Duty Finder on a duty, and so on) and never clicks inside it; write_macro and clear_macro edit one User Macro slot, show the lines verbatim before you approve, return what was there so it can be put back, and refuse the same commands execute_command refuses; target_party_member targets one named member of your own party. What is still to come is listed in docs/TODO.md."
         }
       ]
