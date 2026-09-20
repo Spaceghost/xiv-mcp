@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -253,7 +254,7 @@ internal static class Snapshots
             GameMath.Round(total, 2),
             GameMath.Round(Math.Max(0, total - elapsed), 2),
             chara.IsCastInterruptible,
-            target is 0 or InvalidEntityId ? null : target.ToString());
+            target is 0 or InvalidEntityId ? null : target.ToString(CultureInfo.InvariantCulture));
     }
 
     public static ObjectSummaryDto Summary(IGameObject obj, Vector3 origin, in MapContext map)
@@ -268,7 +269,7 @@ internal static class Snapshots
             SubKindName(obj),
             obj.Name.TextValue,
             EntityIdOrNull(obj.EntityId),
-            obj.GameObjectId.ToString(),
+            obj.GameObjectId.ToString(CultureInfo.InvariantCulture),
             obj.BaseId,
             obj.ObjectIndex,
             GameMath.Round(GameMath.Distance3D(origin, position)),
@@ -321,7 +322,7 @@ internal static class Snapshots
         var targetObjectId = obj.TargetObjectId;
         if (targetObjectId is not (0 or InvalidEntityId))
         {
-            targetId = targetObjectId.ToString();
+            targetId = targetObjectId.ToString(CultureInfo.InvariantCulture);
             try
             {
                 targetName = obj.TargetObject?.Name.TextValue;
@@ -347,7 +348,7 @@ internal static class Snapshots
             SubKindName(obj),
             obj.Name.TextValue,
             EntityIdOrNull(obj.EntityId),
-            obj.GameObjectId.ToString(),
+            obj.GameObjectId.ToString(CultureInfo.InvariantCulture),
             obj.BaseId,
             chara is { NameId: > 0 } ? chara.NameId : null,
             obj.ObjectIndex,

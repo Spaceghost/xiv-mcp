@@ -11,7 +11,7 @@ namespace XivMcp.Core.Http;
 /// client disconnect is observed (via <see cref="Closed"/>) even while a request is being processed.
 /// Requests are handled strictly one at a time (pipelined requests wait in the buffer).
 /// </summary>
-internal sealed class HttpConnection
+internal sealed class HttpConnection : IDisposable
 {
     private const int HighWaterBytes = 256 * 1024;
     private static readonly byte[] ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n"u8.ToArray();
@@ -21,6 +21,11 @@ internal sealed class HttpConnection
     private readonly object _lock = new();
     private readonly CancellationTokenSource _closedCts = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+
+    // Cached so Closed keeps working after _closedCts is disposed: Dispose cancels first, and a
+    // registration on an already-cancelled token runs inline without touching the source.
+    private readonly CancellationToken _closedToken;
+    private int _disposed;
 
     private byte[] _buf = new byte[4096];
     private int _start;
@@ -36,6 +41,7 @@ internal sealed class HttpConnection
     {
         _socket = socket;
         _limits = limits;
+        _closedToken = _closedCts.Token;
         Id = id;
         try
         {
@@ -51,7 +57,7 @@ internal sealed class HttpConnection
     public EndPoint? RemoteEndPoint { get; }
 
     /// <summary>Cancelled when the peer disconnects or the connection is aborted.</summary>
-    public CancellationToken Closed => _closedCts.Token;
+    public CancellationToken Closed => _closedToken;
 
     public bool IsClosed => Volatile.Read(ref _closed) != 0;
 
@@ -446,6 +452,33 @@ internal sealed class HttpConnection
         }
 
         MarkEof();
+    }
+
+    /// <summary>
+    /// Resets the connection and releases the cancellation source and the write lock. Called once
+    /// the connection has been retired from <see cref="HttpServer"/>; safe to call more than once.
+    /// </summary>
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        Abort();
+
+        // MarkEof queues the cancel to the thread pool, so it may not have run yet; cancel here
+        // too (idempotent) so nothing is left waiting on a source that is about to go away.
+        try
+        {
+            _closedCts.Cancel();
+        }
+        catch (Exception)
+        {
+            // A cancellation callback threw, or the source raced to disposal. Either way the
+            // connection is gone.
+        }
+
+        _closedCts.Dispose();
+        _writeLock.Dispose();
     }
 }
 

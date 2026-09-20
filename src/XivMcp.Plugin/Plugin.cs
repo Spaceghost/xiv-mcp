@@ -281,5 +281,11 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         disposables.Clear();
+
+        // host and confirmations are in `disposables` and were released by the loop above. Both
+        // Dispose methods are idempotent, and naming them here keeps "every disposable field of
+        // this type is disposed" checkable by the analyzer instead of hidden behind Track().
+        host?.Dispose();
+        confirmations?.Dispose();
     }
 }

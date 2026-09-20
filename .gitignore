@@ -5,3 +5,4 @@ artifacts/
 .vs/
 node_modules/
 __pycache__/
+.claude/

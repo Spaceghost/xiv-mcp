@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Dalamud.Plugin.Services;
@@ -12,6 +13,10 @@ namespace XivMcp.Plugin.Providers.GameData;
 [McpProvider("gamedata")]
 public sealed class SheetDataProvider : IDisposable
 {
+    // The index is a process-wide shared singleton handed out by GameDataIndex.For; the
+    // providers borrow it and GameDataIndex.Release() owns its teardown on unload.
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Shared singleton owned by GameDataIndex.Release(), not by this provider.")]
     private readonly GameDataIndex index;
 
     public SheetDataProvider(IDataManager data) => index = GameDataIndex.For(data);

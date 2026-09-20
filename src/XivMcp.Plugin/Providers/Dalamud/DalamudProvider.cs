@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Config;
 using Dalamud.Plugin;
@@ -156,7 +157,7 @@ public sealed unsafe class DalamudProvider
                 1 => "light",
                 2 => "classicFF",
                 3 => "clearBlue",
-                _ => themeValue.ToString(),
+                _ => themeValue.ToString(CultureInfo.InvariantCulture),
             };
         }
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.DutyState;
 using Dalamud.Plugin.Services;
@@ -124,7 +125,7 @@ public sealed class DutyProvider : IDisposable
             var use = territory.TerritoryIntendedUse.RowId;
             intendedUse = use <= byte.MaxValue
                 ? ((FFXIVClientStructs.FFXIV.Client.Enums.TerritoryIntendedUse)use).ToString()
-                : use.ToString();
+                : use.ToString(CultureInfo.InvariantCulture);
             cfcFromTerritory = territory.ContentFinderCondition.RowId;
         }
 

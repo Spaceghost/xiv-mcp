@@ -8,7 +8,7 @@ using System.Threading.Channels;
 namespace XivMcp.Core.Http;
 
 /// <summary>Minimal HTTP/1.1 server on a raw <see cref="TcpListener"/> (no http.sys, works under Wine).</summary>
-internal sealed class HttpServer
+internal sealed class HttpServer : IDisposable
 {
     public delegate Task<bool> RequestHandler(HttpConnection connection, HttpRequest request);
 
@@ -162,18 +162,33 @@ internal sealed class HttpServer
             }
 
             var id = Interlocked.Increment(ref _nextId);
-            var connection = new HttpConnection(socket, _limits, id);
-            if (_connections.Count >= _limits.MaxConnections || _stopCts.IsCancellationRequested)
-            {
-                _ = RejectBusyAsync(connection);
-                continue;
-            }
 
-            _connections[id] = connection;
-            var task = Task.Run(() => ProcessConnectionAsync(connection));
-            _connectionTasks[id] = task;
-            if (task.IsCompleted)
-                _connectionTasks.TryRemove(id, out _);
+            // `owned` holds the connection only until its lifetime is handed to RejectBusyAsync or
+            // to ProcessConnectionAsync; it is nulled at the handover so the finally never
+            // double-disposes, and disposes it if anything between throws.
+            HttpConnection? owned = null;
+            try
+            {
+                owned = new HttpConnection(socket, _limits, id);
+                var connection = owned;
+                if (_connections.Count >= _limits.MaxConnections || _stopCts.IsCancellationRequested)
+                {
+                    owned = null;
+                    _ = RejectBusyAsync(connection);
+                    continue;
+                }
+
+                _connections[id] = connection;
+                owned = null;
+                var task = Task.Run(() => ProcessConnectionAsync(connection));
+                _connectionTasks[id] = task;
+                if (task.IsCompleted)
+                    _connectionTasks.TryRemove(id, out _);
+            }
+            finally
+            {
+                owned?.Dispose();
+            }
         }
     }
 
@@ -188,6 +203,10 @@ internal sealed class HttpServer
         catch (Exception)
         {
             connection.Abort();
+        }
+        finally
+        {
+            connection.Dispose();
         }
     }
 
@@ -277,6 +296,7 @@ internal sealed class HttpServer
             connection.Abort();
             _connections.TryRemove(connection.Id, out _);
             _connectionTasks.TryRemove(connection.Id, out _);
+            connection.Dispose();
         }
     }
 
@@ -324,6 +344,21 @@ internal sealed class HttpServer
         {
             // Timeouts or handler faults during shutdown are not actionable.
         }
+    }
+
+    /// <summary>
+    /// Releases the stop source and anything the connection table still holds. Call after
+    /// <see cref="StopAsync"/>: the accept loop and the connection tasks have ended by then, so
+    /// nothing reads <c>_stopCts.Token</c> any more.
+    /// </summary>
+    public void Dispose()
+    {
+        StopAccepting();
+        foreach (var connection in _connections.Values)
+            connection.Dispose();
+        _connections.Clear();
+        _connectionTasks.Clear();
+        _stopCts.Dispose();
     }
 }
 

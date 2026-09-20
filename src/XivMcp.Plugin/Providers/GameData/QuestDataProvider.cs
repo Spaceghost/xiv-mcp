@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
@@ -33,7 +34,7 @@ public sealed class QuestDataProvider
         [McpParam("Results to skip for paging.", Minimum = 0)] int offset = 0)
     {
         if (string.IsNullOrWhiteSpace(query)) throw new McpToolException("query is required.");
-        if (uint.TryParse(query.Trim(), out var numeric) && numeric is > 0 and < QuestIdBase) query = NormalizeQuestId(numeric).ToString();
+        if (uint.TryParse(query.Trim(), out var numeric) && numeric is > 0 and < QuestIdBase) query = NormalizeQuestId(numeric).ToString(CultureInfo.InvariantCulture);
         var page = TextSearch.Search(index.Quests, q => q.Id, q => q.Lower, query, null, offset, limit);
         var results = page.Items.Select(q => new QuestSummary(q.Id, q.Name, q.Level, GenreName(q.Genre), ExpansionName(q.Expansion))).ToList();
         return new PagedResult<QuestSummary>(page.Total, page.Offset, results.Count, page.Truncated, results);

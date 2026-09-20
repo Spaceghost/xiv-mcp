@@ -1,0 +1,131 @@
+# CI
+
+Tests and builds run from one script, `tools/ci/run.sh`, whether in GitHub
+Actions, on a self-hosted runner or in a local shell. The workflow only sets up
+the .NET SDK, restores the NuGet cache and calls it.
+
+## What runs where
+
+| Trigger | Job | Runs | Output |
+| --- | --- | --- | --- |
+| push to any branch, pull request, manual | `hosted` in `.github/workflows/ci.yml` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` = `artifacts/` (kept 14 days) |
+| the same, but only for events from this repository and only while `CI_SELF_HOSTED` is `true` | `self-hosted` in the same workflow, `runs-on: [self-hosted, Linux, X64, xiv-mcp]` | `tools/ci/run.sh test build` | artifact `xiv-mcp-self-hosted-<sha>` |
+| by hand, on your machine or in the Incus build container | `tools/ci/local.sh [stage...]` | the same stages | `artifacts/` where it ran |
+
+Changes that touch only Markdown or `docs/` do not start CI. A newer push to the
+same branch or pull request cancels the older run. `permissions: contents: read`,
+no secrets, and every third-party action is pinned by commit SHA. Nothing uses
+`pull_request_target`.
+
+A fork pull request cannot reach the self-hosted runner: the job's `if` requires
+`github.event.pull_request.head.repo.full_name == github.repository`, so a fork's
+event never starts it, and the `xiv-mcp` label keeps other repositories' jobs off
+the machine. That is the whole guard — there is no deployment environment to
+approve.
+
+**Neither runner has a game installation**, so the Dalamud reference assemblies
+are missing there and `tools/ci/run.sh` says so and skips
+`tests/XivMcp.Plugin.Tests`, `src/XivMcp.Plugin` and `src/XivMcp.Umbra` instead
+of failing. Give a runner `DALAMUD_LIB_PATH` (XIVLauncher's
+`~/.xlcore/dalamud/Hooks/dev`) to cover them.
+
+## `tools/ci/run.sh`
+
+```sh
+tools/ci/run.sh test            # both test projects
+tools/ci/run.sh build           # dotnet build XivMcp.slnx -c Release
+tools/ci/run.sh test build      # what CI runs
+tools/ci/run.sh all             # test, build, package
+```
+
+| Stage | Does |
+| --- | --- |
+| `deps` | finds a .NET SDK that satisfies `global.json` (`dotnet --version` in the repository root is the test), reports whether the Dalamud reference assemblies are there, then `dotnet restore XivMcp.slnx` |
+| `test` | `dotnet test tests/XivMcp.Core.Tests -c Release`, then `tests/XivMcp.Plugin.Tests` unless the Dalamud reference assemblies are missing or `SKIP_PLUGIN_TESTS=1`. Writes `artifacts/test-results/<project>.trx`, a `<project>.log` and a plain-text `summary.txt` |
+| `build` | `dotnet build XivMcp.slnx -c Release`. Without the Dalamud reference assemblies the three Dalamud projects have unresolvable reference paths, so the stage builds `src/XivMcp.Core`, `src/XivMcp.DevHost`, `tools/catalog` and `tests/XivMcp.Core.Tests` and names what it left out |
+| `package` | nothing yet: this repository has no `tools/package.sh`. `tools/install-dev.sh` stages a dev plugin for the local game, which is not a release artifact. The stage says so and does nothing; it runs `tools/package.sh` once one exists |
+| `all` | `test`, `build`, `package` |
+
+Environment (nothing else configures it):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DOTNET` | `dotnet` on `PATH` if it satisfies `global.json`, else `~/.dotnet/dotnet` | the .NET 10 SDK. `global.json` pins 10.0.401 with `rollForward: latestFeature`, so 10.0.4xx works and 10.0.1xx does not |
+| `DALAMUD_LIB_PATH` | `~/.xlcore/dalamud/Hooks/dev` | Dalamud reference assemblies (the directory with `Dalamud.dll`). Missing: the plugin tests and the Dalamud projects are skipped, as `SKIP_PLUGIN_TESTS=1` |
+| `UMBRA_LIB_PATH` | the newest `~/.xlcore/installedPlugins/Umbra/<version>` | Umbra reference assemblies for `src/XivMcp.Umbra` |
+| `SKIP_PLUGIN_TESTS` | | `1` skips `tests/XivMcp.Plugin.Tests` even where Dalamud is present |
+| `CI_CACHE_DIR` | `${XDG_CACHE_HOME:-~/.cache}/xiv-mcp-ci` | cache root; `NUGET_PACKAGES` is `$CI_CACHE_DIR/nuget`, which is what the workflow caches |
+| `XIVMCP_ARTIFACTS` | `<repo>/artifacts` | MSBuild output path (`Directory.Build.props`). CI keeps it inside the checkout — it is git-ignored — so the artifact upload can reach it; a plain `dotnet build` still writes `../xiv-mcp-build/artifacts` |
+| `CI_TRX` | `1` | `0` turns off the `.trx` reports; the plain-text summary is written either way |
+
+Nothing in CI needs a token, a secret or network access beyond NuGet.
+
+## Choosing the runner
+
+Set repository variables (Settings → Secrets and variables → Actions →
+Variables); no YAML change is needed:
+
+| Variable | Effect |
+| --- | --- |
+| `CI_RUNS_ON` unset | the `hosted` job runs on GitHub's `ubuntu-latest` |
+| `CI_RUNS_ON` = `"ubuntu-24.04"` | a specific GitHub-hosted image |
+| `CI_RUNS_ON` = `["self-hosted","Linux","X64","xiv-mcp"]` | the `hosted` job also lands on your own runner |
+| `CI_SELF_HOSTED` = `true` | additionally runs the `self-hosted` job (labels `self-hosted, Linux, X64, xiv-mcp`) |
+| `CI_SELF_HOSTED` unset or anything else | that job does not exist for the run |
+
+```sh
+gh variable set CI_SELF_HOSTED --body true
+gh variable set CI_RUNS_ON --body '"ubuntu-latest"'
+gh variable delete CI_RUNS_ON     # back to the default
+```
+
+A self-hosted runner executes whatever a workflow in this repository asks for.
+Register it with the label `xiv-mcp`, ideally ephemeral, and keep
+`CI_SELF_HOSTED` unset while it is not wanted.
+
+## Running it locally
+
+```sh
+tools/ci/local.sh                 # = tools/ci/local.sh test build
+tools/ci/local.sh test
+CI_LOCAL_REMOTE=0 tools/ci/local.sh test build    # force this machine
+```
+
+The workstation runs the game and has little free memory, so when an Incus remote
+with the build container is reachable (`incus remote list` is set, or
+`INCUS_REMOTE` is set) `local.sh` pushes the checkout — `git ls-files --cached
+--others --exclude-standard`, through `tar` — into `xiv-mcp-build` on that remote,
+runs the same `tools/ci/run.sh` stages there and streams the output back. Nothing
+is copied back and nothing is installed into the game. `CI_LOCAL_REMOTE=0`,
+`INCUS`, `CI_CONTAINER` and `CI_REMOTE_DIR` are the only knobs. The container has
+no game installation, so a remote run skips the Dalamud projects and the plugin
+tests exactly as a GitHub-hosted runner does; run those on this machine, where
+`~/.xlcore/dalamud/Hooks/dev` exists.
+
+## What is and is not verified
+
+Actually run:
+
+* `shellcheck -x tools/ci/*.sh` — clean.
+* `actionlint .github/workflows/ci.yml` (actionlint 1.7.12) — clean.
+* `tools/ci/run.sh --help` exits 0; an unknown stage and no stage at all exit 2.
+* `tools/ci/local.sh test build` against the Incus the configured remote, in the
+  `xiv-mcp-build` container (.NET SDK 10.0.401 installed there under
+  `/root/.dotnet`): the push, the SDK probe, `test` and `build` all ran.
+  `tests/XivMcp.Core.Tests`: **163 passed, 0 failed, 0 skipped**, and the `.trx`
+  report was written. The plugin tests and the three Dalamud projects were
+  skipped there with the expected message, and the reduced build of
+  `XivMcp.Core`, `XivMcp.DevHost`, `tools/catalog` and `XivMcp.Core.Tests`
+  succeeded.
+
+Not verified:
+
+* `tests/XivMcp.Plugin.Tests` and `dotnet build XivMcp.slnx -c Release` (the full
+  solution, with the Dalamud projects) have **not** been run through
+  `tools/ci/run.sh`; the README's total test count is not something this document
+  observed. Run `tools/ci/run.sh test build` on a machine with
+  `~/.xlcore/dalamud/Hooks/dev` to cover that path.
+* Nothing here has run on GitHub: the workflow, the NuGet cache, the artifact
+  upload, the runner labels and the `CI_RUNS_ON` / `CI_SELF_HOSTED` variables are
+  only checked by `actionlint`. The first run on GitHub is their test.
+* No part of CI loads the plugin in FINAL FANTASY XIV.
