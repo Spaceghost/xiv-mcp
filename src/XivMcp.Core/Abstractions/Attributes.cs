@@ -56,6 +56,45 @@ public sealed class McpToolAttribute : Attribute
 
     /// <summary>MCP openWorldHint: interacts with entities outside the local client (other players, servers).</summary>
     public bool OpenWorld { get; init; }
+
+    /// <summary>
+    /// Where the answer comes from, as short stable labels: e.g. "lumina:Item" (a game data sheet), "client:InventoryManager"
+    /// (game client memory), "dalamud:IPartyList" (a Dalamud service), "ipc:GhosttyDalamud.v1.Call", "http:universalis.app",
+    /// "file:dalamud.log". Published as <c>_meta["dev.xivmcp/dataSources"]</c> and in the machine-readable catalogue.
+    /// </summary>
+    public string[]? Sources { get; init; }
+
+    /// <summary>
+    /// <see cref="ToolAvailability.Static"/>: needs only the installed game data (and perhaps the network), so the
+    /// standalone host serves it while the game is closed. <see cref="ToolAvailability.Live"/> (default): needs the running game.
+    /// </summary>
+    public ToolAvailability Availability { get; init; } = ToolAvailability.Live;
+
+    /// <summary>
+    /// One sentence telling the player what this call will do, shown in the in-game approval window and written to
+    /// the action log. <c>{argumentName}</c> is replaced by that argument's value, verbatim (missing arguments render as
+    /// "(default)"). Every tool that <see cref="NeedsApproval"/> should have one; without it the player sees only the tool name and its arguments.
+    /// </summary>
+    public string? ApprovalSummary { get; init; }
+
+    /// <summary>
+    /// Sends a <see cref="ToolPermission.Ui"/> tool through the approval gate too. Action and Chat tools always go
+    /// through it; Ui tools only when what they change outlives the call (the map flag, an opened game window).
+    /// </summary>
+    public bool RequiresApproval { get; init; }
+
+    /// <summary>True when the call is put to <see cref="McpServer.Approver"/> before it runs.</summary>
+    public bool NeedsApproval => Permission >= ToolPermission.Action || RequiresApproval;
+}
+
+/// <summary>Whether a tool needs the running game. See <see cref="McpToolAttribute.Availability"/>.</summary>
+public enum ToolAvailability
+{
+    /// <summary>Reads or changes the running game client.</summary>
+    Live = 0,
+
+    /// <summary>Needs only the installed game data (and perhaps the network).</summary>
+    Static = 1,
 }
 
 /// <summary>Describes a tool/prompt parameter in the generated JSON schema.</summary>

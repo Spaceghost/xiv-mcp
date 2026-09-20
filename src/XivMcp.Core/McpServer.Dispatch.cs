@@ -258,6 +258,9 @@ public sealed partial class McpServer
             ["dev.xivmcp/category"] = tool.Category,
             ["dev.xivmcp/permission"] = JsonNamingPolicy.CamelCase.ConvertName(tool.Permission.ToString()),
             ["dev.xivmcp/requiresLogin"] = tool.RequiresLogin,
+            ["dev.xivmcp/availability"] = JsonNamingPolicy.CamelCase.ConvertName(tool.Availability.ToString()),
+            ["dev.xivmcp/needsApproval"] = tool.NeedsApproval,
+            ["dev.xivmcp/dataSources"] = new JsonArray(tool.Sources.Select(s => (JsonNode?)s).ToArray()),
         };
         return json;
     }
@@ -295,13 +298,17 @@ public sealed partial class McpServer
             },
     };
 
-    private JsonObject ToolError(RequestScope scope, string message)
+    private static JsonObject ToolError(RequestScope scope, string message, string code = McpErrorCodes.ToolError, bool retryable = false, double? retryAfterSeconds = null)
     {
         scope.ToolError = message;
+        var error = new JsonObject { ["code"] = code, ["message"] = message, ["retryable"] = retryable };
+        if (retryAfterSeconds is { } seconds)
+            error["retryAfterSeconds"] = Math.Round(seconds, 2);
         return new JsonObject
         {
             ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = message }),
             ["isError"] = true,
+            ["_meta"] = new JsonObject { ["dev.xivmcp/error"] = error },
         };
     }
 
@@ -325,10 +332,14 @@ public sealed partial class McpServer
     private static string UnknownToolMessage(string name) => $"Unknown tool: '{name}'. Call tools/list for the available tools.";
 
     /// <summary>Category and tier gate shared by tools/call, <see cref="CheckToolCall"/> and approved executions. Null when the tool may run.</summary>
-    private string? ToolGateError(ToolDescriptor tool)
+    private string? ToolGateError(ToolDescriptor tool) => ToolGateError(tool, out _);
+
+    private string? ToolGateError(ToolDescriptor tool, out string code)
     {
+        code = McpErrorCodes.CategoryDisabled;
         if (!CategoryEnabled(tool.Category))
             return $"Tool '{tool.Name}' is unavailable: the '{tool.Category}' tool category is disabled in the xiv-mcp plugin settings (/xivmcp). Ask the user to enable it.";
+        code = McpErrorCodes.TierDisabled;
         if (!Permitted(tool.Permission))
             return $"Tool '{tool.Name}' is unavailable: it needs the '{PermissionLabel(tool.Permission)}' permission tier, which is disabled in the xiv-mcp plugin settings (/xivmcp). Ask the user to enable '{PermissionLabel(tool.Permission)}' tools.";
         return null;
@@ -344,8 +355,11 @@ public sealed partial class McpServer
     private async Task<JsonObject> CallToolAsync(RequestScope scope, ToolDescriptor tool, JsonObject? arguments, bool preApproved)
     {
         var name = tool.Name;
-        if (ToolGateError(tool) is { } gateError)
-            return ToolError(scope, gateError);
+        if (ToolGateError(tool, out var gateCode) is { } gateError)
+            return ToolError(scope, gateError, gateCode);
+
+        if (!preApproved && RateLimitDelaySeconds(scope.AuthenticatedClient, scope.Session?.Id ?? scope.DetachedSessionId) is > 0 and var wait)
+            return ToolError(scope, $"Tool '{name}' was not run: rate limit reached ({Options.RateLimitPerMinute} calls per minute per client). Retry in {Math.Ceiling(wait):0} s.", McpErrorCodes.RateLimited, retryable: true, retryAfterSeconds: wait);
 
         var timeout = Options.CallTimeout > TimeSpan.Zero ? Options.CallTimeout : TimeSpan.FromSeconds(30);
 
@@ -355,11 +369,13 @@ public sealed partial class McpServer
         var context = CreateContext(scope, linked.Token);
 
         var errors = new List<string>();
-        var args = ArgumentBinder.Bind(tool.Parameters, arguments, context, linked.Token, errors);
+        var args = tool.ExternalHandler is null ? ArgumentBinder.Bind(tool.Parameters, arguments, context, linked.Token, errors) : [];
         if (errors.Count > 0)
-            return ToolError(scope, InvalidArgumentsMessage(tool, errors));
+            return ToolError(scope, InvalidArgumentsMessage(tool, errors), McpErrorCodes.InvalidArguments);
 
-        if (!preApproved && tool.Permission >= ToolPermission.Action && Approver is { } approver)
+        // The one approval gate: every tool that changes something (Action, Chat, or a Ui tool that asked for it) is put to
+        // the approver. Whether the player is actually asked is the approver's decision (the plugin's single checkbox).
+        if (!preApproved && tool.NeedsApproval && Approver is { } approver)
         {
             var denial = await ApproveAsync(scope, tool, approver, arguments).ConfigureAwait(false);
             if (denial is not null)
@@ -367,19 +383,35 @@ public sealed partial class McpServer
         }
 
         timeoutCts.CancelAfter(timeout);
+        var result = await RunToolAsync(scope, tool, arguments, args, context, timeout, timeoutCts, linked.Token).ConfigureAwait(false);
+        if (tool.NeedsApproval)
+        {
+            RaiseGatedToolExecuted(new GatedToolExecution(
+                name, tool.Permission, scope.ClientName, scope.AuthenticatedClient, scope.Session?.Id ?? scope.DetachedSessionId,
+                RenderApprovalSummary(tool.ApprovalSummary, name, arguments), arguments?.ToJsonString(McpJson.Options),
+                scope.ToolError is null, scope.ToolError, preApproved));
+        }
 
+        return result;
+    }
+
+    private async Task<JsonObject> RunToolAsync(RequestScope scope, ToolDescriptor tool, JsonObject? arguments, object?[] args, ToolContext context, TimeSpan timeout, CancellationTokenSource timeoutCts, CancellationToken token)
+    {
+        var name = tool.Name;
         object? value;
         try
         {
-            value = await InvokeMemberAsync(tool, tool.GameThread, tool.RequiresLogin, args, linked.Token).ConfigureAwait(false);
+            value = tool.ExternalHandler is { } external
+                ? await external(arguments, context).WaitAsync(token).ConfigureAwait(false)
+                : await InvokeMemberAsync(tool, tool.GameThread, tool.RequiresLogin, args, token).ConfigureAwait(false);
         }
         catch (LoginRequiredException)
         {
-            return ToolError(scope, $"Tool '{name}' requires a logged-in character, and no character is logged in right now. Ask the user to log in, then retry.");
+            return ToolError(scope, $"Tool '{name}' requires a logged-in character, and no character is logged in right now. Ask the user to log in, then retry.", McpErrorCodes.LoginRequired, retryable: true);
         }
         catch (McpToolException ex)
         {
-            return ToolError(scope, ex.Message);
+            return ToolError(scope, ex.Message, ex.Code, ex.Retryable);
         }
         catch (OperationCanceledException) when (scope.CancellationToken.IsCancellationRequested)
         {
@@ -387,12 +419,12 @@ public sealed partial class McpServer
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
-            return ToolError(scope, $"Tool '{name}' timed out after {timeout.TotalSeconds:0.#} s. The game may be busy (loading screen, cutscene); retry shortly.");
+            return ToolError(scope, $"Tool '{name}' timed out after {timeout.TotalSeconds:0.#} s. The game may be busy (loading screen, cutscene); retry shortly.", McpErrorCodes.Timeout, retryable: true);
         }
         catch (Exception ex)
         {
             LogSink($"tool '{name}' threw", ex);
-            return ToolError(scope, $"Tool '{name}' failed with an internal error ({ex.GetType().Name}: {ex.Message}).");
+            return ToolError(scope, $"Tool '{name}' failed with an internal error ({ex.GetType().Name}: {ex.Message}).", McpErrorCodes.InternalError);
         }
 
         try
@@ -402,7 +434,7 @@ public sealed partial class McpServer
         catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
         {
             LogSink($"tool '{name}' result could not be serialized", ex);
-            return ToolError(scope, $"Tool '{name}' produced a result that could not be serialized ({ex.Message}).");
+            return ToolError(scope, $"Tool '{name}' produced a result that could not be serialized ({ex.Message}).", McpErrorCodes.InternalError);
         }
     }
 
@@ -427,14 +459,14 @@ public sealed partial class McpServer
                     ? HostState.IsLoggedIn
                     : await GameThread.InvokeAsync(() => HostState.IsLoggedIn, linked.Token).WaitAsync(linked.Token).ConfigureAwait(false);
                 if (!loggedIn)
-                    return ToolError(scope, $"Tool '{name}' requires a logged-in character, and no character is logged in right now. Ask the user to log in, then retry.");
+                    return ToolError(scope, $"Tool '{name}' requires a logged-in character, and no character is logged in right now. Ask the user to log in, then retry.", McpErrorCodes.LoginRequired, retryable: true);
             }
 
             var argumentsJson = arguments?.ToJsonString(McpJson.Options);
             var sessionId = scope.Session?.Id;
             var approved = await Task.Run(
                     () => approver is ISessionAwareToolCallApprover aware
-                        ? aware.ApproveToolCallAsync(new ToolCallApprovalRequest(name, tool.Permission, scope.ClientName, sessionId, argumentsJson, scope.AuthenticatedClient), linked.Token)
+                        ? aware.ApproveToolCallAsync(new ToolCallApprovalRequest(name, tool.Permission, scope.ClientName, sessionId, argumentsJson, scope.AuthenticatedClient) { Summary = RenderApprovalSummary(tool.ApprovalSummary, name, arguments) }, linked.Token)
                         : approver.ApproveToolCallAsync(name, tool.Permission, scope.ClientName, argumentsJson, linked.Token),
                     linked.Token)
                 .WaitAsync(linked.Token)
@@ -442,8 +474,8 @@ public sealed partial class McpServer
             if (approved)
                 return null;
             return approvalCts.IsCancellationRequested
-                ? ToolError(scope, notConfirmed)
-                : ToolError(scope, $"Tool '{name}' was not run: denied in game by the player. Do not retry unless the player asks you to.");
+                ? ToolError(scope, notConfirmed, McpErrorCodes.NotConfirmed, retryable: true)
+                : ToolError(scope, $"Tool '{name}' was not run: denied in game by the player. Do not retry unless the player asks you to.", McpErrorCodes.Denied);
         }
         catch (OperationCanceledException) when (scope.CancellationToken.IsCancellationRequested)
         {
@@ -451,16 +483,16 @@ public sealed partial class McpServer
         }
         catch (OperationCanceledException) when (approvalCts.IsCancellationRequested)
         {
-            return ToolError(scope, notConfirmed);
+            return ToolError(scope, notConfirmed, McpErrorCodes.NotConfirmed, retryable: true);
         }
         catch (TimeoutException)
         {
-            return ToolError(scope, notConfirmed);
+            return ToolError(scope, notConfirmed, McpErrorCodes.NotConfirmed, retryable: true);
         }
         catch (Exception ex)
         {
             LogSink($"approval for tool '{name}' failed", ex);
-            return ToolError(scope, $"Tool '{name}' was not run: the in-game confirmation failed ({ex.GetType().Name}). Denied for safety.");
+            return ToolError(scope, $"Tool '{name}' was not run: the in-game confirmation failed ({ex.GetType().Name}). Denied for safety.", McpErrorCodes.Denied);
         }
     }
 
@@ -534,7 +566,7 @@ public sealed partial class McpServer
         }
         else
         {
-            return ToolError(scope, $"Tool '{tool.Name}' returned no data.");
+            return ToolError(scope, $"Tool '{tool.Name}' returned no data.", McpErrorCodes.InternalError);
         }
 
         var text = value is string s ? s : structured.ToJsonString(McpJson.Options);
@@ -613,10 +645,21 @@ public sealed partial class McpServer
     private static McpProtocolException ResourceError(RequestScope scope, string uri, string message) =>
         new(scope.Era == Era.Legacy ? JsonRpcCodes.LegacyResourceNotFound : JsonRpcCodes.InvalidParams, message, new JsonObject { ["uri"] = uri });
 
+    /// <summary>resources/read and prompts/get share the per-caller rate limit with tools/call; over it they fail as JSON-RPC errors.</summary>
+    private void ThrowIfRateLimited(RequestScope scope)
+    {
+        if (RateLimitDelaySeconds(scope.AuthenticatedClient, scope.Session?.Id ?? scope.DetachedSessionId) is > 0 and var wait)
+        {
+            throw new McpProtocolException(JsonRpcCodes.RateLimited, $"Rate limit reached ({Options.RateLimitPerMinute} calls per minute per client). Retry in {Math.Ceiling(wait):0} s.",
+                new JsonObject { ["code"] = McpErrorCodes.RateLimited, ["retryAfterSeconds"] = Math.Round(wait, 2) });
+        }
+    }
+
     private async Task<JsonObject> HandleResourcesReadAsync(RequestScope scope)
     {
         var uri = JsonRpc.RequireString(scope.Params, "uri");
         scope.Target = uri;
+        ThrowIfRateLimited(scope);
         var snapshot = _registry.Snapshot;
 
         MemberDescriptor? member = null;
@@ -771,6 +814,7 @@ public sealed partial class McpServer
     {
         var name = JsonRpc.RequireString(scope.Params, "name");
         scope.Target = name;
+        ThrowIfRateLimited(scope);
         if (!_registry.Snapshot.PromptsByName.TryGetValue(name, out var prompt) || !CategoryEnabled(prompt.Category))
             throw new McpProtocolException(JsonRpcCodes.InvalidParams, $"Unknown prompt: '{name}'", new JsonObject { ["name"] = name });
 

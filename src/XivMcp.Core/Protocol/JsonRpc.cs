@@ -53,6 +53,9 @@ internal static class JsonRpcCodes
     public const int LegacyResourceNotFound = -32002;
 
     public const int HeaderMismatch = -32020;
+
+    /// <summary>Per-caller rate limit reached (resources/read, prompts/get; tools/call reports it as an isError result).</summary>
+    public const int RateLimited = -32029;
     public const int MissingRequiredClientCapability = -32021;
     public const int UnsupportedProtocolVersion = -32022;
 }

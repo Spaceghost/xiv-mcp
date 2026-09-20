@@ -68,6 +68,16 @@ public sealed class McpServerOptions
     /// </summary>
     public TimeSpan ApprovalTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// Tool calls, resource reads and prompt gets allowed per minute for each caller (per-client token, else MCP session,
+    /// else everyone on the main token). 0 switches the limit off. A call over the limit fails with the
+    /// <see cref="McpErrorCodes.RateLimited"/> error and <c>retryAfterSeconds</c>; nothing is queued.
+    /// </summary>
+    public int RateLimitPerMinute { get; set; }
+
+    /// <summary>Calls a caller may make at once before the per-minute rate applies; 0 = a quarter of <see cref="RateLimitPerMinute"/>.</summary>
+    public int RateLimitBurst { get; set; }
+
     /// <summary>Maximum items per page for tools/list, resources/list, resources/templates/list and prompts/list.</summary>
     public int ListPageSize { get; set; } = 250;
 }
