@@ -81,10 +81,13 @@ rm -f "$OUT/latest.zip" "$OUT/XivMcp-$VERSION.zip"
     TZ=UTC zip -X -D -q "$OUT/latest.zip" -@ )
 cp "$OUT/latest.zip" "$OUT/XivMcp-$VERSION.zip"
 echo "== $OUT/latest.zip"
-unzip -l "$OUT/latest.zip" | tail -n 3
+# Listed once and kept: `unzip -l | grep -q` makes unzip die of SIGPIPE, which under
+# `set -o pipefail` fails the check even when the file is there.
+ZIP_ENTRIES="$(unzip -Z1 "$OUT/latest.zip")"
+printf '%s\n' "$ZIP_ENTRIES"
 # What Dalamud opens the zip for. A missing manifest installs a plugin that cannot load.
 for want in XivMcp.dll XivMcp.json; do
-  unzip -l "$OUT/latest.zip" | grep -qF " $want" || { echo "error: $want is not in the zip" >&2; exit 1; }
+  printf '%s\n' "$ZIP_ENTRIES" | grep -qxF "$want" || { echo "error: $want is not in the zip" >&2; exit 1; }
 done
 
 # The listing: the shipped manifest plus the fields a plugin repository adds.

@@ -12,8 +12,7 @@
 #
 # Configured only by the environment:
 #   CI_LOCAL_REMOTE   0 forces a local run even when the remote is reachable
-#   INCUS_REMOTE      which Incus remote to use; unset = a local run when
-#                     `incus remote list` has it, otherwise a local run
+#   INCUS_REMOTE      which Incus remote to use; unset = a local run
 #   INCUS             the incus binary, default `incus`
 #   CI_CONTAINER      the container on that remote, default xiv-mcp-build
 #   CI_REMOTE_DIR     where the checkout lands in it, default /build/xiv-mcp
@@ -21,8 +20,8 @@
 #                     passed through to tools/ci/run.sh for a local run only.
 #                     The container has no game installation, so a remote run
 #                     skips the Dalamud projects and the plugin tests exactly as
-#                     a GitHub-hosted runner does; run those stages locally (or
-#                     on the gaming PC's runner) to cover them.
+#                     a GitHub-hosted runner does unless DALAMUD_LIB_PATH points
+#                     at reference assemblies inside it.
 #
 # See docs/CI.md.
 set -euo pipefail
@@ -47,16 +46,14 @@ for a in "$@"; do
 done
 [[ ${#stages[@]} -gt 0 ]] || stages=(test build)
 
-# Which Incus remote, if any. CI_LOCAL_REMOTE=0 skips the whole question.
+# Which Incus remote, if any. Named by INCUS_REMOTE and nothing else: guessing a
+# remote would run a build on whatever machine happened to be configured.
+# CI_LOCAL_REMOTE=0 skips the whole question.
 pick_remote() {
   [[ "${CI_LOCAL_REMOTE:-1}" == 0 ]] && return 1
-  if [[ -n "${INCUS_REMOTE:-}" ]]; then return 0; fi
+  [[ -n "${INCUS_REMOTE:-}" ]] || return 1
   command -v "$INCUS" >/dev/null || return 1
-  if "$INCUS" remote list --format csv 2>/dev/null | cut -d, -f1 | grep -qx "${INCUS_REMOTE:-__none__}"; then
-    INCUS_REMOTE="${INCUS_REMOTE:-}"
-    return 0
-  fi
-  return 1
+  return 0
 }
 
 run_local() {

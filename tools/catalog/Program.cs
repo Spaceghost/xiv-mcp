@@ -82,7 +82,7 @@ var providers = types
 
 if (mode == "serve")
 {
-    using var server = new McpServer(new McpServerOptions { Port = port, BearerToken = null, ServerTitle = "xiv-mcp catalog (list only)" }, new InlineGame(), new AllowAll(),
+    await using var server = new McpServer(new McpServerOptions { Port = port, BearerToken = null, ServerTitle = "xiv-mcp catalog (list only)" }, new InlineGame(), new AllowAll(),
         (message, ex) => Console.Error.WriteLine(ex is null ? message : $"{message}: {ex.Message}"));
     var failures = 0;
     foreach (var type in providers)
