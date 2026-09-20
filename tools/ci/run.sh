@@ -26,7 +26,10 @@
 #                      plugin tests and the Dalamud projects are skipped with a
 #                      message
 #   UMBRA_LIB_PATH     Umbra reference assemblies for src/XivMcp.Umbra; unset =
-#                      the newest ~/.xlcore/installedPlugins/Umbra/<version>
+#                      the newest ~/.xlcore/installedPlugins/Umbra/<version>.
+#                      Umbra is a Dalamud plugin, not a package: a runner that has
+#                      no installed copy cannot build src/XivMcp.Umbra at all, so
+#                      the build stage leaves that one project out with a message
 #   SKIP_PLUGIN_TESTS  1 skips tests/XivMcp.Plugin.Tests even when Dalamud is there
 #   CI_CACHE_DIR       cache root, default ${XDG_CACHE_HOME:-~/.cache}/xiv-mcp-ci;
 #                      the NuGet package cache lives in it
@@ -101,6 +104,29 @@ ensure_dalamud() {
   fi
 }
 
+# HAVE_UMBRA=1 when there are Umbra reference assemblies for src/XivMcp.Umbra.
+# Umbra ships as a Dalamud plugin, so a hosted runner has no way to fetch it; like
+# the Dalamud check above this is a skip, never a failure.
+HAVE_UMBRA=0
+ensure_umbra() {
+  local dir="${UMBRA_LIB_PATH:-}"
+  if [[ -z "$dir" ]]; then
+    local root="${XLCORE_DIR:-$HOME/.xlcore}/installedPlugins/Umbra"
+    if [[ -d "$root" ]]; then
+      dir="$(find "$root" -mindepth 1 -maxdepth 1 -type d | LC_ALL=C sort -V | tail -1)"
+    fi
+  fi
+  if [[ -n "$dir" && -f "${dir%/}/Umbra.dll" ]]; then
+    UMBRA_LIB_PATH="${dir%/}"
+    export UMBRA_LIB_PATH
+    HAVE_UMBRA=1
+    log "umbra reference assemblies in $UMBRA_LIB_PATH"
+  else
+    HAVE_UMBRA=0
+    log "no Umbra.dll${dir:+ in $dir}: src/XivMcp.Umbra is left out of the build (set UMBRA_LIB_PATH)"
+  fi
+}
+
 # The csprojs take DalamudLibPath/UmbraLibPath as MSBuild properties and want a
 # trailing separator; UMBRA_LIB_PATH is only passed when the caller set it.
 dotnet_props() {
@@ -113,6 +139,7 @@ dotnet_props() {
 stage_deps() {
   ensure_dotnet
   ensure_dalamud
+  ensure_umbra
   mkdir -p "$XIVMCP_ARTIFACTS" "$NUGET_PACKAGES"
   log "dotnet restore XivMcp.slnx (packages in $NUGET_PACKAGES)"
   local props=()
@@ -164,21 +191,28 @@ stage_test() {
 stage_build() {
   ensure_dotnet
   ensure_dalamud
-  local props=()
+  ensure_umbra
+  local props=() projects=() p
   mapfile -t props < <(dotnet_props)
-  if [[ "$HAVE_DALAMUD" == 1 ]]; then
+  if [[ "$HAVE_DALAMUD" == 1 && "$HAVE_UMBRA" == 1 ]]; then
     log "dotnet build XivMcp.slnx -c Release"
     "$DOTNET" build XivMcp.slnx -c Release "${props[@]}"
-  else
-    # Not a reduced-for-speed build: without Dalamud.dll on disk these projects
-    # have unresolvable <Reference HintPath>s and the solution build fails.
-    log "no Dalamud reference assemblies: building without ${DALAMUD_PROJECTS[*]}"
-    local p
-    for p in "${PORTABLE_PROJECTS[@]}"; do
-      log "dotnet build $p -c Release"
-      "$DOTNET" build "$p" -c Release "${props[@]}"
-    done
+    log "build output under $XIVMCP_ARTIFACTS"
+    return 0
   fi
+  # Not a reduced-for-speed build: without those reference assemblies on disk the
+  # projects have unresolvable <Reference HintPath>s and the solution build fails.
+  projects=("${PORTABLE_PROJECTS[@]}")
+  if [[ "$HAVE_DALAMUD" == 1 ]]; then
+    projects+=(src/XivMcp.Plugin tests/XivMcp.Plugin.Tests)
+    log "no Umbra reference assemblies: building without src/XivMcp.Umbra"
+  else
+    log "no Dalamud reference assemblies: building without ${DALAMUD_PROJECTS[*]}"
+  fi
+  for p in "${projects[@]}"; do
+    log "dotnet build $p -c Release"
+    "$DOTNET" build "$p" -c Release "${props[@]}"
+  done
   log "build output under $XIVMCP_ARTIFACTS"
 }
 
