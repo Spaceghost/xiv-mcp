@@ -455,6 +455,17 @@ what is unverified in the entry itself rather than writing around it.
 CI runs the same tests and build through one script, `tools/ci/run.sh` (locally: `tools/ci/local.sh`):
 [docs/CI.md](docs/CI.md).
 
+## Releasing
+
+```sh
+tools/release.sh test            # the next testing build, from master as it is
+tools/release.sh stable X.Y.Z    # the stable release X.Y.Z
+```
+
+One command: it checks the tree and CI, writes the version everywhere it lives, dates
+the changelog, tags, pushes, waits for the Release workflow, and verifies the published
+files and the live listing. `-n` is a dry run. See [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Troubleshooting
 
 - **"Could not start on http://127.0.0.1:41800/mcp: ... address already in use"** — another process
