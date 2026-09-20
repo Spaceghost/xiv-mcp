@@ -38,10 +38,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Probe for the .NET SDK
+      # The honest probe is global.json's own: `dotnet --version` in the checkout
+      # fails unless an installed SDK satisfies the pin. "Some 10.x is present" is
+      # not enough — a runner image with 10.0.400 does not satisfy 10.0.401.
+      - name: Probe for the pinned .NET SDK
         id: dotnet
         run: |
-          if command -v dotnet >/dev/null && dotnet --list-sdks | grep -q '^10\.'; then
+          if command -v dotnet >/dev/null && dotnet --version >/dev/null 2>&1; then
             echo "have=true" >>"$GITHUB_OUTPUT"
           else
             echo "have=false" >>"$GITHUB_OUTPUT"
@@ -50,7 +53,7 @@ jobs:
         if: steps.dotnet.outputs.have != 'true'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -94,10 +97,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Probe for the .NET SDK
+      # The honest probe is global.json's own: `dotnet --version` in the checkout
+      # fails unless an installed SDK satisfies the pin. "Some 10.x is present" is
+      # not enough — a runner image with 10.0.400 does not satisfy 10.0.401.
+      - name: Probe for the pinned .NET SDK
         id: dotnet
         run: |
-          if command -v dotnet >/dev/null && dotnet --list-sdks | grep -q '^10\.'; then
+          if command -v dotnet >/dev/null && dotnet --version >/dev/null 2>&1; then
             echo "have=true" >>"$GITHUB_OUTPUT"
           else
             echo "have=false" >>"$GITHUB_OUTPUT"
@@ -106,7 +112,7 @@ jobs:
         if: steps.dotnet.outputs.have != 'true'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
