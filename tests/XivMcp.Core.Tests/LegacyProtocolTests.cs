@@ -447,11 +447,11 @@ public class LegacyProtocolTests
         await SlowProvider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         using (var cancel = await s.Http.SendAsync(s.Post(new JsonObject
-               {
-                   ["jsonrpc"] = "2.0",
-                   ["method"] = "notifications/cancelled",
-                   ["params"] = new JsonObject { ["requestId"] = 77, ["reason"] = "test" },
-               }, sessionId, "2025-11-25")))
+        {
+            ["jsonrpc"] = "2.0",
+            ["method"] = "notifications/cancelled",
+            ["params"] = new JsonObject { ["requestId"] = 77, ["reason"] = "test" },
+        }, sessionId, "2025-11-25")))
             Assert.Equal(HttpStatusCode.Accepted, cancel.StatusCode);
 
         Assert.True(await SlowProvider.CancelObserved.Task.WaitAsync(TimeSpan.FromSeconds(5)));

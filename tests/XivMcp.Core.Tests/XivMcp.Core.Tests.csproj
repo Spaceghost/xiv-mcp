@@ -23,4 +23,7 @@
          artifacts path (Directory.Build.props) is outside of. -->
     <AssemblyMetadata Include="RepositoryRoot" Value="$(MSBuildThisFileDirectory)../.." />
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="RepoRoot" Value="$(MSBuildThisFileDirectory)../.." />
+  </ItemGroup>
 </Project>
