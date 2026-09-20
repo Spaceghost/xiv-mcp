@@ -10,6 +10,10 @@
       "items": [
         {
           "status": "beta",
+          "text": "Twelve tools for Dalamud itself. Reading: a richer list_plugins and get_dalamud_info, read_plugin_log (tail or search, with paths and personal details scrubbed out), get_troubleshooting_summary, list_plugin_repositories, get_plugin_stats and get_ui_info. Behind the approval checkbox: open_plugin_ui, open_dalamud_window, set_plugin_enabled, reload_plugin, and add_plugin_repository, which only opens Dalamud's settings with the URL copied for you. Nothing here installs, updates or removes a plugin, and nothing writes Dalamud's configuration: the installer is opened on a search and you click. It refuses to disable or reload XivMcp itself. Several of these read Dalamud internals that have no public API; each one checks first that this Dalamud build still has what it needs and answers \"unavailable\" with the reason when it does not, and a build-time test fails the moment a Dalamud release renames one."
+        },
+        {
+          "status": "beta",
           "text": "Seven read-only tools for what is happening right now: get_quest_journal (your accepted quests and their current steps), list_hotbars (what is actually on your bars), get_duty_unlocks (which duties this character has unlocked), list_social_groups (the names of your free company, linkshells and cross-world linkshells), get_enmity_list (who currently has hate on what you are fighting), get_character_sheet and get_zone_live, plus a resource ffxiv://zone/current that updates as you travel. None of them prompts and none of them acts. Every one reads the game client's own memory through ClientStructs, and none of those reads has been checked against a running game yet."
         },
         {
