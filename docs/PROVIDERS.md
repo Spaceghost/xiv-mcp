@@ -103,6 +103,18 @@ public sealed class FooProvider : IDisposable
 - `Chat`: produces text other players can see. Set `OpenWorld = true`.
 - No combat rotation, movement or input automation. It is out of scope, whatever the tier.
 
+**Metadata every tool must carry** (checked by `tests/XivMcp.Plugin.Tests/ToolContractTests.cs`)
+- `Sources = [...]`: where the answer comes from — `lumina:<Sheet>`, `client:<struct>`, `dalamud:<service>`,
+  `ipc:<gate>`, `http:<host>`, `file:<what>`, `clock:host`, `xivmcp:<what>`.
+- Anything that changes state is Action or Chat (or Ui with `RequiresApproval = true`) and has an `ApprovalSummary`:
+  one sentence for the player with `{argument}` placeholders; text that is sent or written appears verbatim. Do not
+  build your own confirmation: the server's single gate and the player's one checkbox handle it.
+- `Availability = ToolAvailability.Static` only for tools that need nothing but game data. Those live under
+  `Providers/GameData/` (or `Providers/Prompts/`), take `IGameDataSource`, and must compile without Dalamud, because
+  `src/XivMcp.Standalone` links those folders. Dalamud glue in those folders goes in files named `Dalamud*.cs`.
+- Read tools are named `get_`/`list_`/`search_`/`find_`/`read_`/`compare_`/`convert_`.
+- Read [HARD-LINES.md](HARD-LINES.md) before adding anything that acts.
+
 **Errors**
 - Throw `McpToolException` with an actionable message for expected failures: "No target selected",
   "Item 12345 not found", "Inventory not loaded yet — open it once". Do not rely on other exception types
@@ -130,8 +142,8 @@ XIVMCP_ARTIFACTS=/tmp/xivmcp-art/<you> ~/.dotnet/dotnet build src/XivMcp.Plugin/
 
 Host-side tests that need no game go in `tests/XivMcp.Plugin.Tests` (it references the plugin and resolves Dalamud's
 assemblies from the dev hooks; see `ChatSendProviderTests` for validation paths exercised with interface fakes). After
-adding or renaming tools, regenerate the README catalog with
-`dotnet run --project tools/catalog -c Release -- readme --write README.md`, and lint the real schemas with
+adding or renaming tools, regenerate the catalogue (docs/tools.json, docs/TOOLS.md, the README table) with
+`dotnet run --project tools/catalog -c Release -- all --write .` (CI fails when it is stale), and lint the real schemas with
 `dotnet run --project tools/catalog -c Release -- serve --port 41812` plus
 `npx -y @modelcontextprotocol/inspector --cli http://127.0.0.1:41812/mcp --transport http --method tools/list --strict`.
 

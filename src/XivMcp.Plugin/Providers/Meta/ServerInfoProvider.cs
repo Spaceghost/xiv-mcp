@@ -5,37 +5,6 @@ using XivMcp.Plugin.Services;
 
 namespace XivMcp.Plugin.Providers.Meta;
 
-public sealed record PermissionTiersDto(
-    bool Read,
-    bool Ui,
-    bool Action,
-    bool Chat,
-    bool ConfirmActions,
-    string? Note);
-
-public sealed record CategoryInfoDto(string Name, bool Enabled, int Tools, int FailedProviders);
-
-public sealed record ServerInfoDto(
-    string Name,
-    string Version,
-    string Endpoint,
-    string Transport,
-    bool Running,
-    DateTimeOffset? StartedAt,
-    int ActiveSessions,
-    IReadOnlyList<string> ConnectedClients,
-    string? YourClient,
-    string? YourSessionId,
-    PermissionTiersDto Permissions,
-    int RegisteredTools,
-    int AvailableTools,
-    IReadOnlyList<CategoryInfoDto> Categories,
-    string DalamudVersion,
-    string? GameVersion,
-    string ClientLanguage,
-    bool LoggedIn,
-    string? ProtocolVersion);
-
 /// <summary>Self-description of the server so an agent can plan around what the player enabled.</summary>
 [McpProvider("meta")]
 public sealed class ServerInfoProvider
@@ -59,12 +28,15 @@ public sealed class ServerInfoProvider
         Title = "Server info, enabled tiers and categories",
         Description =
             "Describes this XivMcp server: plugin version, endpoint, running state, connected clients, which permission " +
-            "tiers are currently allowed (read, ui, action, chat — and whether Action/Chat calls need in-game approval), " +
+            "tiers are currently allowed (read, ui, action, chat — and whether state-changing calls need in-game approval: permissions.confirmActions is the player's single approval switch), " +
+            "host (\"plugin\" inside the running game, \"standalone\" before the game starts: there only availability=static tools work and the rest answer game_not_running), " +
             "each tool category with its enabled flag and tool count, Dalamud and game versions, client language, " +
             "whether a character is logged in and the MCP protocolVersion negotiated for this call. Call this first to learn what you can do before planning; a tier or " +
             "category that is off means its tools are unavailable until the player enables them in /xivmcp settings.",
         GameThread = false,
-        RequiresLogin = false)]
+        RequiresLogin = false,
+        Availability = ToolAvailability.Static,
+        Sources = ["xivmcp:server", "dalamud:IDalamudPluginInterface", "lumina:GameData.Repositories"])]
     public async Task<ServerInfoDto> GetServerInfo(ToolContext ctx)
     {
         var loggedIn = await ctx.Game.InvokeAsync(() => clientState.IsLoggedIn, ctx.CancellationToken).ConfigureAwait(false);
@@ -125,6 +97,13 @@ public sealed class ServerInfoProvider
             gameVersion,
             clientState.ClientLanguage.ToString(),
             loggedIn,
-            ctx.ProtocolVersion);
+            ctx.ProtocolVersion)
+        {
+            Host = "plugin",
+            GameRunning = true,
+            CatalogueVersion = McpServer.CatalogueVersion,
+            StaticTools = host.Server.ExportCatalogue()["tools"]!.AsArray().Count(t => t!["availability"]!.GetValue<string>() == "static"),
+            RateLimitPerMinute = host.Server.Options.RateLimitPerMinute,
+        };
     }
 }

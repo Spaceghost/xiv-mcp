@@ -81,6 +81,7 @@ public sealed unsafe class InventoryProvider : IDisposable
     }
 
     [McpTool("get_inventory",
+        Sources = ["client:InventoryManager", "lumina:Item"],
         Title = "Get inventory contents",
         Description =
             "Lists items in the character's containers, slot by slot. containers selects groups: bags (4 main inventory pages), equipped, armory " +
@@ -156,6 +157,7 @@ public sealed unsafe class InventoryProvider : IDisposable
     }
 
     [McpTool("find_owned_items",
+        Sources = ["client:InventoryManager", "lumina:Item"],
         Title = "Find items the character owns",
         Description =
             "Searches every loaded container (bags, equipped, armory, crystals, currency, key items, saddlebags if opened this session, and the " +
@@ -240,6 +242,7 @@ public sealed unsafe class InventoryProvider : IDisposable
     }
 
     [McpTool("get_equipment",
+        Sources = ["client:InventoryManager", "lumina:Item", "lumina:Materia"],
         Title = "Get equipped gear",
         Description =
             "The character's currently equipped gear: for each occupied slot (MainHand, OffHand, Head, Body, Hands, Legs, Feet, Ears, Neck, Wrists, " +
@@ -325,6 +328,7 @@ public sealed unsafe class InventoryProvider : IDisposable
     }
 
     [McpTool("get_currencies",
+        Sources = ["client:InventoryManager", "client:CurrencyManager", "lumina:TomestonesItem"],
         Title = "Get currencies",
         Description =
             "The character's currency balances: gil; Grand Company seals for the current company with its cap; and a list of currencies with " +

@@ -22,6 +22,8 @@ public sealed class TargetProvider
     }
 
     [McpTool("set_target",
+        Sources = ["dalamud:ITargetManager", "dalamud:IObjectTable"],
+        ApprovalSummary = "Target {name} {entityId} {gameObjectId}.",
         Title = "Set target",
         Description =
             "Sets the user's current target, like clicking an object. Choose the object with exactly one of: entityId (number from object/party tools), gameObjectId (64-bit id as a decimal or 0x-hex string), or name (case-insensitive; exact name match preferred, otherwise substring; the nearest targetable match wins). " +
@@ -39,6 +41,8 @@ public sealed class TargetProvider
     }
 
     [McpTool("clear_target",
+        Sources = ["dalamud:ITargetManager"],
+        ApprovalSummary = "Clear your current target.",
         Title = "Clear target",
         Description = "Clears the user's current target (like pressing Escape on a target). Returns whether there was a target and its name.",
         Permission = ToolPermission.Action)]
@@ -51,6 +55,8 @@ public sealed class TargetProvider
     }
 
     [McpTool("set_focus_target",
+        Sources = ["dalamud:ITargetManager", "dalamud:IObjectTable"],
+        ApprovalSummary = "Set your focus target to {name} {entityId} {gameObjectId} (clear: {clear}).",
         Title = "Set or clear focus target",
         Description =
             "Sets the user's focus target (the secondary tracked target shown in the Focus Target bar), or clears it with clear=true. " +

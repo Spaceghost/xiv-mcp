@@ -1,5 +1,4 @@
 using System.Globalization;
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -14,12 +13,14 @@ public sealed class QuestDataProvider
 
     private readonly GameDataIndex index;
 
-    public QuestDataProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public QuestDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     /// <summary>Accepts both full quest row ids (65536+) and short ids (the low 16 bits).</summary>
     internal static uint NormalizeQuestId(uint questId) => questId is > 0 and < QuestIdBase ? questId + QuestIdBase : questId;
 
     [McpTool("search_quests",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Quest"],
         Title = "Search quests",
         Description =
             "Searches quests by name (ranked exact > prefix > word > substring; a numeric query matches the quest id). " +
@@ -41,6 +42,8 @@ public sealed class QuestDataProvider
     }
 
     [McpTool("get_quest",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Quest", "lumina:Level", "lumina:ENpcResident"],
         Title = "Get quest details",
         Description =
             "Static details for one quest id: name, level, allowed classes/jobs, expansion, journal genre/category/section, place name, " +

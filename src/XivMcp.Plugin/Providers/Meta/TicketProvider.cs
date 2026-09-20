@@ -51,6 +51,7 @@ public sealed class TicketProvider : IDisposable
     public static string TicketUri(string id) => $"{TicketsUri}/{id}";
 
     [McpTool("request_action",
+        Sources = ["xivmcp:approval queue"],
         Title = "Queue an Action/Chat call for the player to approve later",
         Description =
             "Files an Action- or Chat-tier tool call (e.g. teleport, execute_command, send_chat) as an approval ticket and returns " +
@@ -80,6 +81,7 @@ public sealed class TicketProvider : IDisposable
     }
 
     [McpTool("get_ticket",
+        Sources = ["xivmcp:approval queue"],
         Title = "Get an approval ticket",
         Description =
             "Returns one of your approval tickets: state (pending, approved, executed, failed, denied, cancelled, expired), who decided, " +
@@ -92,6 +94,7 @@ public sealed class TicketProvider : IDisposable
         ToolContext? ctx = null) => ToDto(Owned(id, ctx?.ClientName));
 
     [McpTool("list_tickets",
+        Sources = ["xivmcp:approval queue"],
         Title = "List your approval tickets",
         Description =
             "Lists your approval tickets, oldest first. state filters: open (pending or approved, the default), pending, final, all. " +
@@ -117,6 +120,7 @@ public sealed class TicketProvider : IDisposable
     }
 
     [McpTool("cancel_ticket",
+        Sources = ["xivmcp:approval queue"],
         Title = "Cancel a pending approval ticket",
         Description = "Withdraws one of your pending tickets so the player is no longer asked about it. Approved or finished tickets cannot be cancelled.",
         Permission = ToolPermission.Ui,

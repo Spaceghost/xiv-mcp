@@ -66,6 +66,7 @@ public sealed class ChatLogProvider : IDisposable
     }
 
     [McpTool("read_chat",
+        Sources = ["dalamud:IChatGui"],
         Title = "Read chat log",
         Description =
             "Returns chat lines the plugin has captured since it loaded (not older history), oldest first. " +

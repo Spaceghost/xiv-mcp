@@ -1,4 +1,3 @@
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -11,9 +10,11 @@ public sealed class ActionDataProvider
 {
     private readonly GameDataIndex index;
 
-    public ActionDataProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public ActionDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     [McpTool("search_actions",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Action"],
         Title = "Search actions",
         Description =
             "Searches actions players can learn (weaponskills, spells, abilities, role actions, gathering abilities, PvP actions; from the Action sheet — " +
@@ -73,6 +74,8 @@ public sealed class ActionDataProvider
     }
 
     [McpTool("get_action",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Action"],
         Title = "Get action details",
         Description =
             "Details for one action id: name, tooltip description (plain text; dynamic values such as potency may appear as placeholders), icon, " +

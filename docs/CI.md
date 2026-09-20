@@ -41,8 +41,8 @@ tools/ci/run.sh all             # test, build, package
 | Stage | Does |
 | --- | --- |
 | `deps` | finds a .NET SDK that satisfies `global.json` (`dotnet --version` in the repository root is the test), reports whether the Dalamud reference assemblies are there, then `dotnet restore XivMcp.slnx` |
-| `test` | `dotnet test tests/XivMcp.Core.Tests -c Release`, then `tests/XivMcp.Plugin.Tests` unless the Dalamud reference assemblies are missing or `SKIP_PLUGIN_TESTS=1`. Writes `artifacts/test-results/<project>.trx`, a `<project>.log` and a plain-text `summary.txt` |
-| `build` | `dotnet build XivMcp.slnx -c Release`. Without the Dalamud reference assemblies the three Dalamud projects have unresolvable reference paths, so the stage builds `src/XivMcp.Core`, `src/XivMcp.DevHost`, `tools/catalog` and `tests/XivMcp.Core.Tests` and names what it left out |
+| `test` | `dotnet test tests/XivMcp.Core.Tests -c Release` and `tests/XivMcp.Standalone.Tests` (Lumina from NuGet, no Dalamud, runs everywhere), then `tests/XivMcp.Plugin.Tests` unless the Dalamud reference assemblies are missing or `SKIP_PLUGIN_TESTS=1`. Writes `artifacts/test-results/<project>.trx`, a `<project>.log` and a plain-text `summary.txt` |
+| `build` | `dotnet build XivMcp.slnx -c Release`, then `xiv-mcp-catalog check`: the generated `docs/tools.json`, `docs/TOOLS.md` and README table must match the built plugin (skipped without Dalamud). Without the Dalamud reference assemblies the three Dalamud projects have unresolvable reference paths, so the stage builds `src/XivMcp.Core`, `src/XivMcp.DevHost`, `tools/catalog` and `tests/XivMcp.Core.Tests` and names what it left out |
 | `package` | nothing yet: this repository has no `tools/package.sh`. `tools/install-dev.sh` stages a dev plugin for the local game, which is not a release artifact. The stage says so and does nothing; it runs `tools/package.sh` once one exists |
 | `all` | `test`, `build`, `package` |
 

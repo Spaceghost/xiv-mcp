@@ -12,6 +12,7 @@ public sealed unsafe class AddonProvider
     private const int MaxDialogueTexts = 40;
 
     [McpTool("list_addons",
+        Sources = ["client:RaptureAtkUnitManager"],
         Title = "List game UI windows",
         Description =
             "Lists the game's loaded UI windows (\"addons\") with their internal names, which get_addon_text needs. " +
@@ -72,6 +73,7 @@ public sealed unsafe class AddonProvider
     }
 
     [McpTool("get_addon_text",
+        Sources = ["client:AtkUnitBase"],
         Title = "Read a UI window's text",
         Description =
             "Reads every text string shown in one game UI window (addon), including text inside nested components such as lists, buttons and tabs, in reading order (top-to-bottom, left-to-right by screen position). " +
@@ -102,6 +104,7 @@ public sealed unsafe class AddonProvider
     }
 
     [McpTool("get_dialogue",
+        Sources = ["client:AtkUnitBase"],
         Title = "Read open dialogue and prompts",
         Description =
             "Returns whatever conversation or prompt windows are currently visible, read-only: " +

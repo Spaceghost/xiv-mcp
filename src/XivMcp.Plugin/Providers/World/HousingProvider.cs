@@ -38,6 +38,7 @@ public sealed unsafe class HousingProvider
         string Note);
 
     [McpTool("get_housing_info",
+        Sources = ["client:HousingManager"],
         Title = "Get housing location",
         Description =
             "Where the player is in the housing system: inHousingArea, territoryId/zone, ward (1-based), plot (1-based, null in an " +

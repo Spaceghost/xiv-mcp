@@ -47,6 +47,7 @@ public sealed class FateProvider
     public sealed record FatesDto(int Total, int Returned, bool Truncated, uint? CurrentFateId, List<FateDto> Fates);
 
     [McpTool("list_fates",
+        Sources = ["dalamud:IFateTable"],
         Title = "List active FATEs",
         Description = "FATEs currently known in the player's zone, nearest first. Each entry: id, name, objective, level and maxLevel (the " +
                       "level sync cap), state (Preparing|Running|Ending|Ended|Failed|...), progressPercent, timeRemainingSeconds, durationSeconds, " +

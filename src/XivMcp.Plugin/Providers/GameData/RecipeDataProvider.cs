@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -14,9 +13,11 @@ public sealed class RecipeDataProvider
 
     private readonly GameDataIndex index;
 
-    public RecipeDataProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public RecipeDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     [McpTool("get_recipe",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Recipe", "lumina:RecipeLevelTable"],
         Title = "Get recipe with ingredient tree",
         Description =
             "Crafting recipe for an item (itemId) or a specific recipe (recipeId): craft type (Carpentry, Smithing, ... Cooking), recipe level and stars, " +
@@ -103,6 +104,8 @@ public sealed class RecipeDataProvider
     }
 
     [McpTool("search_recipes",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Recipe"],
         Title = "Search recipes",
         Description =
             "Searches crafting recipes by the crafted item's name (ranked exact > prefix > word > substring; numeric query matches the recipe id), " +

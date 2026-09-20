@@ -85,6 +85,7 @@ public sealed class LocationProvider : IDisposable
         AetheryteNearbyDto? NearestAethernetShard);
 
     [McpTool("get_location",
+        Sources = ["dalamud:IClientState", "client:AgentMap", "lumina:TerritoryType"],
         Title = "Get current location",
         Description = "Where the player is. Returns territory {id, name, internalName, region, zone, intendedUseId, intendedUse (e.g. Town, " +
                       "Overworld, Dungeon, Raid1, HousingOutdoor, Eureka...), isPvp, mountsAllowed}, map {id, name}, area and subArea place names " +

@@ -55,6 +55,7 @@ public sealed class JobProvider
     public sealed record JobGaugeDto(JobDto? Job, bool HasGauge, string? GaugeType, Dictionary<string, object?>? Values, string? Note);
 
     [McpTool("get_job_levels",
+        Sources = ["client:PlayerState", "lumina:ClassJob"],
         Title = "Get class/job levels",
         Description = "Every combat class/job, crafter and gatherer with the logged-in character's level and experience. Each entry: id, abbreviation, " +
                       "name, role (tank|healer|melee|physicalRanged|magicalRanged|crafter|gatherer), type (class|job|limitedJob), parentClass " +
@@ -132,6 +133,7 @@ public sealed class JobProvider
     }
 
     [McpTool("get_job_gauge",
+        Sources = ["dalamud:IJobGauges"],
         Title = "Get job gauge",
         Description = "The current job's gauge (the job-specific resource UI: e.g. PLD oath, WAR beast gauge, BLM astral fire/umbral ice and " +
                       "polyglot, SAM sen/kenki, VPR rattling coils/serpent offerings, PCT palette/canvas/motifs). Returns job, gaugeType " +

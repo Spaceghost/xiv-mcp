@@ -1,4 +1,3 @@
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -17,7 +16,7 @@ public sealed class GatheringDataProvider
 
     private readonly GameDataIndex index;
 
-    public GatheringDataProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public GatheringDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     public sealed record NodeWindowDto(
         string Start,
@@ -65,6 +64,8 @@ public sealed class GatheringDataProvider
         string Note);
 
     [McpTool("get_gathering_info",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:GatheringItem", "lumina:GatheringPoint", "lumina:GatheringPointTransient", "lumina:SpearfishingItem", "lumina:FishParameter"],
         Title = "Get gathering nodes for an item",
         GameThread = false,
         RequiresLogin = false,

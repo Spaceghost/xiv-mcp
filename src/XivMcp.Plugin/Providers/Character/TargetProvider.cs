@@ -54,6 +54,7 @@ public sealed class TargetProvider : IDisposable
         ObjectDetailDto? MouseOver);
 
     [McpTool("get_target",
+        Sources = ["dalamud:ITargetManager"],
         Title = "Get targets",
         Description = "What the player is targeting. Returns target (hard target), targetOfTarget (whoever the target is targeting), softTarget, " +
                       "focusTarget and mouseOver (object under the cursor or its nameplate); each is omitted when empty. Every entry has kind " +

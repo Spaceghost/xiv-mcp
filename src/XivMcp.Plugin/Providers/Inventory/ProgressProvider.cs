@@ -26,6 +26,7 @@ public sealed unsafe class ProgressProvider
     }
 
     [McpTool("get_quest_status",
+        Sources = ["client:QuestManager", "lumina:Quest"],
         Title = "Get quest completion status",
         Description =
             "For each quest id (Quest sheet row id; short ids below 65536 are accepted): whether the character has completed it, whether it is " +
@@ -59,6 +60,7 @@ public sealed unsafe class ProgressProvider
     }
 
     [McpTool("get_collection_progress",
+        Sources = ["client:PlayerState", "client:UIState", "lumina:Mount", "lumina:Companion"],
         Title = "Get collection progress",
         Description =
             "Unlock progress for one collection kind: mounts, minions, orchestrion (orchestrion rolls), emotes, fashionAccessories (also accepted as " +

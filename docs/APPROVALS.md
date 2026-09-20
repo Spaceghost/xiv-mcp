@@ -10,6 +10,15 @@ Automation through XivMcp is limited to what the player approves. An agent can *
 time, but they run only when the player clicks Allow or Approve, when the player has opened an approval session for
 that client, or when the player wrote a rule for that client's token. Nothing here lets a client approve its own calls.
 
+**All of this sits under one switch.** *Ask me before anything changes* (`ConfirmActions`, top of Settings, on by
+default) is the single place that decides whether the player is asked at all. With it off, every state-changing call
+runs at once and tickets are approved on arrival ("confirmation off"); each call is still written to the action log
+(Approvals tab and `actions.log`: tool, summary, client, token, time, approval on/off, outcome), and chat or gear
+changes still show a notification. With it on, the prompt and the ticket lead with the tool's own one-sentence
+description of what will happen (chat text verbatim), and Ui tools that leave something behind (`set_map_flag`,
+opening windows) are asked about too — sessions, grants and rules treat those as Action. What no setting unlocks is in
+[HARD-LINES.md](HARD-LINES.md).
+
 ## How a call is decided
 
 ```

@@ -39,6 +39,7 @@ public sealed unsafe class AttributesProvider
         string Note);
 
     [McpTool("get_attributes",
+        Sources = ["client:PlayerState", "lumina:BaseParam"],
         Title = "Get character attributes",
         Description =
             "Every attribute the client tracks for the logged-in character, as {baseParamId, name, value} — including the crafter and " +

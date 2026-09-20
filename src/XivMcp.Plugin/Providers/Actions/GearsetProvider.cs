@@ -25,6 +25,7 @@ public sealed unsafe class GearsetProvider
     }
 
     [McpTool("list_gearsets",
+        Sources = ["client:RaptureGearsetModule", "lumina:ClassJob"],
         Title = "List gear sets",
         Description =
             "Lists the character's saved gear sets. Each entry: id (the gear set number shown in the Gear Set list and used by /gearset change and equip_gearset, 1-100), name, classJobId, classJob (abbreviation, e.g. WHM) and classJobName, itemLevel (average item level saved with the set), glamourPlate (linked glamour plate number, omitted if none), mainHandMissing (the set's main-hand weapon is missing, so it cannot be fully equipped), isCurrent (the set currently equipped). " +
@@ -52,6 +53,8 @@ public sealed unsafe class GearsetProvider
     }
 
     [McpTool("equip_gearset",
+        Sources = ["client:RaptureGearsetModule"],
+        ApprovalSummary = "Change to gear set {id} {name} (this can also change your job).",
         Title = "Equip gear set",
         Description =
             "Equips one of the character's saved gear sets (which also changes class/job when the set belongs to another job), exactly like /gearset change. " +

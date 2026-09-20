@@ -39,6 +39,7 @@ public sealed class NotificationProvider
     }
 
     [McpTool("show_toast",
+        Sources = ["dalamud:IToastGui"],
         Title = "Show game toast",
         Description =
             "Shows a short, transient on-screen message using the game's own toast styles, visible only to the user: " +
@@ -67,6 +68,7 @@ public sealed class NotificationProvider
     }
 
     [McpTool("show_notification",
+        Sources = ["dalamud:INotificationManager"],
         Title = "Show Dalamud notification",
         Description =
             "Shows a Dalamud overlay notification card (bottom-right corner, with title, text and a coloured icon for the type) visible only to the user; works on the title screen too. " +

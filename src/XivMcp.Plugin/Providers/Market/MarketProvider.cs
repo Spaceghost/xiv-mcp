@@ -95,6 +95,7 @@ public sealed class MarketProvider : IDisposable
         string Note);
 
     [McpTool("get_market_prices",
+        Sources = ["http:universalis.app", "lumina:Item", "lumina:World"],
         Title = "Get market board prices",
         GameThread = false,
         RequiresLogin = false,
@@ -190,6 +191,7 @@ public sealed class MarketProvider : IDisposable
     }
 
     [McpTool("list_worlds",
+        Sources = ["lumina:World", "lumina:WorldDCGroupType"],
         Title = "List worlds and data centres",
         GameThread = false,
         RequiresLogin = false,
