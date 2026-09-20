@@ -19,7 +19,7 @@
 #                      ../xiv-mcp-build/artifacts/bin/XivMcp.Plugin/release)
 #   OUT                where to write (default ../xiv-mcp-build/release)
 #   REPO               owner/name on GitHub (default $GITHUB_REPOSITORY, else
-#                      Spaceghost/xiv-mcp)
+#                      Spaceghost/xivmcp-dalamud)
 #   TESTING            1 to write pluginmaster-testing.json instead of pluginmaster.json
 #   SOURCE_DATE_EPOCH  timestamp for the zip entries and LastUpdate (default: the last
 #                      commit's time, else 0), so the same build packs to the same bytes
@@ -35,7 +35,7 @@ command -v python3 >/dev/null || { echo "error: python3 is required" >&2; exit 1
 ARTIFACTS="${XIVMCP_ARTIFACTS:-$ROOT/../xiv-mcp-build/artifacts}"
 BIN="${BIN:-$ARTIFACTS/bin/XivMcp.Plugin/release}"
 OUT="${OUT:-$ROOT/../xiv-mcp-build/release}"
-REPO="${REPO:-${GITHUB_REPOSITORY:-Spaceghost/xiv-mcp}}"
+REPO="${REPO:-${GITHUB_REPOSITORY:-Spaceghost/xivmcp-dalamud}}"
 MANIFEST="$ROOT/src/XivMcp.Plugin/XivMcp.json"
 
 [[ -f "$BIN/XivMcp.dll" ]] || {
