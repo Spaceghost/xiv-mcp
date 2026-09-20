@@ -1,0 +1,8 @@
+# Findings gitleaks reports that are not secrets. A fingerprint is
+# <commit>:<file>:<rule>:<line>, so one line per commit the text appears in;
+# new commits keep it quiet with an inline "gitleaks:allow" comment instead.
+#
+# LogScrubberTests feeds LogScrubber a made-up JWT ({"alg":"HS256"} /
+# {"sub":"1234"} / the word "signature" in base64) to prove the scrubber
+# removes it from a plugin log. It signs nothing and opens nothing.
+fa7acf2af20c2f1260951080e735d9bab9cab39f:tests/XivMcp.Plugin.Tests/LogScrubberTests.cs:jwt:14

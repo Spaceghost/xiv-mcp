@@ -11,7 +11,7 @@ public class LogScrubberTests
     [InlineData("{\"Authorization\":\"Bearer abc.def.ghi\"}", "\"Authorization\":\"<redacted:authorization>\"")]
     [InlineData("Proxy-Authorization: Digest qwertyuiop", "Proxy-Authorization: <redacted:authorization>")]
     [InlineData("sending bearer abcdef1234567890 now", "bearer <redacted:token> now")]
-    [InlineData("jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl end", "jwt <redacted:token> end")]
+    [InlineData("jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl end", "jwt <redacted:token> end")] // gitleaks:allow - a made-up JWT the scrubber has to remove, not a credential
     public void RemovesAuthorizationAndBearerValues(string input, string expected)
     {
         var scrubbed = LogScrubber.Scrub(input);
