@@ -44,9 +44,8 @@ other FFXIV mods there. In game:
    `https://spacegho.st/mods/ffxiv/plugins.json` → **+** → **Save and close**.
 2. `/xlplugins` → **All Plugins** → search **XivMcp** → **Install**.
 
-While XivMcp only has test builds, it shows up only for players who opted in:
-`/xlsettings` → **Experimental** → **Get plugin testing builds**. Once it has a
-stable release, ticking testing on its own entry is enough to get test builds early.
+It has a stable release, so it shows up for everyone. For test builds ahead of a
+release, right-click its entry → **Receive plugin testing versions**.
 <https://spacegho.st/mods/ffxiv/plugins/> walks through the same steps. It is a
 third-party repository: Dalamud will say nobody but the author reviewed it, which is
 true. Releases are built on GitHub Actions from a tag (`.github/workflows/release.yml`);
