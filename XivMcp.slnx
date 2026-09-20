@@ -3,6 +3,7 @@
     <Project Path="src/XivMcp.Core/XivMcp.Core.csproj" />
     <Project Path="src/XivMcp.DevHost/XivMcp.DevHost.csproj" />
     <Project Path="src/XivMcp.Plugin/XivMcp.Plugin.csproj" />
+    <Project Path="src/XivMcp.Standalone/XivMcp.Standalone.csproj" />
     <Project Path="src/XivMcp.Umbra/XivMcp.Umbra.csproj" />
   </Folder>
   <Folder Name="/tools/">
@@ -11,5 +12,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/XivMcp.Core.Tests/XivMcp.Core.Tests.csproj" />
     <Project Path="tests/XivMcp.Plugin.Tests/XivMcp.Plugin.Tests.csproj" />
+    <Project Path="tests/XivMcp.Standalone.Tests/XivMcp.Standalone.Tests.csproj" />
   </Folder>
 </Solution>

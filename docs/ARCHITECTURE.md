@@ -9,11 +9,15 @@
 | --- | --- | --- | --- |
 | `src/XivMcp.Core` | `XivMcp.Core.dll` (net10.0) | BCL only | MCP protocol + Streamable HTTP transport on `TcpListener`, attribute-driven registry, sessions, activity feed. No Dalamud, no ASP.NET Core (Dalamud's runtime ships neither). |
 | `src/XivMcp.Plugin` | `XivMcp.dll` (Dalamud.NET.Sdk 15) | Core, Dalamud API 15 | Plugin shell (config, services, windows, IPC, DTR) and every tool provider. |
+| `src/XivMcp.Standalone` | `xiv-mcp-standalone` (net10.0) | Core, Lumina (NuGet) | The pre-game host: compiles the plugin's static providers from the same source files, stubs every other catalogue tool with `game_not_running`, hands the port to the plugin. See [STANDALONE.md](STANDALONE.md). |
 | `src/XivMcp.Umbra` | Umbra widget plugin | Umbra, IPC contract | Toolbar widget that talks to the plugin only over Dalamud IPC. |
 | `src/Shared/IpcContract.cs` | compiled into Plugin and Umbra | — | IPC gate names and JSON payload shapes. |
 
 Frozen contracts (additive changes only): `Core/Abstractions/Attributes.cs`, `Core/Abstractions/Contracts.cs`,
 the public surface of `Core/McpServer.cs`, and `Shared/IpcContract.cs`.
+
+What the server will never do, and the one approval switch, are in [HARD-LINES.md](HARD-LINES.md). The generated
+tool reference is [TOOLS.md](TOOLS.md); the machine-readable catalogue is [tools.json](tools.json).
 
 ## Plugin shell
 
@@ -149,7 +153,9 @@ for API 15):
 - The constructor runs on a `LongRunning` thread-pool thread, **not** the framework thread. Provider
   constructors must not touch game memory; subscribing to events is fine.
 
-Scoped objects the shell passes: `Configuration`, `DalamudGameThread` (as `IGameThread`),
+Scoped objects the shell passes: `DalamudGameDataSource` (as `IGameDataSource`: the static providers take this
+instead of `IDataManager`, which is what lets the standalone host compile them), `DalamudLiveWorld` (as `ILiveWorld`),
+`Configuration`, `DalamudGameThread` (as `IGameThread`),
 `NotifierProxy` (as `IMcpNotifier`), `AgentBoard`, `ServerHost`, `HostState`, `ConfirmationService`,
 `ObjectiveTracker`, `ApprovalQueue`, `ApprovalSessionService`.
 
@@ -168,7 +174,39 @@ after the server has stopped.
 Configuration is written only from the framework thread (UI). Collections are replaced rather than
 modified in place, so server threads always read a consistent reference.
 
+### Tool metadata, errors, rate limit (Core)
+
+`McpToolAttribute` carries, besides tier and MCP hints: `Sources` (where the answer comes from), `Availability`
+(`Static` = needs only the installed game data), `ApprovalSummary` (one sentence with `{argument}` placeholders) and
+`RequiresApproval` (sends a Ui tool through the gate too). All of it is published in `tools/list` `_meta`
+(`dev.xivmcp/availability`, `/needsApproval`, `/dataSources`) and by `McpServer.ExportCatalogue()`, which is
+`docs/tools.json`. `tools/catalog all --write .` regenerates `docs/tools.json`, `docs/TOOLS.md` and the README table;
+`tools/ci/run.sh build` fails when they are stale.
+
+Every isError result carries `_meta["dev.xivmcp/error"] = {code, message, retryable[, retryAfterSeconds]}` with a code
+from `McpErrorCodes` (`not_found`, `invalid_arguments`, `category_disabled`, `tier_disabled`, `login_required`,
+`game_not_running`, `denied`, `not_confirmed`, `timeout`, `rate_limited`, `unavailable`, `refused`, `internal_error`,
+`tool_error`). Providers throw `McpToolException.WithCode(...)`.
+
+`McpServerOptions.RateLimitPerMinute` (plugin setting `RateLimitPerMinute`, default 600) is a token bucket per caller:
+per-client token, else MCP session, else the main token. `tools/call` over the limit is an isError result with
+`rate_limited`; `resources/read` and `prompts/get` fail with JSON-RPC error -32029. Approved tickets are not counted.
+
+`McpServer.ControlHandler` serves paths below the endpoint (`{path}/host`, `{path}/handoff`) behind the same Host,
+Origin and bearer checks; `Core/Net/HostHandoff.cs` is the hand-off protocol both hosts speak. Listeners are exclusive
+on Linux and macOS (raw `SO_REUSEADDR` only — .NET's `ReuseAddress` would also set `SO_REUSEPORT` and let two
+processes share the port), so a second host on the same port fails to bind, which the hand-off relies on.
+**Unverified:** that a bind from inside Wine fails against a native listener the same way.
+
 ### Confirmation of Action/Chat calls
+
+**One switch.** `Configuration.ConfirmActions` — *Ask me before anything changes*, first thing in Settings, default on —
+is the only thing that decides whether the player is asked. The server puts every tool that `NeedsApproval`
+(Action, Chat, and Ui tools marked `RequiresApproval`, e.g. `set_map_flag`) to `ConfirmationService`, whose first line
+reads the switch. After such a tool ran, `McpServer.GatedToolExecuted` fires and `ApprovalWiring` writes the
+`ActionLog` entry (memory tail + `actions.log`, JSON Lines, rotated at 1 MiB) whether or not anyone was asked; with
+the switch off it also shows a notification for chat and gear changes. `ToolContractTests` fails the build for a
+mutating tool outside the gate.
 
 `ServerHost` sets `McpServer.Approver` to the `ConfirmationService` (Core contract `IToolCallApprover`, see
 [PROTOCOL.md](PROTOCOL.md)). For every Action/Chat tool call that passed the category, tier, argument and login

@@ -1,9 +1,7 @@
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Providers.Character;
+using XivMcp.Plugin.Providers.GameData;
 using XivMcp.Plugin.Util;
-using CsFramework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework;
-using CsWeatherManager = FFXIVClientStructs.FFXIV.Client.Game.WeatherManager;
 using LTerritoryType = Lumina.Excel.Sheets.TerritoryType;
 using LWeather = Lumina.Excel.Sheets.Weather;
 using LWeatherRate = Lumina.Excel.Sheets.WeatherRate;
@@ -13,13 +11,13 @@ namespace XivMcp.Plugin.Providers.World;
 [McpProvider("world")]
 public sealed class TimeWeatherProvider
 {
-    private readonly IClientState clientState;
-    private readonly IDataManager data;
+    private readonly IGameDataSource data;
+    private readonly ILiveWorld live;
 
-    public TimeWeatherProvider(IClientState clientState, IDataManager data)
+    public TimeWeatherProvider(IGameDataSource data, ILiveWorld live)
     {
-        this.clientState = clientState;
         this.data = data;
+        this.live = live;
     }
 
     public sealed record EorzeaTimeDto(
@@ -70,6 +68,8 @@ public sealed class TimeWeatherProvider
     [McpTool("get_time",
         Title = "Get Eorzea and real time",
         RequiresLogin = false,
+        Availability = ToolAvailability.Static,
+        Sources = ["client:Framework.ClientTime", "clock:host"],
         Description = "Current Eorzea time and the real-world reset schedule. Returns eorzea {time \"HH:MM\", hour, minute, bell, isDaytime " +
                       "(06:00-18:00), year, month, monthName (e.g. \"3rd Astral Moon\"), day (sun 1-32), moonPhase, isOverridden (the client " +
                       "clock is frozen/overridden, e.g. in some cutscenes), secondsUntilNextBell, secondsUntilNextWeatherChange}, serverTimeUtc " +
@@ -77,39 +77,13 @@ public sealed class TimeWeatherProvider
                       "tribal quests), weeklyReset (Tuesday 08:00 UTC: raids lockouts, Wondrous Tails, custom deliveries), grandCompanyReset " +
                       "(20:00 UTC: GC supply/provisioning missions), leveAllowances (every 12h at 00:00/12:00 UTC), each with nextUtc and " +
                       "secondsUntil. Use for timed nodes, weather windows and 'when does X reset'.")]
-    public unsafe TimeDto GetTime()
+    public TimeDto GetTime()
     {
-        var utcNow = DateTimeOffset.UtcNow;
-        var serverTime = utcNow;
-        var fromGame = false;
-        long eorzeaSeconds;
-        var overridden = false;
-
-        var framework = CsFramework.Instance();
-        if (framework != null)
-        {
-            var server = CsFramework.GetServerTime();
-            if (server > 1_500_000_000)
-            {
-                serverTime = DateTimeOffset.FromUnixTimeSeconds(server);
-                fromGame = true;
-            }
-        }
-
-        eorzeaSeconds = GameMath.ToEorzeaSeconds(serverTime);
-        if (framework != null)
-        {
-            var clientTime = framework->ClientTime;
-            if (clientTime.IsEorzeaTimeOverridden && clientTime.EorzeaTimeOverride > 0)
-            {
-                eorzeaSeconds = clientTime.EorzeaTimeOverride;
-                overridden = true;
-            }
-            else if (clientTime.EorzeaTime > 0)
-            {
-                eorzeaSeconds = clientTime.EorzeaTime;
-            }
-        }
+        var clock = live.ReadClock();
+        var serverTime = clock.ServerTime;
+        var fromGame = clock.FromGame;
+        var overridden = clock.Overridden;
+        var eorzeaSeconds = clock.EorzeaSeconds ?? GameMath.ToEorzeaSeconds(serverTime);
 
         var date = GameMath.ToEorzeaDate(eorzeaSeconds);
         var realUnix = serverTime.ToUnixTimeMilliseconds() / 1000.0;
@@ -151,6 +125,8 @@ public sealed class TimeWeatherProvider
         Title = "Get weather forecast",
         GameThread = false,
         RequiresLogin = false,
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:TerritoryType", "lumina:WeatherRate", "lumina:Weather", "client:WeatherManager", "clock:host"],
         Description = "Weather forecast for a zone computed with the game's own deterministic weather algorithm (weather changes every 8 Eorzea " +
                       "hours = 23m20s real time, at ET 00:00, 08:00 and 16:00). Returns territory, possibleWeather with chancePercent from the " +
                       "zone's WeatherRate, and forecast: count consecutive windows starting with the current one, each {weatherId, name, startUtc, " +
@@ -170,11 +146,16 @@ public sealed class TimeWeatherProvider
         }
 
         var (currentTerritory, currentWeather, loggedIn) =
-            await ctx.Game.InvokeAsync(ReadCurrent, ctx.CancellationToken).ConfigureAwait(false);
+            await ctx.Game.InvokeAsync(live.ReadZone, ctx.CancellationToken).ConfigureAwait(false);
 
         var id = territoryId ?? 0;
         if (id == 0)
         {
+            if (!live.GameRunning)
+            {
+                throw McpToolException.WithCode(McpErrorCodes.GameNotRunning, "The game is not running, so there is no current zone: pass territoryId to forecast a specific zone.", retryable: true);
+            }
+
             if (!loggedIn || currentTerritory == 0)
             {
                 throw new McpToolException("Not logged in: pass territoryId to forecast a specific zone.");
@@ -266,12 +247,5 @@ public sealed class TimeWeatherProvider
             possible,
             forecast,
             "Computed from the host clock. Weather can differ from the forecast during scripted events, quests or in zones with individual weather.");
-    }
-
-    private unsafe (uint Territory, byte Weather, bool LoggedIn) ReadCurrent()
-    {
-        var weatherManager = CsWeatherManager.Instance();
-        var weather = weatherManager != null ? weatherManager->GetCurrentWeather() : (byte)0;
-        return (clientState.TerritoryType, weather, clientState.IsLoggedIn);
     }
 }

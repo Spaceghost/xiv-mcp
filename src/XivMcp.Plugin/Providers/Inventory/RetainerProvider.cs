@@ -17,6 +17,7 @@ public sealed unsafe class RetainerProvider
     public RetainerProvider(IDataManager data) => index = GameDataIndex.For(data);
 
     [McpTool("get_retainers",
+        Sources = ["client:RetainerManager"],
         Title = "Get retainers",
         Description =
             "The character's retainers in display order: id, name, whether the slot is available (subscription), class/job and level, gil held, " +

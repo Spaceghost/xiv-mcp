@@ -31,6 +31,7 @@ public sealed unsafe class AchievementProvider
         string? Note);
 
     [McpTool("get_achievements",
+        Sources = ["client:Achievement", "lumina:Achievement"],
         Title = "Get achievement progress",
         Description =
             "The character's achievement progress: totalInGame, completed, pointsEarned and pointsAvailable, then a filtered, paged list " +

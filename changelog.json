@@ -10,6 +10,30 @@
       "items": [
         {
           "status": "beta",
+          "text": "One checkbox now decides whether you are asked: Settings opens with \"Ask me before anything changes\". Ticked (the default), every tool that changes something — targets, gearsets, teleport, slash commands, chat, the map flag, terminal and desktop panels — waits for Allow / Deny or a ticket, and the prompt says in one sentence what will happen, with chat text shown verbatim. Unticked, those tools run at once. Allow sessions, 10-minute grants and auto-approve rules are shortcuts under that switch."
+        },
+        {
+          "status": "beta",
+          "text": "An action log records every state-changing call that ran — what, which client and token, when, and whether you were being asked — in the Approvals tab and in actions.log. With approval off, a call that sent chat or changed gear still shows a notification."
+        },
+        {
+          "status": "beta",
+          "text": "A standalone host, xiv-mcp-standalone, answers on the same port with the same token before the game is launched: game data tools (items, recipes, quests, duties, actions, sheets, weather, Eorzea time) work from the installed game files, every other tool is listed with its real schema and answers \"game_not_running\". When the game starts the plugin asks for the port and takes over; when it exits the standalone takes it back. Runs on Linux and Windows, as a user service if you like (docs/STANDALONE.md)."
+        },
+        {
+          "status": "beta",
+          "text": "Every tool now declares where its answer comes from, whether it works before the game starts and whether it goes through approval, and errors carry a stable code (not_found, rate_limited, game_not_running, denied…). Clients are rate-limited per token (600 calls a minute by default). The whole catalogue is published as docs/tools.json, and the README table and docs/TOOLS.md are generated from it and checked in CI."
+        },
+        {
+          "status": "beta",
+          "text": "What XivMcp will never do is written down (docs/HARD-LINES.md): nothing that plays the game for you, no market sniping, no packet tampering, no silent plugin installs. The approval checkbox does not unlock any of it."
+        },
+        {
+          "status": "beta",
+          "text": "Two copies of the server can no longer listen on the same port at once on Linux; the second one now fails to bind, as it always did on Windows."
+        },
+        {
+          "status": "beta",
           "text": "The Status tab's facts no longer print one character per line, and the Claude Code snippet shows the token placeholder as <token> instead of an escaped string."
         },
         {

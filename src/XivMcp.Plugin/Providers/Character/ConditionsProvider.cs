@@ -43,6 +43,7 @@ public sealed class ConditionsProvider
         string? IdleBlockedBy);
 
     [McpTool("get_conditions",
+        Sources = ["dalamud:ICondition"],
         Title = "Get client conditions",
         RequiresLogin = false,
         Description = "The game's condition flags (what state the client is in). Returns active: the names of every currently set ConditionFlag " +

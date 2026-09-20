@@ -38,6 +38,7 @@ public sealed class NearbyObjectsProvider
         List<ObjectSummaryDto> Objects);
 
     [McpTool("list_nearby_objects",
+        Sources = ["dalamud:IObjectTable"],
         Title = "List nearby objects",
         Description = "Game objects loaded around the player (the client only knows objects within roughly 100 yalms, fewer in crowded areas), " +
                       "sorted nearest first; the local player is excluded. Filter by kind: all, player, battleNpc (any combat NPC incl. pets/" +

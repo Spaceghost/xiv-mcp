@@ -73,6 +73,7 @@ public sealed class ObjectivesProvider : IDisposable
     private ObjectiveStore Store => tracker.Store;
 
     [McpTool("post_objective",
+        Sources = ["xivmcp:objectives"],
         Title = "Post a custom objective (quest) to the player's game",
         Description =
             "Creates or replaces (same id) a custom objective that the player sees in game like a tracked quest: title and current step " +
@@ -142,6 +143,7 @@ public sealed class ObjectivesProvider : IDisposable
     }
 
     [McpTool("update_objective",
+        Sources = ["xivmcp:objectives"],
         Title = "Update a custom objective's progress",
         Description =
             "Reports progress on an objective posted with post_objective or loaded from a pack: advance=true marks the current step done " +
@@ -192,6 +194,7 @@ public sealed class ObjectivesProvider : IDisposable
     }
 
     [McpTool("list_objectives",
+        Sources = ["xivmcp:objectives", "client:WeatherManager"],
         Title = "List custom objectives with live status",
         Description =
             "Every custom objective in insertion order with steps, location, conditions and live status: ready (in the zone, within the " +
@@ -204,6 +207,7 @@ public sealed class ObjectivesProvider : IDisposable
         [McpParam("Include completed objectives.")] bool includeCompleted = true) => BuildList(includeCompleted);
 
     [McpTool("clear_objectives",
+        Sources = ["xivmcp:objectives"],
         Title = "Remove custom objectives",
         Description =
             "Removes one objective (id), every completed one (completedOnly=true) or all of them (no arguments). " +
@@ -220,6 +224,7 @@ public sealed class ObjectivesProvider : IDisposable
     }
 
     [McpTool("load_objective_pack",
+        Sources = ["xivmcp:objectives", "file:objective pack"],
         Title = "Load a quest pack",
         Description =
             "Loads many objectives at once from a quest pack: pass the JSON text (json) or a file path on the player's machine (path; " +

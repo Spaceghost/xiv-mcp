@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Dalamud.Plugin.Services;
 using Lumina.Excel;
 using Lumina.Text.ReadOnly;
 using XivMcp.Core;
@@ -19,12 +18,14 @@ public sealed class SheetDataProvider : IDisposable
         Justification = "Shared singleton owned by GameDataIndex.Release(), not by this provider.")]
     private readonly GameDataIndex index;
 
-    public SheetDataProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public SheetDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     /// <summary>Stops the shared index warmup thread and releases cached indexes on plugin unload.</summary>
     public void Dispose() => GameDataIndex.Release();
 
     [McpTool("list_sheets",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Excel"],
         Title = "List Excel sheets",
         Description =
             "Lists game Excel sheets that have typed column definitions (Lumina.Excel.Sheets), optionally filtered by nameContains, with row count, " +
@@ -71,6 +72,8 @@ public sealed class SheetDataProvider : IDisposable
     }
 
     [McpTool("get_sheet_row",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Excel"],
         Title = "Read an Excel sheet row",
         Description =
             "Reads one row of any game Excel sheet by sheet name and row id and returns it as JSON: numbers/bools as values, text as plain strings, " +
@@ -133,6 +136,8 @@ public sealed class SheetDataProvider : IDisposable
     public SheetRowResult SheetRowResource(string sheet, uint rowId) => GetSheetRow(sheet, rowId);
 
     [McpTool("search_sheet",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Excel"],
         Title = "Search an Excel sheet column",
         Description =
             "Scans one column of any Excel sheet and returns matching rows as {rowId, subrowId, label, value}, where label is the row's Name/Singular " +

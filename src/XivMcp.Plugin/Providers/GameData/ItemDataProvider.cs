@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -21,9 +20,11 @@ public sealed class ItemDataProvider
     private readonly GameDataIndex index;
     private readonly ConcurrentDictionary<uint, (string? Label, string[] Slots)> slotCache = new();
 
-    public ItemDataProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public ItemDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     [McpTool("search_items",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Item"],
         Title = "Search game items",
         Description =
             "Searches every item in the game data (not the player's inventory; use find_owned_items for that) by name in the client language, " +
@@ -100,6 +101,8 @@ public sealed class ItemDataProvider
     }
 
     [McpTool("get_item",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Item", "lumina:GilShopItem", "lumina:SpecialShop", "lumina:Recipe", "lumina:GatheringItem"],
         Title = "Get item details",
         Description =
             "Full game-data record for one item id: name, description, icon, UI and market categories, item level, equip level and jobs, equip slots, " +

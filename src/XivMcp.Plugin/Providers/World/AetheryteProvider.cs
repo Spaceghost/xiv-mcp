@@ -44,6 +44,7 @@ public sealed class AetheryteProvider
     public sealed record AetherytesDto(int Total, int Offset, int Returned, bool Truncated, List<AetheryteDto> Aetherytes);
 
     [McpTool("list_aetherytes",
+        Sources = ["dalamud:IAetheryteList", "lumina:Aetheryte"],
         Title = "List teleport destinations",
         Description = "The player's teleport list (the in-game Teleport window): every attuned aetheryte plus housing destinations " +
                       "(own/FC house, shared estates, apartments). Each entry: aetheryteId, subIndex, name, territoryId, zone, region, gilCost " +

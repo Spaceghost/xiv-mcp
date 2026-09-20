@@ -21,6 +21,9 @@ public sealed unsafe class MapFlagProvider
     }
 
     [McpTool("set_map_flag",
+        Sources = ["client:AgentMap", "lumina:Map"],
+        ApprovalSummary = "Place your map flag at {x} {y} {worldX} {worldZ} (territory {territoryId}, map {mapId}) and open the map: {openMap}.",
+        RequiresApproval = true,
         Title = "Set map flag",
         Description =
             "Places the user's map flag marker (the one shown on the map/minimap and inserted by <flag> in chat) and by default opens the map window on it. Local only; nothing is sent to other players. " +

@@ -16,6 +16,7 @@ public sealed unsafe class MacroProvider
     }
 
     [McpTool("list_macros",
+        Sources = ["client:RaptureMacroModule"],
         Title = "List user macros",
         Description =
             "Lists the user's macros from the in-game User Macros window: set individual (this character) or shared (all characters on the account), 100 slots each. " +

@@ -105,6 +105,7 @@ public sealed class PartyProvider : IDisposable
         string? Note);
 
     [McpTool("get_party",
+        Sources = ["dalamud:IPartyList", "client:InfoProxyCrossRealm", "client:GroupManager"],
         Title = "Get party",
         Description = "The player's party. mode is solo | party | crossRealmParty | alliance. members (the 8-slot party list; empty when solo) " +
                       "each have index, name, contentId (string), entityId, homeWorld, job {abbreviation, name, role}, level, hp/mp {current, max, " +

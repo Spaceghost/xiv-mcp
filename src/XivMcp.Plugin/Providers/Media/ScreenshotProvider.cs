@@ -85,6 +85,7 @@ public sealed class ScreenshotProvider : IDisposable
         double LoadMs);
 
     [McpTool("take_screenshot",
+        Sources = ["client:render target", "xivmcp:screenshots"],
         Title = "Take a screenshot",
         Permission = ToolPermission.Ui,
         GameThread = false,
@@ -231,6 +232,7 @@ public sealed class ScreenshotProvider : IDisposable
     }
 
     [McpTool("get_latest_screenshot",
+        Sources = ["file:screenshots"],
         Title = "Get the newest saved screenshot",
         Permission = ToolPermission.Read,
         GameThread = false,

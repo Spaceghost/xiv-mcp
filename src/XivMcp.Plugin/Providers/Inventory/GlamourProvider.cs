@@ -26,6 +26,7 @@ public sealed unsafe class GlamourProvider
     public sealed record PlatesResult(bool Loaded, int Total, int NonEmpty, List<PlateDto> Plates, string? Note);
 
     [McpTool("get_glamour_plates",
+        Sources = ["client:MirageManager", "lumina:Item"],
         Title = "Get glamour plates",
         Description =
             "The character's glamour plates (the Glamour Dresser plate slots) with, per plate, plateNumber, empty, filledSlots and the " +

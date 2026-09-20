@@ -25,6 +25,7 @@ public sealed class BridgeProvider
     public sealed record BridgeStateDto(BridgeStatus Bridge, List<BridgeValueDto> Values, string Note);
 
     [McpTool("list_bridges",
+        Sources = ["dalamud:InstalledPlugins", "ipc:probe"],
         Title = "List plugin bridges",
         RequiresLogin = false,
         Description =
@@ -44,6 +45,7 @@ public sealed class BridgeProvider
     }
 
     [McpTool("get_bridge_state",
+        Sources = ["ipc:bridge"],
         Title = "Read a plugin bridge",
         RequiresLogin = false,
         Description =

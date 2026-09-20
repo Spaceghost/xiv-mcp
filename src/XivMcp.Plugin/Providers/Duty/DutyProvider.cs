@@ -100,6 +100,7 @@ public sealed class DutyProvider : IDisposable
         PartySummaryDto Party);
 
     [McpTool("get_duty_state",
+        Sources = ["dalamud:IDutyState", "client:ContentsFinder", "lumina:ContentFinderCondition"],
         Title = "Get duty state",
         Description = "Instanced-content status. Returns inDuty (bound by duty), isDutyStarted (the duty's barrier dropped/commenced), isCompleted, " +
                       "isPvp, territory, territoryIntendedUse, content {id, name, contentType, levelRequired, levelSync, itemLevelRequired, " +

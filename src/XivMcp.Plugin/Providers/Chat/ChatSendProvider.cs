@@ -100,6 +100,8 @@ public sealed partial class ChatSendProvider
     }
 
     [McpTool("send_chat",
+        Sources = ["client:chat input"],
+        ApprovalSummary = "Send to {channel} {tellTarget}, visible to other players, exactly this text: {message}",
         Title = "Send chat message",
         Description =
             "Sends one line of text that OTHER PLAYERS WILL SEE, on the chosen channel, exactly as if the user typed it into the chat box. " +
@@ -144,6 +146,7 @@ public sealed partial class ChatSendProvider
     }
 
     [McpTool("print_echo",
+        Sources = ["dalamud:IChatGui"],
         Title = "Print to own chat log",
         Description =
             "Prints a line into the user's OWN chat log only (tagged [MCP]); nobody else can see it and nothing is sent to the server. " +
@@ -175,6 +178,8 @@ public sealed partial class ChatSendProvider
     }
 
     [McpTool("execute_command",
+        Sources = ["client:chat input", "dalamud:ICommandManager"],
+        ApprovalSummary = "Run the slash command, exactly as typed: {command}",
         Title = "Execute slash command",
         Description =
             "Runs one slash command as if the user typed it into the chat box, e.g. \"/gearset change 3\", \"/hudlayout 2\", \"/xlplugins\" or another installed plugin's command. " +

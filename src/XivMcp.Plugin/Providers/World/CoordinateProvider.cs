@@ -58,6 +58,7 @@ public sealed class CoordinateProvider
         string Note);
 
     [McpTool("convert_coordinates",
+        Sources = ["lumina:Map", "lumina:TerritoryType"],
         Title = "Convert map and world coordinates",
         GameThread = false,
         RequiresLogin = false,
@@ -126,6 +127,7 @@ public sealed class CoordinateProvider
     }
 
     [McpTool("find_nearest_aetheryte",
+        Sources = ["lumina:Aetheryte", "lumina:Level", "dalamud:IClientState"],
         Title = "Find the nearest aetheryte",
         GameThread = false,
         RequiresLogin = false,

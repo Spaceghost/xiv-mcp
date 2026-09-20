@@ -74,6 +74,7 @@ public sealed class PlayerProvider
         List<StatusDto> Statuses);
 
     [McpTool("get_player",
+        Sources = ["dalamud:IObjectTable", "dalamud:IClientState"],
         Title = "Get player character",
         Description = "Snapshot of the logged-in player character. Returns name, entityId, contentId (string), home/current world with data center " +
                       "(isWorldVisiting when they differ), job {id, abbreviation, name, role}, level plus syncedLevel when level-synced, hp/mp " +

@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -19,9 +18,11 @@ public sealed partial class DutyDataProvider
 
     private readonly GameDataIndex index;
 
-    public DutyDataProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public DutyDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     [McpTool("search_duties",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:ContentFinderCondition"],
         Title = "Search duties",
         Description =
             "Searches duties from the Duty Finder data (ContentFinderCondition: dungeons, guildhests, trials, raids, alliance raids, PvP, " +
@@ -77,6 +78,8 @@ public sealed partial class DutyDataProvider
     }
 
     [McpTool("get_duty",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:ContentFinderCondition", "lumina:Quest"],
         Title = "Get duty details",
         Description =
             "Details for one duty (ContentFinderCondition id): name, description, content type, required level and item level, level/item-level sync, " +

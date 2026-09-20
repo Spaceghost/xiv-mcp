@@ -35,6 +35,7 @@ public sealed unsafe class RouletteProvider
         string Note);
 
     [McpTool("get_roulette_status",
+        Sources = ["client:InstanceContent", "lumina:ContentRoulette"],
         Title = "Get duty roulette status",
         Description =
             "Which Duty Finder roulettes have already given their daily completion bonus this reset. Returns each roulette as " +

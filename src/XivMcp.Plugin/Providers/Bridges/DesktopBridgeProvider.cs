@@ -34,6 +34,7 @@ public sealed class DesktopBridgeProvider
     public sealed record BridgeJsonDto(string Bridge, string Method, bool Ok, JsonNode? Result, string? Error, string Raw);
 
     [McpTool("ghostty_query",
+        Sources = ["ipc:GhosttyDalamud.v1.Call"],
         Title = "Query the in-game terminal bridge",
         Description =
             "Reads GhosttyDalamud's state over IPC. method is one of: window.list (every terminal panel with id, title, app, size, " +
@@ -51,6 +52,8 @@ public sealed class DesktopBridgeProvider
     }
 
     [McpTool("ghostty_command",
+        Sources = ["ipc:GhosttyDalamud.v1.Call"],
+        ApprovalSummary = "Ghostty terminal panels: {method} {parameters}",
         Title = "Command the in-game terminal bridge",
         Permission = ToolPermission.Action,
         Idempotent = false,
@@ -88,6 +91,7 @@ public sealed class DesktopBridgeProvider
     }
 
     [McpTool("desktop_query",
+        Sources = ["ipc:XivDesktop.v1"],
         Title = "Query the host desktop bridge",
         RequiresLogin = false,
         Description =
@@ -114,6 +118,8 @@ public sealed class DesktopBridgeProvider
     }
 
     [McpTool("desktop_command",
+        Sources = ["ipc:XivDesktop.v1"],
+        ApprovalSummary = "XivDesktop: {method} {argument}",
         Title = "Command the host desktop bridge",
         Permission = ToolPermission.Action,
         Idempotent = false,

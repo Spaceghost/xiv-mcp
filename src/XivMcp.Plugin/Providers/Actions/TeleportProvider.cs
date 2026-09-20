@@ -25,6 +25,8 @@ public sealed unsafe class TeleportProvider
     }
 
     [McpTool("teleport",
+        Sources = ["client:Telepo", "lumina:Aetheryte"],
+        ApprovalSummary = "Teleport to {name} {aetheryteId} (costs gil, like the Teleport window).",
         Title = "Teleport to aetheryte",
         Description =
             "Starts the Teleport spell to one of the character's attuned aetherytes (or free-company/private estate and apartment entries), exactly like choosing it in the Teleport window. Costs gil (reported as gilCost) and takes a ~5 second cast that can be interrupted. " +

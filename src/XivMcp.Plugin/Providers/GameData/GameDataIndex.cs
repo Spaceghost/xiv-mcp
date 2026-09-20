@@ -1,7 +1,5 @@
 using System.Collections.Frozen;
 using System.Reflection;
-using Dalamud.Plugin.Services;
-using Dalamud.Utility;
 using Lumina.Data;
 using Lumina.Excel;
 using XivMcp.Plugin.Util;
@@ -15,7 +13,7 @@ namespace XivMcp.Plugin.Providers.GameData;
 /// built once on first use (on whichever thread asks, which for data tools is never the framework
 /// thread) and then shared by every provider.
 /// </summary>
-internal sealed class GameDataIndex : IDisposable
+internal sealed partial class GameDataIndex : IDisposable
 {
     private static readonly object Gate = new();
     private static GameDataIndex? current;
@@ -40,9 +38,9 @@ internal sealed class GameDataIndex : IDisposable
         instanceUnlockQuests = new(BuildInstanceUnlockQuests);
     }
 
-    public static GameDataIndex For(IDataManager data)
+    public static GameDataIndex For(IGameDataSource data)
     {
-        var language = data.Language.ToLumina();
+        var language = data.Language;
         lock (Gate)
         {
             if (current == null || !ReferenceEquals(current.Module, data.Excel) || current.Language != language)

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Dalamud.Plugin.Services;
 using XivMcp.Core;
 using XivMcp.Plugin.Util;
 using Sheets = Lumina.Excel.Sheets;
@@ -17,7 +16,7 @@ public sealed class ItemCompareProvider
 
     private readonly GameDataIndex index;
 
-    public ItemCompareProvider(IDataManager data) => index = GameDataIndex.For(data);
+    public ItemCompareProvider(IGameDataSource data) => index = GameDataIndex.For(data);
 
     public sealed record CompareItemDto(
         uint ItemId,
@@ -44,6 +43,8 @@ public sealed class ItemCompareProvider
         string Note);
 
     [McpTool("compare_items",
+        Availability = ToolAvailability.Static,
+        Sources = ["lumina:Item", "lumina:BaseParam"],
         Title = "Compare equipment",
         GameThread = false,
         RequiresLogin = false,

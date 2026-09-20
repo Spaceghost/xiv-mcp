@@ -115,6 +115,7 @@ public sealed class EventsProvider : IDisposable
     public sealed record EventKindsDto(long Cursor, int Buffered, int Capacity, List<EventKindDto> Kinds);
 
     [McpTool("get_events",
+        Sources = ["xivmcp:event stream"],
         Title = "Get recent game events",
         GameThread = false,
         RequiresLogin = false,
@@ -151,6 +152,7 @@ public sealed class EventsProvider : IDisposable
     }
 
     [McpTool("list_event_kinds",
+        Sources = ["xivmcp:event stream"],
         Title = "List event kinds",
         GameThread = false,
         RequiresLogin = false,

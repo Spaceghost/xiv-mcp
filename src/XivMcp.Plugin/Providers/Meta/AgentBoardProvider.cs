@@ -46,6 +46,7 @@ public sealed class AgentBoardProvider : IDisposable
     }
 
     [McpTool("post_status",
+        Sources = ["xivmcp:agent board"],
         Title = "Post agent status to the in-game board",
         Description =
             "Shows your progress inside the player's game: creates or replaces the board entry for `agent` " +
@@ -83,6 +84,7 @@ public sealed class AgentBoardProvider : IDisposable
     }
 
     [McpTool("list_status",
+        Sources = ["xivmcp:agent board"],
         Title = "List the in-game agent board",
         Description =
             "Returns every entry on the in-game agent board (newest update first) with agent, status, state " +
@@ -94,6 +96,7 @@ public sealed class AgentBoardProvider : IDisposable
     public AgentBoardDto ListStatus() => BuildBoard();
 
     [McpTool("clear_status",
+        Sources = ["xivmcp:agent board"],
         Title = "Clear agent board entries",
         Description =
             "Removes your entry (pass agent) or every entry (omit agent) from the in-game agent board. " +

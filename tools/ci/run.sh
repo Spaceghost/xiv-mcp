@@ -6,10 +6,13 @@
 #
 #   deps     locate the .NET 10 SDK and the Dalamud reference assemblies, then
 #            `dotnet restore XivMcp.slnx`
-#   test     dotnet test tests/XivMcp.Core.Tests -c Release, then
+#   test     dotnet test tests/XivMcp.Core.Tests and tests/XivMcp.Standalone.Tests
+#            -c Release, then
 #            tests/XivMcp.Plugin.Tests (which needs the Dalamud reference
 #            assemblies; without them it is skipped, not failed)
-#   build    dotnet build XivMcp.slnx -c Release. Without Dalamud (and Umbra)
+#   build    dotnet build XivMcp.slnx -c Release, then check that the generated
+#            tool catalogue (docs/tools.json, docs/TOOLS.md, the README table)
+#            matches the built plugin. Without Dalamud (and Umbra)
 #            reference assemblies the Dalamud projects cannot compile at all, so
 #            the stage then builds the rest of the solution and says which
 #            projects it left out
@@ -56,12 +59,12 @@ RESULTS="$XIVMCP_ARTIFACTS/test-results"
 # they cannot be compiled at all
 DALAMUD_PROJECTS=(src/XivMcp.Plugin src/XivMcp.Umbra tests/XivMcp.Plugin.Tests)
 # everything else in XivMcp.slnx, built when the Dalamud assemblies are missing
-PORTABLE_PROJECTS=(src/XivMcp.Core src/XivMcp.DevHost tools/catalog tests/XivMcp.Core.Tests)
+PORTABLE_PROJECTS=(src/XivMcp.Core src/XivMcp.DevHost src/XivMcp.Standalone tools/catalog tests/XivMcp.Core.Tests tests/XivMcp.Standalone.Tests)
 
 log() { printf '== ci: %s\n' "$*"; }
 die() { printf 'ci: error: %s\n' "$*" >&2; exit 1; }
 
-usage() { sed -n '2,38p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,43p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 # DOTNET: the caller's, else dotnet on PATH, else the SDK installed in ~/.dotnet.
 # `dotnet --version` in the repository root is the honest test: it fails when no
@@ -175,6 +178,8 @@ stage_test() {
   mkdir -p "$RESULTS"
   : >"$RESULTS/summary.txt"
   run_test_project tests/XivMcp.Core.Tests
+  # the pre-game host: Lumina from NuGet, no Dalamud, so it runs everywhere
+  run_test_project tests/XivMcp.Standalone.Tests
   if [[ "${SKIP_PLUGIN_TESTS:-0}" == 1 ]]; then
     log "SKIP_PLUGIN_TESTS=1: tests/XivMcp.Plugin.Tests skipped"
     echo "tests/XivMcp.Plugin.Tests: skipped (SKIP_PLUGIN_TESTS=1)" >>"$RESULTS/summary.txt"
@@ -188,6 +193,16 @@ stage_test() {
   cat "$RESULTS/summary.txt"
 }
 
+# docs/tools.json, docs/TOOLS.md and the README table are generated from the built
+# plugin; a tool added without regenerating them fails here. The standalone host
+# embeds docs/tools.json, so a stale file would also publish stale stubs.
+check_catalogue() {
+  local plugin="$XIVMCP_ARTIFACTS/bin/XivMcp.Plugin/release/XivMcp.dll"
+  [[ -f "$plugin" ]] || die "catalogue check: $plugin was not built"
+  log "tool catalogue is up to date (tools/catalog check)"
+  DALAMUD_HOME="$DALAMUD_LIB_PATH" "$DOTNET" "$XIVMCP_ARTIFACTS/bin/XivMcp.Catalog/release/xiv-mcp-catalog.dll" check --plugin "$plugin" --write "$ROOT"
+}
+
 stage_build() {
   ensure_dotnet
   ensure_dalamud
@@ -198,6 +213,7 @@ stage_build() {
     log "dotnet build XivMcp.slnx -c Release"
     "$DOTNET" build XivMcp.slnx -c Release "${props[@]}"
     log "build output under $XIVMCP_ARTIFACTS"
+    check_catalogue
     return 0
   fi
   # Not a reduced-for-speed build: without those reference assemblies on disk the
@@ -214,6 +230,7 @@ stage_build() {
     "$DOTNET" build "$p" -c Release "${props[@]}"
   done
   log "build output under $XIVMCP_ARTIFACTS"
+  if [[ "$HAVE_DALAMUD" == 1 ]]; then check_catalogue; fi
 }
 
 stage_package() {

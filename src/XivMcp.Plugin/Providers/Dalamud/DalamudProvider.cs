@@ -32,6 +32,7 @@ public sealed unsafe class DalamudProvider
     }
 
     [McpTool("list_plugins",
+        Sources = ["dalamud:InstalledPlugins"],
         Title = "List Dalamud plugins",
         Description =
             "Lists the Dalamud plugins installed in this game client. Each entry: internalName, name, version, author, loaded (currently running), isDev (local dev plugin), isThirdParty (from a custom repository), isTesting, isOutdated, isBanned/isOrphaned/isDecommissioned (only when true), hasMainUi/hasConfigUi, apiLevel. " +
@@ -89,6 +90,7 @@ public sealed unsafe class DalamudProvider
     }
 
     [McpTool("get_dalamud_info",
+        Sources = ["dalamud:IDalamudPluginInterface", "lumina:GameData.Repositories"],
         Title = "Dalamud and client info",
         Description =
             "Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamudUiLanguage, " +

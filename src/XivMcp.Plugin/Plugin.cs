@@ -92,15 +92,17 @@ public sealed class Plugin : IDalamudPlugin
                 Path.Combine(pluginInterface.GetPluginConfigDirectory(), TicketStore.FileName),
                 (message, ex) => log.Warning(ex, "{Message}", message));
             var approvalQueue = Track(new ApprovalQueue(config, ticketStore, new ServerToolRunner(host.Server), confirmations));
-            approvalWiring = Track(new ApprovalWiring(host, approvalQueue, approvalSessions, notifications, log));
+            var actionLog = new ActionLog(pluginInterface.GetPluginConfigDirectory(), onError: (message, ex) => log.Warning(ex, message));
+            approvalWiring = Track(new ApprovalWiring(host, approvalQueue, approvalSessions, notifications, log, config, actionLog));
 
             // Scoped objects providers may request in their constructors (besides Dalamud services).
-            host.LoadProviders(typeof(Plugin).Assembly, config, gameThread, notifier, board, host, hostState, confirmations, objectives, approvalQueue, approvalSessions);
+            host.LoadProviders(typeof(Plugin).Assembly, new Providers.GameData.DalamudGameDataSource(data), new Providers.World.DalamudLiveWorld(clientState), config, gameThread, notifier, board, host, hostState, confirmations, objectives, approvalQueue, approvalSessions);
 
             mainWindow = new MainWindow(pluginInterface, config, host, board, confirmations);
             mainWindow.Approvals = approvalQueue;
             mainWindow.Provision = provision;
             mainWindow.ApprovalSessions = approvalSessions;
+            mainWindow.Actions = actionLog;
             confirmWindow = new ConfirmWindow(confirmations);
             windowSystem.AddWindow(mainWindow);
             windowSystem.AddWindow(confirmWindow);

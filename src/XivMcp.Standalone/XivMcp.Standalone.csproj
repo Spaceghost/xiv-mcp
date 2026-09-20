@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The pre-game host: the same McpServer, tool names, schemas, token and port as the plugin, serving every tool that
+    needs only the installed game data (Lumina over sqpack) and answering the live ones with a structured
+    "game_not_running" error. See docs/STANDALONE.md.
+
+    The static providers are NOT copied: this project compiles the plugin's own source files. Anything under the
+    linked folders that is named Dalamud*.cs is the plugin's glue and is left out; everything else must build with
+    Lumina and the BCL alone, which this project's build enforces.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>XivMcp.Standalone</RootNamespace>
+    <AssemblyName>xiv-mcp-standalone</AssemblyName>
+    <Version>0.1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DefineConstants>$(DefineConstants);XIVMCP_STANDALONE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\XivMcp.Core\XivMcp.Core.csproj" />
+    <!-- Pinned to what Dalamud API 15 ships, so the linked sources see the same sheet definitions in both hosts. -->
+    <PackageReference Include="Lumina" Version="7.6.0" />
+    <PackageReference Include="Lumina.Excel" Version="7.5.0" />
+    <InternalsVisibleTo Include="XivMcp.Standalone.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\XivMcp.Plugin\Providers\GameData\**\*.cs" Exclude="..\XivMcp.Plugin\Providers\GameData\**\Dalamud*.cs" LinkBase="Shared\GameData" />
+    <Compile Include="..\XivMcp.Plugin\Providers\World\TimeWeatherProvider.cs;..\XivMcp.Plugin\Providers\World\ILiveWorld.cs" LinkBase="Shared\World" />
+    <Compile Include="..\XivMcp.Plugin\Providers\Character\SnapshotDtos.cs" LinkBase="Shared\Character" />
+    <Compile Include="..\XivMcp.Plugin\Providers\Meta\ServerInfoDtos.cs" LinkBase="Shared\Meta" />
+    <Compile Include="..\XivMcp.Plugin\Providers\Prompts\**\*.cs" Exclude="..\XivMcp.Plugin\Providers\Prompts\**\Dalamud*.cs" LinkBase="Shared\Prompts" />
+    <Compile Include="..\XivMcp.Plugin\Util\GameMath.cs;..\XivMcp.Plugin\Util\SheetJson.cs;..\XivMcp.Plugin\Util\GatheringWindows.cs" LinkBase="Shared\Util" />
+    <!-- The plugin's tool catalogue: the live tools are re-published from it as stubs with identical names and schemas. -->
+    <EmbeddedResource Include="..\..\docs\tools.json" LogicalName="XivMcp.Standalone.tools.json" />
+  </ItemGroup>
+</Project>

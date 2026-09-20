@@ -35,6 +35,13 @@ MCP client (Claude Code, ...)  --HTTP POST/GET/DELETE /mcp, Bearer token-->  Xiv
 Wine maps `127.0.0.1` inside the game to the host's loopback, so host-side clients reach the plugin
 directly. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+**Before the game is launched** the same endpoint can be served by `xiv-mcp-standalone`: game-data tools work from the
+installed game files, everything else answers `game_not_running`, and the plugin takes the port over when the game
+starts ([docs/STANDALONE.md](docs/STANDALONE.md)). Host-tested only.
+
+**What this will never do** — play the game for you, snipe the market, touch packets, install plugins silently — and
+the one checkbox that governs approval of everything that changes state: [docs/HARD-LINES.md](docs/HARD-LINES.md).
+
 ## Install (from the plugin repository)
 
 XivMcp is listed in the author's own third-party Dalamud repository, next to the
@@ -294,80 +301,102 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-65 tools, 12 resources and templates, 6 prompts. Tier and category are the in-game switches
-(Settings → Permissions / Categories); *Login* means the call fails at the title screen. Descriptions are the first
-sentence of what clients see; `tools/list` has the full text and schemas. Behaviour in game is unverified unless
-stated elsewhere.
+86 tools (10 change something and go through the approval switch; 18 also work before the game starts), 14 resources and templates, 6 prompts.
+Catalogue version 2; the machine-readable listing is [docs/tools.json](docs/tools.json) and the full reference (arguments, data sources, approval text) is [docs/TOOLS.md](docs/TOOLS.md).
+Tier and category are the in-game switches; *Login* means the call fails at the title screen; *Approval* means the call waits for you in game
+while *Ask me before anything changes* is ticked; *Pre-game* means the standalone host serves it while the game is closed.
+Behaviour in game is unverified unless stated elsewhere.
 
 ### Tools
 
-| Tool | Tier | Category | Login | What it does |
-| --- | --- | --- | --- | --- |
-| `list_gearsets` | Read | actions | yes | Lists the character's saved gear sets. |
-| `list_macros` | Read | actions | yes | Lists the user's macros from the in-game User Macros window: set individual (this character) or shared (all characters on the account), 100 slots each. |
-| `clear_target` | Action | actions | yes | Clears the user's current target (like pressing Escape on a target). |
-| `equip_gearset` | Action | actions | yes | Equips one of the character's saved gear sets (which also changes class/job when the set belongs to another job), exactly like /gearset change. |
-| `set_focus_target` | Action | actions | yes | Sets the user's focus target (the secondary tracked target shown in the Focus Target bar), or clears it with clear=true. |
-| `set_target` | Action | actions | yes | Sets the user's current target, like clicking an object. |
-| `teleport` | Action | actions | yes | Starts the Teleport spell to one of the character's attuned aetherytes (or free-company/private estate and apartment entries), exactly like choosing it in the Teleport window. |
-| `get_ticket` | Read | approvals | no | Returns one of your approval tickets: state (pending, approved, executed, failed, denied, cancelled, expired), who decided, your resumeToken, and once it ran the tool result (result, same shape as a tools/call result)… |
-| `list_tickets` | Read | approvals | no | Lists your approval tickets, oldest first. state filters: open (pending or approved, the default), pending, final, all. |
-| `cancel_ticket` | Ui | approvals | no | Withdraws one of your pending tickets so the player is no longer asked about it. |
-| `request_action` | Ui | approvals | no | Files an Action- or Chat-tier tool call (e.g. teleport, execute_command, send_chat) as an approval ticket and returns immediately with its id and state pending; nothing runs until the player approves it in the XivMcp… |
-| `get_conditions` | Read | character | no | The game's condition flags (what state the client is in). |
-| `get_job_gauge` | Read | character | yes | The current job's gauge (the job-specific resource UI: e.g. PLD oath, WAR beast gauge, BLM astral fire/umbral ice and polyglot, SAM sen/kenki, VPR rattling coils/serpent offerings, PCT palette/canvas/motifs). |
-| `get_job_levels` | Read | character | yes | Every combat class/job, crafter and gatherer with the logged-in character's level and experience. |
-| `get_player` | Read | character | yes | Snapshot of the logged-in player character. |
-| `get_target` | Read | character | yes | What the player is targeting. |
-| `read_chat` | Read | chat | no | Returns chat lines the plugin has captured since it loaded (not older history), oldest first. |
-| `print_echo` | Ui | chat | yes | Prints a line into the user's OWN chat log only (tagged [MCP]); nobody else can see it and nothing is sent to the server. |
-| `execute_command` | Action | chat | yes | Runs one slash command as if the user typed it into the chat box, e.g. "/gearset change 3", "/hudlayout 2", "/xlplugins" or another installed plugin's command. |
-| `send_chat` | Chat | chat | yes | Sends one line of text that OTHER PLAYERS WILL SEE, on the chosen channel, exactly as if the user typed it into the chat box. |
-| `get_dalamud_info` | Read | dalamud | no | Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamu… |
-| `list_plugins` | Read | dalamud | no | Lists the Dalamud plugins installed in this game client. |
-| `get_duty_state` | Read | duty | yes | Instanced-content status. |
-| `get_action` | Read | gamedata | no | Details for one action id: name, tooltip description (plain text; dynamic values such as potency may appear as placeholders), icon, class/job and which classes/jobs can use it, level acquired, category (Spell, Weapons… |
-| `get_duty` | Read | gamedata | no | Details for one duty (ContentFinderCondition id): name, description, content type, required level and item level, level/item-level sync, party size and role composition (tanks/healers/dps per party, number of parties)… |
-| `get_item` | Read | gamedata | no | Full game-data record for one item id: name, description, icon, UI and market categories, item level, equip level and jobs, equip slots, rarity, stack size, flags (unique, untradable, marketable, HQ-able, collectable,… |
-| `get_quest` | Read | gamedata | no | Static details for one quest id: name, level, allowed classes/jobs, expansion, journal genre/category/section, place name, issuer NPC with zone and map X/Y coordinates (when the issuer has a placement in game data), p… |
-| `get_recipe` | Read | gamedata | no | Crafting recipe for an item (itemId) or a specific recipe (recipeId): craft type (Carpentry, Smithing, ... |
-| `get_sheet_row` | Read | gamedata | no | Reads one row of any game Excel sheet by sheet name and row id and returns it as JSON: numbers/bools as values, text as plain strings, RowRef links as {rowId, sheet, name} (name is the linked row's Name/Singular when… |
-| `list_sheets` | Read | gamedata | no | Lists game Excel sheets that have typed column definitions (Lumina.Excel.Sheets), optionally filtered by nameContains, with row count, whether rows have subrows, and column names with types (string, uint8..int64, floa… |
-| `search_actions` | Read | gamedata | no | Searches actions players can learn (weaponskills, spells, abilities, role actions, gathering abilities, PvP actions; from the Action sheet — crafting actions such as Basic Synthesis live in the CraftAction sheet, see… |
-| `search_duties` | Read | gamedata | no | Searches duties from the Duty Finder data (ContentFinderCondition: dungeons, guildhests, trials, raids, alliance raids, PvP, deep dungeons, variant/criterion, etc.) by name (ranked exact > prefix > word > substring; n… |
-| `search_items` | Read | gamedata | no | Searches every item in the game data (not the player's inventory; use find_owned_items for that) by name in the client language, ranked exact match > prefix > word prefix > substring > all words present; a numeric que… |
-| `search_quests` | Read | gamedata | no | Searches quests by name (ranked exact > prefix > word > substring; a numeric query matches the quest id). |
-| `search_recipes` | Read | gamedata | no | Searches crafting recipes by the crafted item's name (ranked exact > prefix > word > substring; numeric query matches the recipe id), optionally filtered by craftType (crafter name like "Weaving"/"Weaver", abbreviatio… |
-| `search_sheet` | Read | gamedata | no | Scans one column of any Excel sheet and returns matching rows as {rowId, subrowId, label, value}, where label is the row's Name/Singular when it has one. |
-| `find_owned_items` | Read | inventory | yes | Searches every loaded container (bags, equipped, armory, crystals, currency, key items, saddlebags if opened this session, and the currently/last opened retainer's inventory, equipment and market listings) for items b… |
-| `get_currencies` | Read | inventory | yes | The character's currency balances: gil; Grand Company seals for the current company with its cap; and a list of currencies with category (common: ventures, MGP; tomestone: every current tomestone with weeklyAcquired/w… |
-| `get_equipment` | Read | inventory | yes | The character's currently equipped gear: for each occupied slot (MainHand, OffHand, Head, Body, Hands, Legs, Feet, Ears, Neck, Wrists, RingRight, RingLeft, SoulCrystal) the item id, name, item level, equip level, HQ,… |
-| `get_inventory` | Read | inventory | yes | Lists items in the character's containers, slot by slot. containers selects groups: bags (4 main inventory pages), equipped, armory (armoury chest), crystals, currency, keyItems, saddlebag, premiumSaddlebag, retainer… |
-| `get_retainers` | Read | inventory | yes | The character's retainers in display order: id, name, whether the slot is available (subscription), class/job and level, gil held, number of items in its inventory and on the market board, market listing expiry, marke… |
-| `get_server_info` | Read | meta | no | Describes this XivMcp server: plugin version, endpoint, running state, connected clients, which permission tiers are currently allowed (read, ui, action, chat — and whether Action/Chat calls need in-game approval), ea… |
-| `list_status` | Read | meta | no | Returns every entry on the in-game agent board (newest update first) with agent, status, state (running\|done\|failed\|info), progress, detail, the MCP client that posted it and seconds since its last update (ageSeconds). |
-| `clear_status` | Ui | meta | no | Removes your entry (pass agent) or every entry (omit agent) from the in-game agent board. |
-| `post_status` | Ui | meta | no | Shows your progress inside the player's game: creates or replaces the board entry for `agent` (one entry per agent name, case-insensitive) in the XivMcp window and Umbra toolbar widget. |
-| `list_objectives` | Read | objectives | no | Every custom objective in insertion order with steps, location, conditions and live status: ready (in the zone, within the radius, inside the Eorzea time window and weather), summary (the line the player sees, e.g. "N… |
-| `clear_objectives` | Ui | objectives | no | Removes one objective (id), every completed one (completedOnly=true) or all of them (no arguments). |
-| `load_objective_pack` | Ui | objectives | no | Loads many objectives at once from a quest pack: pass the JSON text (json) or a file path on the player's machine (path; host paths such as /home/me/pack.json or ~/pack.json are mapped to Wine's Z: drive). |
-| `post_objective` | Ui | objectives | no | Creates or replaces (same id) a custom objective that the player sees in game like a tracked quest: title and current step under the Duty List, live 'ready now' / 'next window in N min' state, click to place the map f… |
-| `update_objective` | Ui | objectives | no | Reports progress on an objective posted with post_objective or loaded from a pack: advance=true marks the current step done (after the last step the objective completes), step=N makes step N (0-based) current with eve… |
-| `get_party` | Read | party | yes | The player's party. mode is solo \| party \| crossRealmParty \| alliance. members (the 8-slot party list; empty when solo) each have index, name, contentId (string), entityId, homeWorld, job {abbreviation, name, role}, l… |
-| `get_collection_progress` | Read | progress | yes | Unlock progress for one collection kind: mounts, minions, orchestrion (orchestrion rolls), emotes, fashionAccessories (also accepted as ornaments), triadCards (Triple Triad cards), bardings (chocobo barding), glasses… |
-| `get_quest_status` | Read | progress | yes | For each quest id (Quest sheet row id; short ids below 65536 are accepted): whether the character has completed it, whether it is currently accepted (in the journal) and its current sequence step, plus name and whethe… |
-| `get_addon_text` | Read | ui | yes | Reads every text string shown in one game UI window (addon), including text inside nested components such as lists, buttons and tabs, in reading order (top-to-bottom, left-to-right by screen position). |
-| `get_dialogue` | Read | ui | yes | Returns whatever conversation or prompt windows are currently visible, read-only: talk (NPC speaker + dialogue text of the current Talk box), subtitle (cutscene subtitle), selectString / selectIconString (the option l… |
-| `list_addons` | Read | ui | yes | Lists the game's loaded UI windows ("addons") with their internal names, which get_addon_text needs. |
-| `set_map_flag` | Ui | ui | yes | Places the user's map flag marker (the one shown on the map/minimap and inserted by <flag> in chat) and by default opens the map window on it. |
-| `show_notification` | Ui | ui | no | Shows a Dalamud overlay notification card (bottom-right corner, with title, text and a coloured icon for the type) visible only to the user; works on the title screen too. |
-| `show_toast` | Ui | ui | yes | Shows a short, transient on-screen message using the game's own toast styles, visible only to the user: normal (small banner near the top of the screen), quest (large centred quest-style text with a chime), error (red… |
-| `get_location` | Read | world | yes | Where the player is. |
-| `get_time` | Read | world | no | Current Eorzea time and the real-world reset schedule. |
-| `get_weather_forecast` | Read | world | no | Weather forecast for a zone computed with the game's own deterministic weather algorithm (weather changes every 8 Eorzea hours = 23m20s real time, at ET 00:00, 08:00 and 16:00). |
-| `list_aetherytes` | Read | world | yes | The player's teleport list (the in-game Teleport window): every attuned aetheryte plus housing destinations (own/FC house, shared estates, apartments). |
-| `list_fates` | Read | world | yes | FATEs currently known in the player's zone, nearest first. |
-| `list_nearby_objects` | Read | world | yes | Game objects loaded around the player (the client only knows objects within roughly 100 yalms, fewer in crowded areas), sorted nearest first; the local player is excluded. |
+| Tool | Tier | Category | Login | Approval | Pre-game | What it does |
+| --- | --- | --- | --- | --- | --- | --- |
+| `list_gearsets` | Read | actions | yes | — | — | Lists the character's saved gear sets. |
+| `list_macros` | Read | actions | yes | — | — | Lists the user's macros from the in-game User Macros window: set individual (this character) or shared (all characters on the account), 100 slots each. |
+| `clear_target` | Action | actions | yes | yes | — | Clears the user's current target (like pressing Escape on a target). |
+| `equip_gearset` | Action | actions | yes | yes | — | Equips one of the character's saved gear sets (which also changes class/job when the set belongs to another job), exactly like /gearset change. |
+| `set_focus_target` | Action | actions | yes | yes | — | Sets the user's focus target (the secondary tracked target shown in the Focus Target bar), or clears it with clear=true. |
+| `set_target` | Action | actions | yes | yes | — | Sets the user's current target, like clicking an object. |
+| `teleport` | Action | actions | yes | yes | — | Starts the Teleport spell to one of the character's attuned aetherytes (or free-company/private estate and apartment entries), exactly like choosing it in the Teleport window. |
+| `get_ticket` | Read | approvals | no | — | — | Returns one of your approval tickets: state (pending, approved, executed, failed, denied, cancelled, expired), who decided, your resumeToken, and once it ran the tool result (result, same shape as a tools/call result)… |
+| `list_tickets` | Read | approvals | no | — | — | Lists your approval tickets, oldest first. state filters: open (pending or approved, the default), pending, final, all. |
+| `cancel_ticket` | Ui | approvals | no | — | — | Withdraws one of your pending tickets so the player is no longer asked about it. |
+| `request_action` | Ui | approvals | no | — | — | Files an Action- or Chat-tier tool call (e.g. teleport, execute_command, send_chat) as an approval ticket and returns immediately with its id and state pending; nothing runs until the player approves it in the XivMcp… |
+| `desktop_query` | Read | bridges | no | — | — | Reads XivDesktop's view of the host desktop. method is status (bridge health), windows (open windows with id, title, app, workspace, focused), apps (launchable applications) or palette (ranked command-palette entries… |
+| `get_bridge_state` | Read | bridges | no | — | — | Reads one bridge's read-only IPC gates and returns each as {field, description, value, error}: for Penumbra the enabled state, mod list and collections; for Glamourer the saved design list; for Lifestream/AutoRetainer… |
+| `ghostty_query` | Read | bridges | yes | — | — | Reads GhosttyDalamud's state over IPC. method is one of: window.list (every terminal panel with id, title, app, size, state, kind, anchor, hidden, focused, plus the last request results), agent.status, agent.windows,… |
+| `list_bridges` | Read | bridges | no | — | — | Every other Dalamud plugin XivMcp can read through IPC, with installed, loaded, version, ipcAvailable, apiVersion and (when it cannot be used) unavailable explaining why — not installed, not loaded, or the plugin's IP… |
+| `desktop_command` | Action | bridges | no | yes | — | Acts on the host desktop through XivDesktop. method launch starts an application (argument: the app id or a search text); method window sends a window action (argument: JSON such as {"action":"focus","id":12} — action… |
+| `ghostty_command` | Action | bridges | yes | yes | — | Changes a GhosttyDalamud terminal panel. method is one of: window.open (params: run \| match \| wid, optional pin such as "here", "me 2 1.7", "target", "orbit 3.5", "hud X Y", "pet"), window.close {id}, window.focus {id… |
+| `get_attributes` | Read | character | yes | — | — | Every attribute the client tracks for the logged-in character, as {baseParamId, name, value} — including the crafter and gatherer stats an agent needs before planning a craft: craftsmanship, control, CP, gathering, pe… |
+| `get_conditions` | Read | character | no | — | — | The game's condition flags (what state the client is in). |
+| `get_job_gauge` | Read | character | yes | — | — | The current job's gauge (the job-specific resource UI: e.g. PLD oath, WAR beast gauge, BLM astral fire/umbral ice and polyglot, SAM sen/kenki, VPR rattling coils/serpent offerings, PCT palette/canvas/motifs). |
+| `get_job_levels` | Read | character | yes | — | — | Every combat class/job, crafter and gatherer with the logged-in character's level and experience. |
+| `get_player` | Read | character | yes | — | — | Snapshot of the logged-in player character. |
+| `get_target` | Read | character | yes | — | — | What the player is targeting. |
+| `read_chat` | Read | chat | no | — | — | Returns chat lines the plugin has captured since it loaded (not older history), oldest first. |
+| `print_echo` | Ui | chat | yes | — | — | Prints a line into the user's OWN chat log only (tagged [MCP]); nobody else can see it and nothing is sent to the server. |
+| `execute_command` | Action | chat | yes | yes | — | Runs one slash command as if the user typed it into the chat box, e.g. "/gearset change 3", "/hudlayout 2", "/xlplugins" or another installed plugin's command. |
+| `send_chat` | Chat | chat | yes | yes | — | Sends one line of text that OTHER PLAYERS WILL SEE, on the chosen channel, exactly as if the user typed it into the chat box. |
+| `get_dalamud_info` | Read | dalamud | no | — | — | Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamu… |
+| `list_plugins` | Read | dalamud | no | — | — | Lists the Dalamud plugins installed in this game client. |
+| `get_duty_state` | Read | duty | yes | — | — | Instanced-content status. |
+| `get_roulette_status` | Read | duty | yes | — | — | Which Duty Finder roulettes have already given their daily completion bonus this reset. |
+| `get_events` | Read | events | no | — | — | Polls the plugin's bounded stream of game events and returns them oldest first. |
+| `list_event_kinds` | Read | events | no | — | — | The event kinds currently in the buffer with how many of each, plus the current cursor and the buffer size. |
+| `compare_items` | Read | gamedata | no | — | yes | Compares 2-6 pieces of equipment from game data side by side: per item the itemLevel, equipLevel, category, jobs, materiaSlots, canBeHq, weapon damage / defence and every substat (critical hit, determination, direct h… |
+| `get_action` | Read | gamedata | no | — | yes | Details for one action id: name, tooltip description (plain text; dynamic values such as potency may appear as placeholders), icon, class/job and which classes/jobs can use it, level acquired, category (Spell, Weapons… |
+| `get_duty` | Read | gamedata | no | — | yes | Details for one duty (ContentFinderCondition id): name, description, content type, required level and item level, level/item-level sync, party size and role composition (tanks/healers/dps per party, number of parties)… |
+| `get_gathering_info` | Read | gamedata | no | — | yes | Where a gatherable item is found and, for timed nodes, when. |
+| `get_item` | Read | gamedata | no | — | yes | Full game-data record for one item id: name, description, icon, UI and market categories, item level, equip level and jobs, equip slots, rarity, stack size, flags (unique, untradable, marketable, HQ-able, collectable,… |
+| `get_quest` | Read | gamedata | no | — | yes | Static details for one quest id: name, level, allowed classes/jobs, expansion, journal genre/category/section, place name, issuer NPC with zone and map X/Y coordinates (when the issuer has a placement in game data), p… |
+| `get_recipe` | Read | gamedata | no | — | yes | Crafting recipe for an item (itemId) or a specific recipe (recipeId): craft type (Carpentry, Smithing, ... |
+| `get_sheet_row` | Read | gamedata | no | — | yes | Reads one row of any game Excel sheet by sheet name and row id and returns it as JSON: numbers/bools as values, text as plain strings, RowRef links as {rowId, sheet, name} (name is the linked row's Name/Singular when… |
+| `list_sheets` | Read | gamedata | no | — | yes | Lists game Excel sheets that have typed column definitions (Lumina.Excel.Sheets), optionally filtered by nameContains, with row count, whether rows have subrows, and column names with types (string, uint8..int64, floa… |
+| `search_actions` | Read | gamedata | no | — | yes | Searches actions players can learn (weaponskills, spells, abilities, role actions, gathering abilities, PvP actions; from the Action sheet — crafting actions such as Basic Synthesis live in the CraftAction sheet, see… |
+| `search_duties` | Read | gamedata | no | — | yes | Searches duties from the Duty Finder data (ContentFinderCondition: dungeons, guildhests, trials, raids, alliance raids, PvP, deep dungeons, variant/criterion, etc.) by name (ranked exact > prefix > word > substring; n… |
+| `search_items` | Read | gamedata | no | — | yes | Searches every item in the game data (not the player's inventory; use find_owned_items for that) by name in the client language, ranked exact match > prefix > word prefix > substring > all words present; a numeric que… |
+| `search_quests` | Read | gamedata | no | — | yes | Searches quests by name (ranked exact > prefix > word > substring; a numeric query matches the quest id). |
+| `search_recipes` | Read | gamedata | no | — | yes | Searches crafting recipes by the crafted item's name (ranked exact > prefix > word > substring; numeric query matches the recipe id), optionally filtered by craftType (crafter name like "Weaving"/"Weaver", abbreviatio… |
+| `search_sheet` | Read | gamedata | no | — | yes | Scans one column of any Excel sheet and returns matching rows as {rowId, subrowId, label, value}, where label is the row's Name/Singular when it has one. |
+| `find_owned_items` | Read | inventory | yes | — | — | Searches every loaded container (bags, equipped, armory, crystals, currency, key items, saddlebags if opened this session, and the currently/last opened retainer's inventory, equipment and market listings) for items b… |
+| `get_currencies` | Read | inventory | yes | — | — | The character's currency balances: gil; Grand Company seals for the current company with its cap; and a list of currencies with category (common: ventures, MGP; tomestone: every current tomestone with weeklyAcquired/w… |
+| `get_equipment` | Read | inventory | yes | — | — | The character's currently equipped gear: for each occupied slot (MainHand, OffHand, Head, Body, Hands, Legs, Feet, Ears, Neck, Wrists, RingRight, RingLeft, SoulCrystal) the item id, name, item level, equip level, HQ,… |
+| `get_glamour_plates` | Read | inventory | yes | — | — | The character's glamour plates (the Glamour Dresser plate slots) with, per plate, plateNumber, empty, filledSlots and the occupied slots as {slot, itemId, name, hq, dye1, dye2}. |
+| `get_inventory` | Read | inventory | yes | — | — | Lists items in the character's containers, slot by slot. containers selects groups: bags (4 main inventory pages), equipped, armory (armoury chest), crystals, currency, keyItems, saddlebag, premiumSaddlebag, retainer… |
+| `get_retainers` | Read | inventory | yes | — | — | The character's retainers in display order: id, name, whether the slot is available (subscription), class/job and level, gil held, number of items in its inventory and on the market board, market listing expiry, marke… |
+| `get_market_prices` | Read | market | no | — | — | Current market-board listings and recent sales for up to 20 items, from the public Universalis crowd-sourced database (universalis.app) over the host's internet connection — NOT from the player's own market board wind… |
+| `list_worlds` | Read | market | no | — | — | Every public world in the game with its data centre and region, from game data (no network call). |
+| `get_latest_screenshot` | Read | media | no | — | — | Returns the newest screenshot the player has already saved (the files the game writes when they press the screenshot key), as a PNG/JPEG image plus fileName, directory, modifiedUtc and fileBytes. |
+| `take_screenshot` | Ui | media | no | — | — | Captures what is on the player's screen right now and returns it as a PNG image the model can look at, plus a text summary. |
+| `get_server_info` | Read | meta | no | — | yes | Describes this XivMcp server: plugin version, endpoint, running state, connected clients, which permission tiers are currently allowed (read, ui, action, chat — and whether state-changing calls need in-game approval:… |
+| `list_status` | Read | meta | no | — | — | Returns every entry on the in-game agent board (newest update first) with agent, status, state (running\|done\|failed\|info), progress, detail, the MCP client that posted it and seconds since its last update (ageSeconds). |
+| `clear_status` | Ui | meta | no | — | — | Removes your entry (pass agent) or every entry (omit agent) from the in-game agent board. |
+| `post_status` | Ui | meta | no | — | — | Shows your progress inside the player's game: creates or replaces the board entry for `agent` (one entry per agent name, case-insensitive) in the XivMcp window and Umbra toolbar widget. |
+| `list_objectives` | Read | objectives | no | — | — | Every custom objective in insertion order with steps, location, conditions and live status: ready (in the zone, within the radius, inside the Eorzea time window and weather), summary (the line the player sees, e.g. "N… |
+| `clear_objectives` | Ui | objectives | no | — | — | Removes one objective (id), every completed one (completedOnly=true) or all of them (no arguments). |
+| `load_objective_pack` | Ui | objectives | no | — | — | Loads many objectives at once from a quest pack: pass the JSON text (json) or a file path on the player's machine (path; host paths such as /home/me/pack.json or ~/pack.json are mapped to Wine's Z: drive). |
+| `post_objective` | Ui | objectives | no | — | — | Creates or replaces (same id) a custom objective that the player sees in game like a tracked quest: title and current step under the Duty List, live 'ready now' / 'next window in N min' state, click to place the map f… |
+| `update_objective` | Ui | objectives | no | — | — | Reports progress on an objective posted with post_objective or loaded from a pack: advance=true marks the current step done (after the last step the objective completes), step=N makes step N (0-based) current with eve… |
+| `get_party` | Read | party | yes | — | — | The player's party. mode is solo \| party \| crossRealmParty \| alliance. members (the 8-slot party list; empty when solo) each have index, name, contentId (string), entityId, homeWorld, job {abbreviation, name, role}, l… |
+| `get_achievements` | Read | progress | yes | — | — | The character's achievement progress: totalInGame, completed, pointsEarned and pointsAvailable, then a filtered, paged list of {id, name, description, category, points, completed}. |
+| `get_collection_progress` | Read | progress | yes | — | — | Unlock progress for one collection kind: mounts, minions, orchestrion (orchestrion rolls), emotes, fashionAccessories (also accepted as ornaments), triadCards (Triple Triad cards), bardings (chocobo barding), glasses… |
+| `get_quest_status` | Read | progress | yes | — | — | For each quest id (Quest sheet row id; short ids below 65536 are accepted): whether the character has completed it, whether it is currently accepted (in the journal) and its current sequence step, plus name and whethe… |
+| `get_addon_text` | Read | ui | yes | — | — | Reads every text string shown in one game UI window (addon), including text inside nested components such as lists, buttons and tabs, in reading order (top-to-bottom, left-to-right by screen position). |
+| `get_dialogue` | Read | ui | yes | — | — | Returns whatever conversation or prompt windows are currently visible, read-only: talk (NPC speaker + dialogue text of the current Talk box), subtitle (cutscene subtitle), selectString / selectIconString (the option l… |
+| `list_addons` | Read | ui | yes | — | — | Lists the game's loaded UI windows ("addons") with their internal names, which get_addon_text needs. |
+| `set_map_flag` | Ui | ui | yes | yes | — | Places the user's map flag marker (the one shown on the map/minimap and inserted by <flag> in chat) and by default opens the map window on it. |
+| `show_notification` | Ui | ui | no | — | — | Shows a Dalamud overlay notification card (bottom-right corner, with title, text and a coloured icon for the type) visible only to the user; works on the title screen too. |
+| `show_toast` | Ui | ui | yes | — | — | Shows a short, transient on-screen message using the game's own toast styles, visible only to the user: normal (small banner near the top of the screen), quest (large centred quest-style text with a chime), error (red… |
+| `convert_coordinates` | Read | world | no | — | — | Converts between the map coordinates the game displays (the x/y in quest guides, hunt trains and <flag> links, roughly 1-42) and the world position other tools report (worldX / worldZ). |
+| `find_nearest_aetheryte` | Read | world | no | — | — | Aetherytes in a zone, nearest first, to a point given as map coordinates (x/y) or world coordinates (worldX/worldZ); with no point and a logged-in character it uses the player's position. |
+| `get_housing_info` | Read | world | yes | — | — | Where the player is in the housing system: inHousingArea, territoryId/zone, ward (1-based), plot (1-based, null in an apartment or subdivision entrance), division (1 = main area, 2 = subdivision), room (apartment/FC r… |
+| `get_location` | Read | world | yes | — | — | Where the player is. |
+| `get_time` | Read | world | no | — | yes | Current Eorzea time and the real-world reset schedule. |
+| `get_weather_forecast` | Read | world | no | — | yes | Weather forecast for a zone computed with the game's own deterministic weather algorithm (weather changes every 8 Eorzea hours = 23m20s real time, at ET 00:00, 08:00 and 16:00). |
+| `list_aetherytes` | Read | world | yes | — | — | The player's teleport list (the in-game Teleport window): every attuned aetheryte plus housing destinations (own/FC house, shared estates, apartments). |
+| `list_fates` | Read | world | yes | — | — | FATEs currently known in the player's zone, nearest first. |
+| `list_nearby_objects` | Read | world | yes | — | — | Game objects loaded around the player (the client only knows objects within roughly 100 yalms, fewer in crowded areas), sorted nearest first; the local player is excluded. |
 
 ### Resources
 
@@ -380,6 +409,8 @@ Resources and templates follow the Read tier and their category.
 | `ffxiv://player` | character | yes | Same JSON as the get_player tool: the logged-in character's identity, job, level, HP/MP, position, statuses. |
 | `ffxiv://target` | character | yes | Same JSON as get_target (target, target of target, soft, focus, mouseover). |
 | `ffxiv://chat/recent` | chat | no | The newest 100 captured chat lines (oldest first) in the same shape as read_chat, excluding private tells and battle-log lines. |
+| `ffxiv://events` | events | no | The newest buffered game events (same shape as get_events with no cursor). |
+| `ffxiv://events/{kind}` | events | no | The newest buffered events of one kind (zone, duty, combat, condition, party, inventory, level, job, session). |
 | `ffxiv://item/{itemId}` | gamedata | no | Game-data record for an item id (same content as the get_item tool). |
 | `ffxiv://sheet/{sheet}/{rowId}` | gamedata | no | One Excel sheet row as JSON (same content as get_sheet_row with default options). |
 | `ffxiv://inventory` | inventory | yes | Main inventory bags (4 pages) with per-container usage; updated notifications are sent when the inventory changes. |
