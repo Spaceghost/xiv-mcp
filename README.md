@@ -394,6 +394,36 @@ source tree. Writing a provider: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
 Host tests prove only what they run; nothing in them loads the plugin in FINAL FANTASY XIV.
 
+### Changelog
+
+`changelog.json` at the top of the repository is the changelog, and the only place entries are
+written. Both places a user reads it come from that one file: the plugin embeds it
+(`XivMcp.Core.Changelog`) and shows it in the **What's new** tab, and
+[CHANGELOG.md](CHANGELOG.md) is rendered from it.
+
+```sh
+tools/changelog.py           # rewrite CHANGELOG.md from changelog.json
+tools/changelog.py --check   # fails, with a diff, when they drift
+```
+
+The convention, and it is not optional: **every change a user can see adds or edits its entry in
+`changelog.json` in the same commit as the change**, and regenerates `CHANGELOG.md`. Never edit
+`CHANGELOG.md` by hand. `tests/XivMcp.Core.Tests` runs the check (it shells out to
+`tools/changelog.py`, so there is only one renderer), which means `dotnet test` and any CI that runs
+the tests catch drift.
+
+A status word means exactly the same thing here as in Ghostty for FFXIV's changelog, and nothing
+more:
+
+| Status | Shown | Means |
+| --- | --- | --- |
+| `next` | SOON | still being built, on a branch; not merged. |
+| `beta` | BETA | merged, but **not yet verified in game**. |
+| `new` / `fix` | NEW / FIX | in a numbered release: seen working in game. |
+
+An entry keeps its `beta` until the thing it describes has been observed working in the game. Say
+what is unverified in the entry itself rather than writing around it.
+
 ## Troubleshooting
 
 - **"Could not start on http://127.0.0.1:41800/mcp: ... address already in use"** — another process

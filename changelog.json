@@ -1,0 +1,50 @@
+{
+  "_comment": "The changelog. tools/changelog.py renders CHANGELOG.md from this file, and the plugin shows the same entries in game in the What's new tab (the file is embedded in XivMcp.Core). Every user-visible change edits this file in the same commit. Statuses: new/fix (in a release, seen working in game), beta (merged, not yet verified in game), next (still being built, not merged).",
+  "project": "XivMcp",
+  "intro": "Every change to XivMcp a user can see, newest first.\n\nXivMcp has not had a release, and the plugin has not yet been observed running in the game: nothing below about in-game behaviour has been seen working. Treat it as the design, not as a result — the README says the same thing.",
+  "releases": [
+    {
+      "version": "next",
+      "title": "In the workshop",
+      "blurb": "BETA is merged but has not been seen working in game. SOON is still being built on its own branch and is not merged yet.",
+      "items": [
+        {
+          "status": "beta",
+          "text": "The Status tab's facts no longer print one character per line, and the Claude Code snippet shows the token placeholder as <token> instead of an escaped string."
+        },
+        {
+          "status": "beta",
+          "text": "Settings leads with what you actually change — the server switch and port, the four permission tiers and in-game confirmation — and folds categories and advanced options away. Turning the server on or off takes effect at once; a port or host change restarts the listener cleanly. An unreadable settings file is kept aside and your token and readable values recovered rather than lost."
+        },
+        {
+          "status": "beta",
+          "text": "Tools that act in the world or speak in chat ask you in game first: an Allow/Deny window, with resources and completions held to the Read tier."
+        },
+        {
+          "status": "beta",
+          "text": "XivMcp itself: a Model Context Protocol server inside the game that your own MCP client (Claude Code and others) connects to on loopback with a bearer token, with tools, resources and prompts for character, items and the game's UI, and an optional Umbra toolbar widget showing the server and the agent board."
+        },
+        {
+          "status": "next",
+          "text": "Ask a local model without leaving the game: a Local model block in Settings with Detect (it probes the common local servers) and Test (it lists the model and times a one-line completion), and a switch that lets other plugins — Almanac, Ghostty — connect themselves and be handed their own token. XivMcp does not run the model, and the API key is never handed to another plugin."
+        },
+        {
+          "status": "next",
+          "text": "Approvals you can take your time over: an Action or Chat call you are not ready for waits as a ticket you approve or deny later, in bulk if you like, from an Approvals tab with a pending badge. Nothing ever times out into an approval. \"Allow everything from this client\" grants a client a few minutes at a time (Chat only if you tick it), with a banner counting it down and a Revoke button."
+        },
+        {
+          "status": "next",
+          "text": "Clients can be given their own bearer token, so a client cannot claim to be someone else, and an owner rule can pre-approve exactly one tool with an exact argument prefix for one named client. Only the token's hash is stored, arguments are never logged, and revocation takes effect on the next request."
+        },
+        {
+          "status": "next",
+          "text": "Custom objectives: post your own goals with conditions the game understands — an Eorzea time window, a zone's weather, a place and a radius — and XivMcp tracks them, places the map flag, shows the game's quest toast when one starts or completes, and lists them under the Duty List in the game's own font. It only reads the addon; nothing is injected into it. /xivmcp quests works from chat, and objective packs can be loaded from a file."
+        },
+        {
+          "status": "next",
+          "text": "Plugin icon and banner art, listed in the manifest."
+        }
+      ]
+    }
+  ]
+}

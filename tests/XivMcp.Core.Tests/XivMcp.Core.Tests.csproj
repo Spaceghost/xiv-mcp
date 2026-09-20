@@ -18,4 +18,9 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- ChangelogTests checks CHANGELOG.md against changelog.json in the checkout, which the
+         artifacts path (Directory.Build.props) is outside of. -->
+    <AssemblyMetadata Include="RepositoryRoot" Value="$(MSBuildThisFileDirectory)../.." />
+  </ItemGroup>
 </Project>
