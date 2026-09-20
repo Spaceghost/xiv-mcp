@@ -81,4 +81,21 @@ public static class IpcJson
             updatedAt = p.UpdatedAt,
         }),
         Json);
+
+    /// <summary>GetLocalModel. The API key is reported only as <c>hasApiKey</c>.</summary>
+    public static string LocalModel(string? endpoint, string? model, string? apiKey)
+    {
+        var e = string.IsNullOrWhiteSpace(endpoint) ? null : endpoint.Trim();
+        var m = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
+        return JsonSerializer.Serialize(
+            new { configured = e != null && m != null, endpoint = e, model = m, hasApiKey = !string.IsNullOrWhiteSpace(apiKey) },
+            Json);
+    }
+
+    /// <summary>ConnectClient success: the MCP endpoint and the new per-client token.</summary>
+    public static string Connect(string endpoint, string token, string clientName) =>
+        JsonSerializer.Serialize(new { endpoint, token, clientName }, Json);
+
+    /// <summary>ConnectClient failure.</summary>
+    public static string Error(string error) => JsonSerializer.Serialize(new { error }, Json);
 }

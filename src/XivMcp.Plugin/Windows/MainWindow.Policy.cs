@@ -37,7 +37,7 @@ public sealed partial class MainWindow
         {
             ImGui.TextUnformatted($"  {entry.Name}");
             ImGui.SameLine();
-            ImGui.TextDisabled($"created {entry.CreatedAt.LocalDateTime:yyyy-MM-dd HH:mm}");
+            ImGui.TextDisabled($"created {entry.CreatedAt.LocalDateTime:yyyy-MM-dd HH:mm}{(entry.CreatedVia == ClientConnector.CreatedViaIpc ? " via IPC" : "")}");
             ImGui.SameLine();
             if (ImGui.SmallButton($"Revoke##token-{entry.Name}") && config.RevokeClientToken(entry.Name))
             {

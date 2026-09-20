@@ -58,6 +58,8 @@ public sealed partial class MainWindow
         ImGui.Spacing();
         DrawPolicySettings();
         ImGui.Spacing();
+        DrawLocalModelSettings();
+        ImGui.Spacing();
         DrawAdvancedSettings();
     }
 

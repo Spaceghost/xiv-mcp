@@ -14,6 +14,9 @@ public sealed class ClientTokenEntry
     public string TokenSha256 { get; set; } = "";
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>How the token was issued: null for the Settings tab, <see cref="ClientConnector.CreatedViaIpc"/> for XivMcp.ConnectClient.</summary>
+    public string? CreatedVia { get; set; }
 }
 
 /// <summary>
