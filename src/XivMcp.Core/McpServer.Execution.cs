@@ -53,7 +53,7 @@ public sealed partial class McpServer
         JsonObject result;
         if (!_registry.Snapshot.ToolsByName.TryGetValue(toolName, out var tool))
         {
-            result = ToolError(scope, UnknownToolMessage(toolName));
+            result = ToolError(scope, UnknownToolMessage(toolName), McpErrorCodes.UnknownTool);
         }
         else
         {
@@ -68,7 +68,7 @@ public sealed partial class McpServer
             catch (Exception ex)
             {
                 LogSink($"approved execution of '{toolName}' failed", ex);
-                result = ToolError(scope, $"Tool '{toolName}' failed with an internal error ({ex.GetType().Name}: {ex.Message}).");
+                result = ToolError(scope, $"Tool '{toolName}' failed with an internal error ({ex.GetType().Name}: {ex.Message}).", McpErrorCodes.InternalError);
             }
         }
 

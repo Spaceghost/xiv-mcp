@@ -109,6 +109,18 @@ internal sealed class ToolDescriptor : MemberDescriptor
     public bool ReturnsToolResult { get; init; }
 
     public required string Signature { get; init; }
+
+    public string[] Sources { get; init; } = [];
+
+    public ToolAvailability Availability { get; init; }
+
+    public string? ApprovalSummary { get; init; }
+
+    /// <summary>The call is put to the approver before it runs (Action, Chat, or a Ui tool that asked for it).</summary>
+    public bool NeedsApproval { get; init; }
+
+    /// <summary>Set for <see cref="ExternalTool"/>s: called instead of <see cref="MemberDescriptor.Method"/>, with the raw arguments.</summary>
+    public Func<JsonObject?, ToolContext, Task<ToolResult>>? ExternalHandler { get; init; }
 }
 
 internal sealed class ResourceDescriptor : MemberDescriptor
@@ -293,6 +305,72 @@ internal sealed class ProviderRegistry
         return change;
     }
 
+    private static readonly MethodInfo ExternalPlaceholder = typeof(ProviderRegistry).GetMethod(nameof(ExternalPlaceholderBody), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    private static void ExternalPlaceholderBody()
+    {
+    }
+
+    /// <summary>Adds tools described by data instead of by an attributed method. Duplicate names throw.</summary>
+    public RegistryChange RegisterExternal(IReadOnlyList<ExternalTool> externals)
+    {
+        var tools = new List<ToolDescriptor>(externals.Count);
+        foreach (var e in externals)
+        {
+            if (string.IsNullOrWhiteSpace(e.Name) || !ToolNamePattern.IsMatch(e.Name))
+                throw new ArgumentException($"external tool name '{e.Name}' must match ^[A-Za-z0-9_.-]{{1,128}}$.");
+            ArgumentNullException.ThrowIfNull(e.Handler);
+            var needsApproval = e.Permission >= ToolPermission.Action || e.RequiresApproval;
+            tools.Add(new ToolDescriptor
+            {
+                Name = e.Name,
+                Title = e.Title,
+                Description = e.Description,
+                Permission = e.Permission,
+                GameThread = false,
+                RequiresLogin = false,
+                Destructive = e.Destructive,
+                Idempotent = e.Idempotent,
+                OpenWorld = e.OpenWorld,
+                Sources = [.. e.Sources],
+                Availability = e.Availability,
+                ApprovalSummary = e.ApprovalSummary,
+                NeedsApproval = needsApproval,
+                ExternalHandler = e.Handler,
+                Target = null,
+                Method = ExternalPlaceholder,
+                Invoker = MethodInvoker.Create(ExternalPlaceholder),
+                Parameters = [],
+                Category = string.IsNullOrWhiteSpace(e.Category) ? "general" : e.Category,
+                AsyncShape = AsyncShape.None,
+                ValueType = typeof(ToolResult),
+                InputSchema = (JsonObject)e.InputSchema.DeepClone(),
+                OutputSchema = e.OutputSchema?.DeepClone() as JsonObject,
+                ReturnsToolResult = true,
+                Signature = "(see inputSchema)",
+            });
+        }
+
+        lock (_lock)
+        {
+            var current = _snapshot;
+            var names = new HashSet<string>(current.Tools.Select(t => t.Name), StringComparer.Ordinal);
+            foreach (var t in tools)
+            {
+                if (!names.Add(t.Name))
+                    throw new ArgumentException($"Duplicate tool name '{t.Name}' (external tool).");
+            }
+
+            _snapshot = new RegistrySnapshot(
+                current.Tools.Concat(tools).OrderBy(t => t.Name, StringComparer.Ordinal).ToArray(),
+                current.Resources,
+                current.Templates,
+                current.Prompts);
+        }
+
+        return tools.Count > 0 ? RegistryChange.Tools : RegistryChange.None;
+    }
+
     private static string Where(MethodInfo m) => $"{m.DeclaringType?.FullName}.{m.Name}";
 
     private static (AsyncShape Shape, Type ValueType) AnalyzeReturn(MethodInfo method)
@@ -354,6 +432,10 @@ internal sealed class ProviderRegistry
             Destructive = attr.Destructive,
             Idempotent = attr.Idempotent,
             OpenWorld = attr.OpenWorld,
+            Sources = attr.Sources ?? [],
+            Availability = attr.Availability,
+            ApprovalSummary = attr.ApprovalSummary,
+            NeedsApproval = attr.NeedsApproval,
             Target = target,
             Method = method,
             Invoker = MethodInvoker.Create(method),

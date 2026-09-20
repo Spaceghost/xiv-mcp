@@ -31,7 +31,10 @@ public sealed partial class McpServer
     {
         var started = Stopwatch.GetTimestamp();
         var path = request.Path.Length > 1 ? request.Path.TrimEnd('/') : request.Path;
-        if (!string.Equals(path, _path, StringComparison.Ordinal))
+        string? controlPath = null;
+        if (ControlHandler is not null && path.Length > _path.Length + 1 && path.StartsWith(_path, StringComparison.Ordinal) && path[_path.Length] == '/')
+            controlPath = path[(_path.Length + 1)..];
+        if (controlPath is null && !string.Equals(path, _path, StringComparison.Ordinal))
         {
             await connection.SendErrorAsync(request, 404, $"Not found. The MCP endpoint is {_path}", close: false).ConfigureAwait(false);
             return true;
@@ -87,6 +90,9 @@ public sealed partial class McpServer
         }
 
         request.AuthenticatedClient = tokenClient;
+        if (controlPath is not null)
+            return await HandleControlAsync(connection, request, controlPath, headers).ConfigureAwait(false);
+
         switch (request.Method)
         {
             case "POST":
@@ -100,6 +106,45 @@ public sealed partial class McpServer
                 await connection.SendErrorAsync(request, 405, "Method not allowed", close: false, headers).ConfigureAwait(false);
                 return true;
         }
+    }
+
+    /// <summary>Routes below the endpoint path (<see cref="ControlHandler"/>), reached only after the Host, Origin and bearer checks.</summary>
+    private async Task<bool> HandleControlAsync(HttpConnection connection, HttpRequest request, string subPath, List<KeyValuePair<string, string>> headers)
+    {
+        ControlResponse? response = null;
+        try
+        {
+            JsonNode? body = null;
+            if (request.Body.Length > 0)
+            {
+                try
+                {
+                    body = JsonNode.Parse(request.Body, null, DocumentOptions);
+                }
+                catch (JsonException)
+                {
+                    body = null;
+                }
+            }
+
+            if (ControlHandler is { } handler)
+                response = await handler(new ControlRequest(request.Method, subPath, request.AuthenticatedClient, connection.RemoteEndPoint is System.Net.IPEndPoint { Address: var peer } && System.Net.IPAddress.IsLoopback(peer), body)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            LogSink($"control route '{subPath}' failed", ex);
+            await SendJsonAsync(connection, request, 500, new JsonObject { ["error"] = "internal_error" }, headers).ConfigureAwait(false);
+            return true;
+        }
+
+        if (response is null)
+        {
+            await connection.SendErrorAsync(request, 404, $"Not found. The MCP endpoint is {_path}", close: false).ConfigureAwait(false);
+            return true;
+        }
+
+        await SendJsonAsync(connection, request, response.Status, response.Body, headers).ConfigureAwait(false);
+        return true;
     }
 
     private void RecordRejection(HttpRequest request, long started, string status, string reason) =>

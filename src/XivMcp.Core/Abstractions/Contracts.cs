@@ -72,7 +72,27 @@ public interface IToolCallApprover
 /// <param name="SessionId">MCP session id (Mcp-Session-Id) of the calling session; null for stateless (2026-07-28) requests.</param>
 /// <param name="ArgumentsJson">The call's arguments object as compact JSON, or null when none were sent.</param>
 /// <param name="AuthenticatedClient">Per-client token name the request authenticated with; null for the main token.</param>
-public sealed record ToolCallApprovalRequest(string ToolName, ToolPermission Permission, string? ClientName, string? SessionId, string? ArgumentsJson, string? AuthenticatedClient = null);
+public sealed record ToolCallApprovalRequest(string ToolName, ToolPermission Permission, string? ClientName, string? SessionId, string? ArgumentsJson, string? AuthenticatedClient = null)
+{
+    /// <summary>The tool's <see cref="McpToolAttribute.ApprovalSummary"/> with this call's arguments filled in: what will happen, for the player.</summary>
+    public string? Summary { get; init; }
+}
+
+/// <summary>
+/// One call of a tool that goes through the approval gate, after it ran (or failed). Raised whether the player was
+/// asked, a grant/session/rule covered it, or asking is switched off, so the host can keep a record of every action.
+/// </summary>
+/// <param name="ToolName">Registered tool name.</param>
+/// <param name="Permission">The tool's declared tier.</param>
+/// <param name="ClientName">Client-reported name and version, if any (not authenticated).</param>
+/// <param name="AuthenticatedClient">Per-client token name the request authenticated with; null for the main token.</param>
+/// <param name="SessionId">MCP session id, when there is one.</param>
+/// <param name="Summary">What the call did, for a human (<see cref="McpToolAttribute.ApprovalSummary"/> filled in).</param>
+/// <param name="ArgumentsJson">The call's arguments as compact JSON, or null.</param>
+/// <param name="Success">False when the tool reported an error.</param>
+/// <param name="Error">The error text when it failed.</param>
+/// <param name="PreApproved">True for a call the host ran through <see cref="McpServer.ExecuteApprovedToolAsync"/> (an approved ticket).</param>
+public sealed record GatedToolExecution(string ToolName, ToolPermission Permission, string? ClientName, string? AuthenticatedClient, string? SessionId, string Summary, string? ArgumentsJson, bool Success, string? Error, bool PreApproved);
 
 /// <summary>A per-client bearer token: the client's name and the SHA-256 (hex) of the token.</summary>
 public sealed record ClientToken(string Name, string Sha256Hex);
@@ -131,6 +151,67 @@ public class McpToolException : Exception
     public McpToolException(string message) : base(message) { }
 
     public McpToolException(string message, Exception inner) : base(message, inner) { }
+
+    /// <summary>
+    /// Stable machine-readable code from <see cref="McpErrorCodes"/>, published as <c>_meta["dev.xivmcp/error"].code</c> on the
+    /// isError result. Defaults to <see cref="McpErrorCodes.ToolError"/>.
+    /// </summary>
+    public string Code { get; init; } = McpErrorCodes.ToolError;
+
+    /// <summary>Whether the same call may succeed later without the caller changing anything.</summary>
+    public bool Retryable { get; init; }
+
+    /// <summary>Shorthand for a failure with a code.</summary>
+    public static McpToolException WithCode(string code, string message, bool retryable = false) =>
+        new(message) { Code = code, Retryable = retryable };
+}
+
+/// <summary>
+/// The error model: every isError tool result carries <c>_meta["dev.xivmcp/error"] = {code, message, retryable}</c>
+/// next to its text. Codes are stable; messages are for people and models and may be reworded.
+/// </summary>
+public static class McpErrorCodes
+{
+    /// <summary>A provider reported a failure without a more specific code.</summary>
+    public const string ToolError = "tool_error";
+
+    /// <summary>The thing asked for (item, quest, plugin, window) does not exist.</summary>
+    public const string NotFound = "not_found";
+
+    public const string InvalidArguments = "invalid_arguments";
+
+    public const string UnknownTool = "unknown_tool";
+
+    /// <summary>The tool's category is switched off in the settings.</summary>
+    public const string CategoryDisabled = "category_disabled";
+
+    /// <summary>The tool's permission tier is switched off in the settings.</summary>
+    public const string TierDisabled = "tier_disabled";
+
+    /// <summary>No character is logged in.</summary>
+    public const string LoginRequired = "login_required";
+
+    /// <summary>Served by the standalone host: the tool needs the running game. Retry once the game is up.</summary>
+    public const string GameNotRunning = "game_not_running";
+
+    /// <summary>The player clicked Deny.</summary>
+    public const string Denied = "denied";
+
+    /// <summary>Nobody answered the approval prompt in time.</summary>
+    public const string NotConfirmed = "not_confirmed";
+
+    public const string Timeout = "timeout";
+
+    /// <summary>Too many calls; <c>retryAfterSeconds</c> says when to come back.</summary>
+    public const string RateLimited = "rate_limited";
+
+    /// <summary>Something the tool depends on is missing or not loaded (another plugin, an unopened window, a file).</summary>
+    public const string Unavailable = "unavailable";
+
+    /// <summary>Refused on purpose: the request is outside what this server does (see docs/HARD-LINES.md).</summary>
+    public const string Refused = "refused";
+
+    public const string InternalError = "internal_error";
 }
 
 /// <summary>Explicit tool result when the default JSON serialization is not wanted.</summary>
