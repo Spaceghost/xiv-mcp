@@ -107,6 +107,12 @@ public interface ISessionAwareToolCallApprover : IToolCallApprover
     Task<bool> ApproveToolCallAsync(ToolCallApprovalRequest call, CancellationToken cancellationToken);
 }
 
+/// <summary>What <see cref="McpServer.DescribeApproval"/> says about one call.</summary>
+/// <param name="NeedsApproval">The call is put to the approver before it runs.</param>
+/// <param name="Permission">The tool's declared tier.</param>
+/// <param name="Summary">What the call will do, for the player.</param>
+public sealed record ToolApprovalInfo(bool NeedsApproval, ToolPermission Permission, string Summary);
+
 /// <summary>Outcome of <see cref="McpServer.ExecuteApprovedToolAsync"/>.</summary>
 /// <param name="Result">A tools/call result object (content, structuredContent, isError) as a 2026-07-28 client would get it.</param>
 /// <param name="IsError">True when the tool did not run or reported an error.</param>

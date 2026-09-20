@@ -12,6 +12,7 @@ namespace XivMcp.Core.Tests;
 /// handler still points at it), must have closed its port, and must not have left threads or handles behind.
 /// The Dalamud-facing layer cannot be constructed here; ReloadLeakAuditTests reads its sources instead.
 /// </summary>
+[Collection(ProcessWideMeasurements.Name)]
 public sealed class UnloadLeakTests
 {
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -80,4 +81,14 @@ public sealed class UnloadLeakTests
         var grown = GC.GetTotalMemory(forceFullCollection: true) - memory;
         Assert.True(grown < 2 * 1024 * 1024, $"managed memory grew by {grown} bytes over 25 start/dispose cycles");
     }
+}
+
+/// <summary>
+/// Thread, handle and heap counts are process-wide, so a test that compares them before and after must not share
+/// the process with other test classes opening sockets at the same moment.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class ProcessWideMeasurements
+{
+    public const string Name = "process-wide measurements";
 }

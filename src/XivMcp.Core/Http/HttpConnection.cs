@@ -46,6 +46,7 @@ internal sealed class HttpConnection : IDisposable
         try
         {
             RemoteEndPoint = socket.RemoteEndPoint;
+            LocalEndPoint = socket.LocalEndPoint;
         }
         catch (SocketException)
         {
@@ -55,6 +56,16 @@ internal sealed class HttpConnection : IDisposable
     public long Id { get; }
 
     public EndPoint? RemoteEndPoint { get; }
+
+    public EndPoint? LocalEndPoint { get; }
+
+    /// <summary>
+    /// The peer is on this machine: a loopback address, or the very address it connected to (a local connection to the
+    /// tailnet address has that address on both ends).
+    /// </summary>
+    public bool PeerIsThisMachine =>
+        RemoteEndPoint is IPEndPoint { Address: var peer }
+        && (IPAddress.IsLoopback(peer) || (LocalEndPoint is IPEndPoint { Address: var local } && peer.Equals(local)));
 
     /// <summary>Cancelled when the peer disconnects or the connection is aborted.</summary>
     public CancellationToken Closed => _closedToken;

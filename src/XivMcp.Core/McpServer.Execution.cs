@@ -29,6 +29,15 @@ public sealed partial class McpServer
     }
 
     /// <summary>
+    /// Whether a call of <paramref name="toolName"/> goes through the approval gate and, if so, the sentence that tells the
+    /// player what it will do. Null for an unknown tool.
+    /// </summary>
+    public ToolApprovalInfo? DescribeApproval(string toolName, JsonObject? arguments) =>
+        _registry.Snapshot.ToolsByName.TryGetValue(toolName, out var tool)
+            ? new ToolApprovalInfo(tool.NeedsApproval, tool.Permission, RenderApprovalSummary(tool.ApprovalSummary, toolName, arguments))
+            : null;
+
+    /// <summary>
     /// Runs a tool call the player has already approved. Category, tier, argument and login checks and
     /// <see cref="McpServerOptions.CallTimeout"/> apply exactly as for tools/call; <see cref="Approver"/> is not asked again.
     /// Works whether or not the listener is running. Does not record activity (see <see cref="RecordHostActivity"/>).
