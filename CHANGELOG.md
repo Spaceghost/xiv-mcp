@@ -13,11 +13,16 @@ Statuses mean exactly what they mean in the What's new view in game:
 * **BETA** — merged, but not yet verified in game.
 * **SOON** — still being built.
 
+## [Unreleased] — In the workshop
+
+Everything here is merged into master. BETA means exactly that and no more: merged, and not yet seen working in the game.
+
+* Four new tools that act, all behind the approval checkbox: open_game_window opens one of the game's own windows (map, journal, a recipe, the Duty Finder on a duty, and so on) and never clicks inside it; write_macro and clear_macro edit one User Macro slot, show the lines verbatim before you approve, return what was there so it can be put back, and refuse the same commands execute_command refuses; target_party_member targets one named member of your own party. What is still to come is listed in docs/TODO.md.
+
 ## [0.1.0] — Released 2026-09-20
 
 BETA entries are in this release but have not been verified in game yet; they become NEW or FIX once they have been seen working.
 
-* Four new tools that act, all behind the approval checkbox: open_game_window opens one of the game's own windows (map, journal, a recipe, the Duty Finder on a duty, and so on) and never clicks inside it; write_macro and clear_macro edit one User Macro slot, show the lines verbatim before you approve, return what was there so it can be put back, and refuse the same commands execute_command refuses; target_party_member targets one named member of your own party. What is still to come is listed in docs/TODO.md.
 * One checkbox now decides whether you are asked: Settings opens with "Ask me before anything changes". Ticked (the default), every tool that changes something — targets, gearsets, teleport, slash commands, chat, the map flag, terminal and desktop panels — waits for Allow / Deny or a ticket, and the prompt says in one sentence what will happen, with chat text shown verbatim. Unticked, those tools run at once. Allow sessions, 10-minute grants and auto-approve rules are shortcuts under that switch.
 * An action log records every state-changing call that ran — what, which client and token, when, and whether you were being asked — in the Approvals tab and in actions.log. With approval off, a call that sent chat or changed gear still shows a notification.
 * A standalone host, xiv-mcp-standalone, answers on the same port with the same token before the game is launched: game data tools (items, recipes, quests, duties, actions, sheets, weather, Eorzea time) work from the installed game files, every other tool is listed with its real schema and answers "game_not_running". When the game starts the plugin asks for the port and takes over; when it exits the standalone takes it back. Runs on Linux and Windows, as a user service if you like (docs/STANDALONE.md).
