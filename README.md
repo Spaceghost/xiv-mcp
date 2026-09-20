@@ -27,6 +27,26 @@ MCP client (Claude Code, ...)  --HTTP POST/GET/DELETE /mcp, Bearer token-->  Xiv
 Wine maps `127.0.0.1` inside the game to the host's loopback, so host-side clients reach the plugin
 directly. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Install (from the plugin repository)
+
+XivMcp is listed in the author's own third-party Dalamud repository, next to the
+other FFXIV mods there. In game:
+
+1. `/xlsettings` → **Experimental** → **Custom Plugin Repositories** → paste
+   `https://spacegho.st/mods/ffxiv/plugins.json` → **+** → **Save and close**.
+2. `/xlplugins` → **All Plugins** → search **XivMcp** → **Install**.
+
+While XivMcp only has test builds, it shows up only for players who opted in:
+`/xlsettings` → **Experimental** → **Get plugin testing builds**. Once it has a
+stable release, ticking testing on its own entry is enough to get test builds early.
+<https://spacegho.st/mods/ffxiv/plugins/> walks through the same steps. It is a
+third-party repository: Dalamud will say nobody but the author reviewed it, which is
+true. Releases are built on GitHub Actions from a tag (`.github/workflows/release.yml`);
+`v1.2.3` is a stable release, `v1.2.3-test.1` moves the floating `testing` release.
+
+You do not need any of that to run it: building it yourself, below, is the path the
+author develops on, and it stays supported for anyone who wants to read the code first.
+
 ## Install (dev plugin)
 
 Requirements: XIVLauncher.Core with Dalamud 15.0.3.5 (API 15), the .NET 10 SDK on the host (`~/.dotnet/dotnet`

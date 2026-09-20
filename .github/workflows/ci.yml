@@ -6,10 +6,12 @@
 # string or label array), default GitHub's ubuntu-latest. The self-hosted job
 # only exists when the repository variable CI_SELF_HOSTED is "true".
 #
-# Neither job has a game installation, so the Dalamud reference assemblies are
-# absent: tools/ci/run.sh skips tests/XivMcp.Plugin.Tests and the Dalamud
-# projects with a message instead of failing. A runner with DALAMUD_LIB_PATH
-# pointing at real reference assemblies covers them.
+# Neither job has a game installation, so tools/fetch-dalamud.sh pulls the public
+# Dalamud reference assemblies into ./.dalamud first and DALAMUD_LIB_PATH points at
+# them; that is what lets the Dalamud projects and tests/XivMcp.Plugin.Tests run
+# here. Without them tools/ci/run.sh skips both with a message instead of failing.
+# The package stage runs tools/package.sh, so the release path is exercised on
+# every push rather than first on a tag.
 name: CI
 
 on:
@@ -58,8 +60,16 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Test and build
-        run: tools/ci/run.sh test build
+      - name: Check the plugin manifest
+        run: tools/check-manifest.py
+
+      - name: Fetch the Dalamud reference assemblies
+        run: tools/fetch-dalamud.sh
+
+      - name: Test, build and package
+        env:
+          DALAMUD_LIB_PATH: ${{ github.workspace }}/.dalamud
+        run: tools/ci/run.sh test build package
 
       - name: Upload build output
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -106,8 +116,16 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Test and build
-        run: tools/ci/run.sh test build
+      - name: Check the plugin manifest
+        run: tools/check-manifest.py
+
+      - name: Fetch the Dalamud reference assemblies
+        run: tools/fetch-dalamud.sh
+
+      - name: Test, build and package
+        env:
+          DALAMUD_LIB_PATH: ${{ github.workspace }}/.dalamud
+        run: tools/ci/run.sh test build package
 
       - name: Upload build output
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
