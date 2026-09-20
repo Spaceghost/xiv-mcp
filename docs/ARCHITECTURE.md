@@ -220,6 +220,16 @@ Gates from `IpcContract` with their type parameters (a subscriber must use the s
 | `XivMcp.ToggleWindow` | `<object>` action | toggles the main window |
 | `XivMcp.Changed` | `<object>` message | no arguments; sent from the framework thread, coalesced to ≤ 4 Hz, on server state, activity or board changes |
 
+Revision 2 added the gates below without changing `ApiVersion` (still 1). Companion plugins (Almanac, the Ghostty
+terminal's `/ask`) use them to find the MCP endpoint, get a client token and learn which local model to call.
+
+| Gate | Types | Payload |
+| --- | --- | --- |
+| `XivMcp.ApiRevision` | `<int>` func | `IpcContract.Revision` (2); absent on older builds |
+| `XivMcp.GetLocalModel` | `<string>` func | `{configured, endpoint, model, hasApiKey}`; `endpoint`/`model` are `null` when unset, `configured` needs both. The API key is never returned. |
+| `XivMcp.ConnectClient` | `<string, string>` func | argument: client name (1–64 of letters, digits, `-`, `_`, `.`). Issues a fresh per-client token for that name, replacing an existing one (same spelling kept, so auto-approve rules still match), saves the config and hands the new hash to the running server. Returns `{endpoint, token, clientName}` — `endpoint` is the address the running listener bound (the configured one only while the server is stopped); when bind modes land this gate must take its endpoint list and preferred endpoint from that API (the provisioning file being one more source of those values) rather than read the configuration, and gain an `endpoints` array or `{error: "disabled"\|"invalid_client_name"\|"failed"}`. The token is never logged. Action/Chat calls from that client are still prompted or queued. |
+| `XivMcp.LocalModelChanged` | `<object>` message | no arguments; raised when the Settings tab saves the local model block |
+
 ## Agent board
 
 `AgentBoard` keeps at most 64 posts, keyed by agent name (case-insensitive). Agent names are capped at

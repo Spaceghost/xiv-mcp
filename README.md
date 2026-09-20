@@ -232,6 +232,13 @@ session / rule / 10-min grant covers the call --> runs without a prompt, logged
   or its MagicDNS name (DNS-rebinding defence). See [Where the server listens](#where-the-server-listens).
 - **Out of scope:** combat rotations, movement, and input automation of any kind.
 
+**Local model and companion plugins.** *Settings → Local model* records an OpenAI-compatible local server (Ollama, LM
+Studio, llama.cpp, KoboldCpp) with **Detect** and **Test** buttons. XivMcp does not run the model; companion plugins
+(Almanac, the Ghostty terminal's `/ask`) read it over Dalamud IPC (`XivMcp.GetLocalModel`) and can connect themselves
+with `XivMcp.ConnectClient`, which issues a per-client token (switch: *Let other plugins connect themselves*). Game
+actions from those clients still need your in-game approval. Gates and payloads:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ipc-plugin--umbra).
+
 All settings: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ## In game
