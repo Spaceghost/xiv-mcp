@@ -10,6 +10,10 @@
       "items": [
         {
           "status": "beta",
+          "text": "Eight tools that answer from the game's own data files, so they work before the game has started as well as inside it: get_recipe_tree walks a whole crafting tree and pools what you actually need, get_item_sources and get_item_uses say where an item comes from and what it goes into, search_zones and get_zone_info cover the map, find_weather_windows finds the next real-world times a zone has the weather you want (optionally right after another weather, and only during given Eorzea hours), and get_duty_unlock and list_roulettes cover duties. With them come four resource templates (quest, recipe, duty, zone) and four prompts: plan_daily_reset, what_do_i_need_to_craft, where_do_i_get and weather_hunt. All read-only. Monster drops and quest hand-ins are not in the data files and are not covered."
+        },
+        {
+          "status": "beta",
           "text": "Forty new tools in a \"bridges\" category let an assistant see and drive the owner's other mods. Ghostty: list the terminal panels, read a panel's layout and status, open a terminal (the approval prompt shows the command verbatim), place, focus, close, hide or reorder a panel, take a screenshot or a clip, set the theme and run the selftest. XivDesktop: list applications and windows, search the palette, read status, launch an application, act on a window, switch workspace and ask the NPC assistant. Almanac: read its status and ask it something. Everything that changes anything goes through the same approval checkbox. Some of these tools are written against IPC the other mods do not offer yet; those answer with a clear \"unavailable\" that names exactly what is missing, and start working when the sibling ships it — nothing in XivMcp has to change."
         },
         {

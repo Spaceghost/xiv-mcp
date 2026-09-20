@@ -1713,6 +1713,249 @@
       }
     },
     {
+      "name": "find_weather_windows",
+      "title": "Find upcoming windows of a weather",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:TerritoryType",
+        "lumina:WeatherRate",
+        "lumina:Weather",
+        "clock:host"
+      ],
+      "description": "When a wanted weather next occurs in a zone, in real time. Weather is deterministic: it changes every 8 Eorzea hours (23m20s real time, at ET 00:00, 08:00 and 16:00) and this uses the same algorithm as get_weather_forecast, but searches ahead (up to horizonDays, default 14, max 60) instead of listing the next few windows. zone is a territory id or a zone name; weather is a name in the client language (\"Rain\", \"Fog\") or a Weather id. Optional: previousWeather (the weather of the 8-bell window before must be this, as some fish, FATE and hunt spawns require) and an Eorzea hour range eorzeaHourStart/eorzeaHourEnd (end exclusive, may wrap past midnight, e.g. 22 and 4), which trims each window to the hours that count. Returns the zone, the resolved wanted weather ids, chancePercent per window from the zone's table, possibleWeather, and windows: startUtc, endUtc, eorzeaStart/eorzeaEnd (HH:00), durationSeconds, secondsUntilStart (0 when activeNow), weather, previousWeather and windows = how many consecutive 8-bell windows were merged. Fewer than count windows means nothing more was found within the horizon. Fails with not_found when the zone has no weather table (duties, interiors) or the weather never occurs there; the message then lists what does. Times come from the host clock.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "description": "Zone: TerritoryType id or zone name (any case), e.g. \"Eastern La Noscea\".",
+            "type": "string"
+          },
+          "weather": {
+            "description": "Wanted weather: name in the client language (any case) or Weather row id.",
+            "type": "string"
+          },
+          "previousWeather": {
+            "description": "Weather the previous 8-bell window must have had (name or id). Omit for no requirement.",
+            "type": "string"
+          },
+          "eorzeaHourStart": {
+            "description": "First Eorzea hour that counts (0-23). Give together with eorzeaHourEnd.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "eorzeaHourEnd": {
+            "description": "Eorzea hour at which it stops counting (0-24, exclusive). A value below eorzeaHourStart wraps past midnight.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "count": {
+            "description": "How many windows to return (1-50).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 5
+          },
+          "horizonDays": {
+            "description": "How many real days ahead to search (1-60).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 14
+          },
+          "afterUtc": {
+            "description": "Search from this instant instead of now: ISO 8601 UTC, e.g. 2026-01-31T18:00:00Z.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone",
+          "weather"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "territoryId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "zone": {
+            "type": "string"
+          },
+          "wanted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          },
+          "previousWanted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          },
+          "eorzeaHours": {
+            "type": "string"
+          },
+          "afterUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "horizonDays": {
+            "type": "integer"
+          },
+          "chancePercent": {
+            "type": "integer"
+          },
+          "possibleWeather": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "weatherId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "chancePercent": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "weatherId",
+                "chancePercent"
+              ]
+            }
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startUtc": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "endUtc": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "eorzeaStart": {
+                  "type": "string"
+                },
+                "eorzeaEnd": {
+                  "type": "string"
+                },
+                "durationSeconds": {
+                  "type": "integer"
+                },
+                "secondsUntilStart": {
+                  "type": "integer"
+                },
+                "activeNow": {
+                  "type": "boolean"
+                },
+                "weather": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                },
+                "previousWeather": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                },
+                "windows": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "startUtc",
+                "endUtc",
+                "durationSeconds",
+                "secondsUntilStart",
+                "activeNow",
+                "windows"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "territoryId",
+          "afterUtc",
+          "horizonDays",
+          "chancePercent"
+        ]
+      }
+    },
+    {
       "name": "focus_terminal_panel",
       "title": "Focus a terminal panel",
       "category": "bridges",
@@ -4048,6 +4291,190 @@
       }
     },
     {
+      "name": "get_duty_unlock",
+      "title": "Get how a duty is unlocked",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:ContentFinderCondition",
+        "lumina:Quest",
+        "lumina:Level",
+        "lumina:ENpcResident",
+        "lumina:ContentRoulette"
+      ],
+      "description": "How to unlock one duty (ContentFinderCondition id from search_duties): required level and item level, level and item-level sync, expansion, and unlockQuests: each quest the game data ties to the duty (its unlock criteria, or the quest whose reward opens the instance) with quest level, journal genre, issuer NPC, issuer zone and map X/Y, and its prerequisite quests one level deep (previousQuestsJoin says whether all or any are needed). Also roulettes: the Duty Roulettes that include the duty, with the ContentRoulette id when it can be matched (see list_roulettes). unlockQuests is empty when the sheets do not name a quest: many duties unlock through a quest script instead, so empty does not mean unlocked by default. Use get_duty for party composition and description, get_quest for a quest's full details and rewards, and get_quest_status to check whether the player has completed the quests.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentFinderConditionId": {
+            "description": "ContentFinderCondition id (from search_duties).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          }
+        },
+        "required": [
+          "contentFinderConditionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer"
+          },
+          "itemLevelRequired": {
+            "type": "integer"
+          },
+          "levelSync": {
+            "type": "integer"
+          },
+          "itemLevelSync": {
+            "type": "integer"
+          },
+          "expansion": {
+            "type": "string"
+          },
+          "inDutyFinder": {
+            "type": "boolean"
+          },
+          "unlockQuests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "questId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "genre": {
+                  "type": "string"
+                },
+                "issuer": {
+                  "type": "string"
+                },
+                "issuerLocation": {
+                  "type": "object",
+                  "properties": {
+                    "territoryId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "zone": {
+                      "type": "string"
+                    },
+                    "mapId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "region": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "territoryId",
+                    "mapId"
+                  ]
+                },
+                "previousQuestsJoin": {
+                  "type": "string"
+                },
+                "previousQuests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "questId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "level": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "questId",
+                      "level"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "questId",
+                "level"
+              ]
+            }
+          },
+          "roulettes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rouletteId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "itemLevelRequired",
+          "levelSync",
+          "itemLevelSync",
+          "inDutyFinder"
+        ]
+      }
+    },
+    {
       "name": "get_equipment",
       "title": "Get equipped gear",
       "category": "inventory",
@@ -5355,6 +5782,9 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 4294967295
+                      },
+                      "timed": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -5398,6 +5828,829 @@
           "vendorTotal",
           "exchangeTotal",
           "usedInTotal"
+        ]
+      }
+    },
+    {
+      "name": "get_item_sources",
+      "title": "Get every known source of an item",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:Item",
+        "lumina:Recipe",
+        "lumina:GatheringItem",
+        "lumina:GatheringPoint",
+        "lumina:GilShopItem",
+        "lumina:SpecialShop",
+        "lumina:GCScripShopItem",
+        "lumina:RetainerTask",
+        "lumina:Quest",
+        "lumina:Achievement",
+        "lumina:ENpcBase",
+        "lumina:Level"
+      ],
+      "description": "Where an item comes from, as far as the game data says. Returns kinds (the source types found, in the order a player would try them: gilVendor, gathering, crafting, specialShop, gcSeals, retainerVenture, quest, achievement; [other] when the sheets know none), gilPrice (vendor price each, when sold for gil), recipes that make it (recipeId, craftType, level, stars, yield), gathering (per GatheringItem: level, stars, hidden, perception and node points with zone, place, node level, type Mining/Quarrying/Logging/Harvesting and timed = unspoiled|ephemeral), vendors (NPC name and id, shop, price in gil, location with zone and map X/Y when the NPC has a placement), exchanges (special shops: shop name, receiveCount, costs as currency or item ids with amounts, NPCs), gcSeals (Grand Company seal price and required rank id), ventures (targeted retainer ventures: retainer level, jobs, venture cost, duration, quantities), quests that reward it (count, optional = one of several choices) and achievements. The long lists (vendors, exchanges, ventures, quests, achievements) each come as {total, truncated, results} and share limit/offset. NOT covered, because the sheets do not hold it: monster drops, treasure, duty loot, random retainer ventures, fishing, desynthesis, FC credit shops, events. Use get_item for the item's stats, get_gathering_info for node coordinates and time windows, get_recipe_tree for what a craft needs, and get_market_prices for the market board.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "description": "Item id (use search_items to find it). The HQ offset (1,000,000) is ignored.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "limit": {
+            "description": "Maximum entries per paged list (1-100).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10
+          },
+          "offset": {
+            "description": "Entries to skip in each paged list.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "itemId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "name": {
+            "type": "string"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gilPrice": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "recipes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recipeId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "itemId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "itemName": {
+                  "type": "string"
+                },
+                "craftType": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "stars": {
+                  "type": "integer"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "yield": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "recipeId",
+                "itemId",
+                "level"
+              ]
+            }
+          },
+          "gathering": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "gatheringItemId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "itemLevel": {
+                  "type": "integer"
+                },
+                "stars": {
+                  "type": "integer"
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "perceptionRequired": {
+                  "type": "integer"
+                },
+                "totalPoints": {
+                  "type": "integer"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "zone": {
+                        "type": "string"
+                      },
+                      "place": {
+                        "type": "string"
+                      },
+                      "level": {
+                        "type": "integer"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "territoryId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "timed": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "level",
+                      "territoryId"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "gatheringItemId",
+                "itemLevel",
+                "stars",
+                "hidden",
+                "perceptionRequired",
+                "totalPoints"
+              ]
+            }
+          },
+          "vendors": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "npc": {
+                      "type": "string"
+                    },
+                    "npcId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "shop": {
+                      "type": "string"
+                    },
+                    "shopId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "priceGil": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "location": {
+                      "type": "object",
+                      "properties": {
+                        "territoryId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        },
+                        "zone": {
+                          "type": "string"
+                        },
+                        "mapId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        },
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "region": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "territoryId",
+                        "mapId"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "npcId",
+                    "shopId",
+                    "priceGil"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "exchanges": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "shop": {
+                      "type": "string"
+                    },
+                    "shopId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "receiveCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "costs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemId": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          }
+                        },
+                        "required": [
+                          "itemId",
+                          "count"
+                        ]
+                      }
+                    },
+                    "npcs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "shopId",
+                    "receiveCount"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "gcSeals": {
+            "type": "object",
+            "properties": {
+              "seals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "requiredRankId": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            },
+            "required": [
+              "seals",
+              "requiredRankId"
+            ]
+          },
+          "ventures": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "retainerTaskId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "retainerLevel": {
+                      "type": "integer"
+                    },
+                    "jobs": {
+                      "type": "string"
+                    },
+                    "ventureCost": {
+                      "type": "integer"
+                    },
+                    "maxMinutes": {
+                      "type": "integer"
+                    },
+                    "quantities": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "retainerTaskId",
+                    "retainerLevel",
+                    "ventureCost",
+                    "maxMinutes"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "quests": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "questId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "optional": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "questId",
+                    "level",
+                    "count",
+                    "optional"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "achievements": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "achievementId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "achievementId"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "notCovered": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      }
+    },
+    {
+      "name": "get_item_uses",
+      "title": "Get what an item is used for",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:Item",
+        "lumina:Recipe",
+        "lumina:SpecialShop",
+        "lumina:CraftLeve",
+        "lumina:Leve",
+        "lumina:GCSupplyDuty"
+      ],
+      "description": "What an item is good for, so the player can decide whether to keep, sell or turn it in. Returns recipes that consume it (recipeId, the crafted item, craftType, level, quantity = amount one synth uses), tradeIns (special shops that take it as payment: amount, what they give, other costs, NPCs), leves (tradecraft levequests asking for it: leve name, level, jobs, count per turn-in, repeats), gcSupply (Grand Company supply and provisioning missions that can ask for it: class level, crafter or gatherer, count) and the flags desynthesizable, aetherialReducible, isCollectable, isCrystal, isMarketable, isUntradable, plus vendorSellPrice in gil. recipes, tradeIns and leves each come as {total, truncated, results} and share limit/offset. NOT covered: quest hand-ins, custom deliveries, expert delivery, housing and glamour uses. Use get_item_sources for the opposite question and get_item for stats.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "description": "Item id (use search_items to find it). The HQ offset (1,000,000) is ignored.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "limit": {
+            "description": "Maximum entries per paged list (1-200).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 25
+          },
+          "offset": {
+            "description": "Entries to skip in each paged list.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "itemId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "name": {
+            "type": "string"
+          },
+          "recipes": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "recipeId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "itemId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "itemName": {
+                      "type": "string"
+                    },
+                    "craftType": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "stars": {
+                      "type": "integer"
+                    },
+                    "quantity": {
+                      "type": "integer"
+                    },
+                    "yield": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "recipeId",
+                    "itemId",
+                    "level"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "tradeIns": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "shop": {
+                      "type": "string"
+                    },
+                    "shopId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "gives": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemId": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          }
+                        },
+                        "required": [
+                          "itemId",
+                          "count"
+                        ]
+                      }
+                    },
+                    "otherCosts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemId": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          }
+                        },
+                        "required": [
+                          "itemId",
+                          "count"
+                        ]
+                      }
+                    },
+                    "npcs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "shopId",
+                    "amount"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "leves": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "leveId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "jobs": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "repeats": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "leveId",
+                    "level",
+                    "count",
+                    "repeats"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          },
+          "gcSupply": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "level": {
+                  "type": "integer"
+                },
+                "job": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "level",
+                "count"
+              ]
+            }
+          },
+          "desynthesizable": {
+            "type": "boolean"
+          },
+          "aetherialReducible": {
+            "type": "boolean"
+          },
+          "isCollectable": {
+            "type": "boolean"
+          },
+          "isCrystal": {
+            "type": "boolean"
+          },
+          "isMarketable": {
+            "type": "boolean"
+          },
+          "isUntradable": {
+            "type": "boolean"
+          },
+          "vendorSellPrice": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "notCovered": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "desynthesizable",
+          "aetherialReducible",
+          "isCollectable",
+          "isCrystal",
+          "isMarketable",
+          "isUntradable",
+          "vendorSellPrice"
         ]
       }
     },
@@ -7980,6 +9233,522 @@
           "isExpert",
           "requiresSpecialist",
           "depth"
+        ]
+      }
+    },
+    {
+      "name": "get_recipe_tree",
+      "title": "Get full crafting tree and sourced shopping list",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:Recipe",
+        "lumina:RecipeLevelTable",
+        "lumina:Item",
+        "lumina:GilShopItem",
+        "lumina:SpecialShop",
+        "lumina:GatheringItem",
+        "lumina:GCScripShopItem",
+        "lumina:RetainerTask",
+        "lumina:Quest",
+        "lumina:Achievement"
+      ],
+      "description": "Everything needed to craft `quantity` of an item (itemId) or of one recipe (recipeId), expanded all the way down: every craftable ingredient is expanded into its own sub-recipe until only raw materials remain (maxDepth levels at most, a cycle guard, and a cap of 400 tree nodes; depthLimited/nodeCapHit/hasCycle tell when a cap cut the tree). Returns the root recipe (craftType, level, stars, yield, crafts = synths needed, surplus = extra items the last synth makes), tree (per node: itemId, name, quantity for that branch, and for crafted nodes recipeId, craftType, level, stars, crafts, yield; notExpanded = depth|cycle|nodeCap when a craftable node was left as a leaf), craftOrder (every sub-craft pooled across branches, deepest first, with crafts/needed/surplus), crafterRequirements (highest recipe level per crafter class, root included), rawMaterials and crystals. Each raw material carries its total quantity and sources in preference order (gilVendor, gathering, crafting, specialShop, gcSeals, retainerVenture, quest, achievement, or other when the game data knows no source: monster drops, treasure, duty chests), plus gilPriceEach/gilTotal and one vendor with zone and map coordinates when a gil shop sells it, a gathering hint (type, level, zone, timed), the first special-shop exchange with its currency cost, and gcSealsEach. gilForVendorMaterials sums the vendor-buyable lines. Quantities respect recipe yields. Use get_recipe instead for the craft stats of a single recipe (durability, difficulty, quality), get_item_sources for every source of one material, and find_owned_items to subtract what the player already has (this tool never reads the inventory).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "description": "Item id of the crafted result. Provide this or recipeId.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "recipeId": {
+            "description": "Recipe row id. Takes precedence over itemId; use it to pick a specific crafter when an item has several recipes.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "quantity": {
+            "description": "Number of finished items wanted.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999,
+            "default": 1
+          },
+          "maxDepth": {
+            "description": "How many levels of sub-recipes to expand (1-10). The default expands everything in practice.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 8
+          },
+          "includeTree": {
+            "description": "false = omit the nested tree and return only the pooled lists (much smaller).",
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recipeId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "itemId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "craftType": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer"
+          },
+          "stars": {
+            "type": "integer"
+          },
+          "yield": {
+            "type": "integer"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "crafts": {
+            "type": "integer"
+          },
+          "surplus": {
+            "type": "integer"
+          },
+          "maxDepth": {
+            "type": "integer"
+          },
+          "nodeCount": {
+            "type": "integer"
+          },
+          "depthLimited": {
+            "type": "boolean"
+          },
+          "nodeCapHit": {
+            "type": "boolean"
+          },
+          "hasCycle": {
+            "type": "boolean"
+          },
+          "tree": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "isCrystal": {
+                  "type": "boolean"
+                },
+                "recipeId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "craftType": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "stars": {
+                  "type": "integer"
+                },
+                "crafts": {
+                  "type": "integer"
+                },
+                "yield": {
+                  "type": "integer"
+                },
+                "notExpanded": {
+                  "type": "string"
+                },
+                "ingredients": {
+                  "type": "array"
+                }
+              },
+              "required": [
+                "itemId",
+                "quantity",
+                "isCrystal"
+              ]
+            }
+          },
+          "craftOrder": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "recipeId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "craftType": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "stars": {
+                  "type": "integer"
+                },
+                "crafts": {
+                  "type": "integer"
+                },
+                "needed": {
+                  "type": "integer"
+                },
+                "surplus": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "itemId",
+                "recipeId",
+                "level",
+                "crafts",
+                "needed",
+                "surplus"
+              ]
+            }
+          },
+          "crafterRequirements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "craftType": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "stars": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "level"
+              ]
+            }
+          },
+          "rawMaterials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "gilPriceEach": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "gilTotal": {
+                  "type": "integer"
+                },
+                "vendor": {
+                  "type": "object",
+                  "properties": {
+                    "npc": {
+                      "type": "string"
+                    },
+                    "npcId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "shop": {
+                      "type": "string"
+                    },
+                    "shopId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "priceGil": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "location": {
+                      "type": "object",
+                      "properties": {
+                        "territoryId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        },
+                        "zone": {
+                          "type": "string"
+                        },
+                        "mapId": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4294967295
+                        },
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "region": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "territoryId",
+                        "mapId"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "npcId",
+                    "shopId",
+                    "priceGil"
+                  ]
+                },
+                "gathering": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "zone": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "timed": {
+                      "type": "string"
+                    },
+                    "totalPoints": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "level",
+                    "totalPoints"
+                  ]
+                },
+                "exchange": {
+                  "type": "object",
+                  "properties": {
+                    "shop": {
+                      "type": "string"
+                    },
+                    "shopId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "receiveCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "costs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemId": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                          }
+                        },
+                        "required": [
+                          "itemId",
+                          "count"
+                        ]
+                      }
+                    },
+                    "npcs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "shopId",
+                    "receiveCount"
+                  ]
+                },
+                "gcSealsEach": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "craftableRecipeId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              },
+              "required": [
+                "itemId",
+                "quantity"
+              ]
+            }
+          },
+          "crystals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "isCrystal": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "itemId",
+                "quantity",
+                "isCrystal"
+              ]
+            }
+          },
+          "gilForVendorMaterials": {
+            "type": "integer"
+          },
+          "alternativeRecipes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recipeId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "itemId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "itemName": {
+                  "type": "string"
+                },
+                "craftType": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "stars": {
+                  "type": "integer"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "yield": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "recipeId",
+                "itemId",
+                "level"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipeId",
+          "itemId",
+          "level",
+          "yield",
+          "quantity",
+          "crafts",
+          "surplus",
+          "maxDepth",
+          "nodeCount",
+          "depthLimited",
+          "nodeCapHit",
+          "hasCycle",
+          "gilForVendorMaterials"
         ]
       }
     },
@@ -11250,6 +13019,281 @@
       }
     },
     {
+      "name": "get_zone_info",
+      "title": "Get zone details",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:TerritoryType",
+        "lumina:PlaceName",
+        "lumina:Map",
+        "lumina:MapMarker",
+        "lumina:Aetheryte",
+        "lumina:WeatherRate",
+        "lumina:Weather",
+        "lumina:ContentFinderCondition"
+      ],
+      "description": "Static details of one zone (territoryId, or zone = a name): name, region, internalName (the level path id such as s1f1), kind (city, field, inn, housing, duty, pvp, other) with the raw intendedUse id, expansion, the duty it hosts, isPvp, mountsAllowed, its maps (mapId, path like s1f1/00, sub-name for floors, sizeFactor where 100 = a 41x41 coordinate grid, offsets, isDefault), aetherytes and aethernet shards (isShard) with the map X/Y the game shows, the weather table (weatherRateId and each weather with chancePercent; empty when weather is fixed or scripted), and markers: the named labels drawn on the zone's maps (settlements, landmarks, exits to neighbouring zones) with map X/Y, icon and dataType (1 = link to another map, 3 = aetheryte, 4 = place tooltip, which aethernet shards use), paged with markerLimit/markerOffset as {total, truncated, results}. Coordinates are ready for set_map_flag. Nothing here depends on the character: use get_location for where the player is, list_aetherytes for unlocked teleports and find_weather_windows or get_weather_forecast for when a weather occurs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "territoryId": {
+            "description": "TerritoryType row id. Provide this or zone.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "zone": {
+            "description": "Zone name (any case); must identify one zone name. Ignored when territoryId is given.",
+            "type": "string"
+          },
+          "markerLimit": {
+            "description": "Maximum map markers to return (0-200).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "default": 40
+          },
+          "markerOffset": {
+            "description": "Map markers to skip for paging.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "territoryId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "name": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "zoneName": {
+            "type": "string"
+          },
+          "internalName": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "intendedUse": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "expansion": {
+            "type": "string"
+          },
+          "duty": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "isPvp": {
+            "type": "boolean"
+          },
+          "mountsAllowed": {
+            "type": "boolean"
+          },
+          "maps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mapId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "path": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "subName": {
+                  "type": "string"
+                },
+                "sizeFactor": {
+                  "type": "integer"
+                },
+                "offsetX": {
+                  "type": "integer"
+                },
+                "offsetY": {
+                  "type": "integer"
+                },
+                "isDefault": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "mapId",
+                "sizeFactor",
+                "offsetX",
+                "offsetY",
+                "isDefault"
+              ]
+            }
+          },
+          "aetherytes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "aetheryteId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "isShard": {
+                  "type": "boolean"
+                },
+                "mapId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "aethernetGroup": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "aetheryteId",
+                "isShard",
+                "aethernetGroup"
+              ]
+            }
+          },
+          "weatherRateId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "weather": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "weatherId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "chancePercent": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "weatherId",
+                "chancePercent"
+              ]
+            }
+          },
+          "markers": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "mapId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "icon": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "dataType": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "mapId",
+                    "x",
+                    "y",
+                    "icon",
+                    "dataType"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "truncated"
+            ]
+          }
+        },
+        "required": [
+          "territoryId",
+          "intendedUse",
+          "isPvp",
+          "mountsAllowed",
+          "weatherRateId"
+        ]
+      }
+    },
+    {
       "name": "ghostty_command",
       "title": "Command the in-game terminal bridge",
       "category": "bridges",
@@ -13114,6 +15158,163 @@
         },
         "required": [
           "total",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "name": "list_roulettes",
+      "title": "List Duty Roulettes",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:ContentRoulette",
+        "lumina:ContentRouletteRoleBonus",
+        "lumina:ContentFinderCondition"
+      ],
+      "description": "Every Duty Roulette in the game data (ContentRoulette): id, name, category, dutyType, description, requiredLevel, itemLevelRequired, itemLevelSync, partySize, rewardTomeA/B/C (the sheet's three tomestone reward amounts for the daily bonus; the sheet does not say which tomestone each is), roleBonus (the adventurer-in-need item and amount), inDutyFinder, pvp, and dutyCount = how many duties are flagged for it (only for roulettes that have a membership flag on duties). Static: it says nothing about today's bonus or what the character has unlocked; use get_roulette_status for that while the game is running, and get_duty_unlock for one duty's roulettes. Returns {total, offset, returned, truncated, results}.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inDutyFinderOnly": {
+            "description": "true = only roulettes shown in the Duty Finder.",
+            "type": "boolean",
+            "default": true
+          },
+          "limit": {
+            "description": "Maximum results (1-100).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          },
+          "offset": {
+            "description": "Results to skip for paging.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "returned": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "dutyType": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "requiredLevel": {
+                  "type": "integer"
+                },
+                "itemLevelRequired": {
+                  "type": "integer"
+                },
+                "itemLevelSync": {
+                  "type": "integer"
+                },
+                "partySize": {
+                  "type": "integer"
+                },
+                "rewardTomeA": {
+                  "type": "integer"
+                },
+                "rewardTomeB": {
+                  "type": "integer"
+                },
+                "rewardTomeC": {
+                  "type": "integer"
+                },
+                "roleBonus": {
+                  "type": "object",
+                  "properties": {
+                    "itemId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "itemId",
+                    "amount"
+                  ]
+                },
+                "inDutyFinder": {
+                  "type": "boolean"
+                },
+                "pvp": {
+                  "type": "boolean"
+                },
+                "dutyCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "requiredLevel",
+                "itemLevelRequired",
+                "itemLevelSync",
+                "partySize",
+                "rewardTomeA",
+                "rewardTomeB",
+                "rewardTomeC",
+                "inDutyFinder",
+                "pvp"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "returned",
           "truncated"
         ]
       }
@@ -15906,6 +18107,145 @@
       }
     },
     {
+      "name": "search_zones",
+      "title": "Search zones",
+      "category": "gamedata",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "lumina:TerritoryType",
+        "lumina:PlaceName"
+      ],
+      "description": "Searches zones (TerritoryType rows that have a place name) by name, ranked exact > prefix > word > substring; a numeric query matches the territory id. Filter by kind: city, field, inn, housing, duty, pvp or other (coarse, from TerritoryIntendedUse and the zone's Duty Finder entry) and by region name. Query may be omitted when a filter is set. Returns {total, offset, returned, truncated, results:[{territoryId, name, region, kind, intendedUse, expansion, duty, hasWeather}]}. The same name can appear several times: instanced and quest copies of a zone are separate territories; the town or field copy is normally the lowest id with kind city/field. Use get_zone_info for maps, aetherytes, weather and markers, and search_duties for duties by name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "description": "Zone name text (any case) or a territory id.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Zone kind.",
+            "type": "string",
+            "enum": [
+              "city",
+              "field",
+              "inn",
+              "housing",
+              "duty",
+              "pvp",
+              "other"
+            ]
+          },
+          "region": {
+            "description": "Region name text, e.g. \"La Noscea\", \"Thanalan\", \"Norvrandt\" (partial ok).",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum results (1-500).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 25
+          },
+          "offset": {
+            "description": "Results to skip for paging.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "returned": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "territoryId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "intendedUse": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "expansion": {
+                  "type": "string"
+                },
+                "duty": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                },
+                "hasWeather": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "territoryId",
+                "intendedUse",
+                "hasWeather"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "returned",
+          "truncated"
+        ]
+      }
+    },
+    {
       "name": "send_chat",
       "title": "Send chat message",
       "category": "chat",
@@ -17308,6 +19648,14 @@
   ],
   "resourceTemplates": [
     {
+      "uriTemplate": "ffxiv://duty/{dutyId}",
+      "name": "Duty",
+      "category": "gamedata",
+      "mimeType": "application/json",
+      "requiresLogin": false,
+      "description": "Game-data record for a duty (ContentFinderCondition id; same content as the get_duty tool)."
+    },
+    {
       "uriTemplate": "ffxiv://events/{kind}",
       "name": "Game events of one kind",
       "category": "events",
@@ -17324,6 +19672,22 @@
       "description": "Game-data record for an item id (same content as the get_item tool)."
     },
     {
+      "uriTemplate": "ffxiv://quest/{questId}",
+      "name": "Quest",
+      "category": "gamedata",
+      "mimeType": "application/json",
+      "requiresLogin": false,
+      "description": "Game-data record for a quest id (same content as the get_quest tool)."
+    },
+    {
+      "uriTemplate": "ffxiv://recipe/{recipeId}",
+      "name": "Crafting recipe",
+      "category": "gamedata",
+      "mimeType": "application/json",
+      "requiresLogin": false,
+      "description": "Game-data record for a recipe id (same content as the get_recipe tool with default depth and quantity)."
+    },
+    {
       "uriTemplate": "ffxiv://sheet/{sheet}/{rowId}",
       "name": "Excel sheet row",
       "category": "gamedata",
@@ -17338,6 +19702,14 @@
       "mimeType": "application/json",
       "requiresLogin": false,
       "description": "One of your approval tickets (same shape as get_ticket). Subscribe to learn when it is decided or has run."
+    },
+    {
+      "uriTemplate": "ffxiv://zone/{territoryId}",
+      "name": "Zone",
+      "category": "gamedata",
+      "mimeType": "application/json",
+      "requiresLogin": false,
+      "description": "Game-data record for a zone (TerritoryType id; same content as the get_zone_info tool with default paging)."
     }
   ],
   "prompts": [
@@ -17389,11 +19761,75 @@
       "description": "Audit equipped gear for a job: item level outliers, missing materia or upgrades available in inventory or gearsets."
     },
     {
+      "name": "plan_daily_reset",
+      "title": "Plan the daily reset",
+      "category": "prompts",
+      "arguments": [
+        {
+          "name": "minutes",
+          "required": false
+        }
+      ],
+      "description": "What resets when (daily, weekly, Grand Company, leve allowances) and what is still worth doing today: roulettes, tribal quests, GC turn-ins, custom deliveries, currencies near cap."
+    },
+    {
       "name": "situation_report",
       "title": "Situation report",
       "category": "prompts",
       "arguments": [],
       "description": "What is going on around me right now: zone, Eorzea time, weather, active FATEs, duty and party state, recent chat."
+    },
+    {
+      "name": "weather_hunt",
+      "title": "Weather hunt",
+      "category": "prompts",
+      "arguments": [
+        {
+          "name": "zone",
+          "required": true
+        },
+        {
+          "name": "weather",
+          "required": true
+        },
+        {
+          "name": "previousWeather",
+          "required": false
+        },
+        {
+          "name": "eorzeaHours",
+          "required": false
+        }
+      ],
+      "description": "Find the next real-time windows of a weather in a zone (optionally after another weather or during certain Eorzea hours) and pin the next one as an objective."
+    },
+    {
+      "name": "what_do_i_need_to_craft",
+      "title": "What do I need to craft…",
+      "category": "prompts",
+      "arguments": [
+        {
+          "name": "item",
+          "required": true
+        },
+        {
+          "name": "quantity",
+          "required": false
+        }
+      ],
+      "description": "Full shopping list for crafting an item: the whole ingredient tree, what is already owned, where each missing material comes from, and optionally market prices."
+    },
+    {
+      "name": "where_do_i_get",
+      "title": "Where do I get…",
+      "category": "prompts",
+      "arguments": [
+        {
+          "name": "item",
+          "required": true
+        }
+      ],
+      "description": "Every known way to obtain an item (vendors with location, gathering nodes, recipes, currency exchanges, quest and achievement rewards) and the most practical one."
     },
     {
       "name": "where_is",

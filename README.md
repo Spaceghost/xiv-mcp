@@ -301,7 +301,7 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-130 tools (33 change something and go through the approval switch; 18 also work before the game starts), 14 resources and templates, 6 prompts.
+138 tools (33 change something and go through the approval switch; 26 also work before the game starts), 18 resources and templates, 10 prompts.
 Catalogue version 2; the machine-readable listing is [docs/tools.json](docs/tools.json) and the full reference (arguments, data sources, approval text) is [docs/TOOLS.md](docs/TOOLS.md).
 Tier and category are the in-game switches; *Login* means the call fails at the title screen; *Approval* means the call waits for you in game
 while *Ask me before anything changes* is ticked; *Pre-game* means the standalone host serves it while the game is closed.
@@ -388,13 +388,20 @@ Behaviour in game is unverified unless stated elsewhere.
 | `get_events` | Read | events | no | — | — | Polls the plugin's bounded stream of game events and returns them oldest first. |
 | `list_event_kinds` | Read | events | no | — | — | The event kinds currently in the buffer with how many of each, plus the current cursor and the buffer size. |
 | `compare_items` | Read | gamedata | no | — | yes | Compares 2-6 pieces of equipment from game data side by side: per item the itemLevel, equipLevel, category, jobs, materiaSlots, canBeHq, weapon damage / defence and every substat (critical hit, determination, direct h… |
+| `find_weather_windows` | Read | gamedata | no | — | yes | When a wanted weather next occurs in a zone, in real time. |
 | `get_action` | Read | gamedata | no | — | yes | Details for one action id: name, tooltip description (plain text; dynamic values such as potency may appear as placeholders), icon, class/job and which classes/jobs can use it, level acquired, category (Spell, Weapons… |
 | `get_duty` | Read | gamedata | no | — | yes | Details for one duty (ContentFinderCondition id): name, description, content type, required level and item level, level/item-level sync, party size and role composition (tanks/healers/dps per party, number of parties)… |
+| `get_duty_unlock` | Read | gamedata | no | — | yes | How to unlock one duty (ContentFinderCondition id from search_duties): required level and item level, level and item-level sync, expansion, and unlockQuests: each quest the game data ties to the duty (its unlock crite… |
 | `get_gathering_info` | Read | gamedata | no | — | yes | Where a gatherable item is found and, for timed nodes, when. |
 | `get_item` | Read | gamedata | no | — | yes | Full game-data record for one item id: name, description, icon, UI and market categories, item level, equip level and jobs, equip slots, rarity, stack size, flags (unique, untradable, marketable, HQ-able, collectable,… |
+| `get_item_sources` | Read | gamedata | no | — | yes | Where an item comes from, as far as the game data says. |
+| `get_item_uses` | Read | gamedata | no | — | yes | What an item is good for, so the player can decide whether to keep, sell or turn it in. |
 | `get_quest` | Read | gamedata | no | — | yes | Static details for one quest id: name, level, allowed classes/jobs, expansion, journal genre/category/section, place name, issuer NPC with zone and map X/Y coordinates (when the issuer has a placement in game data), p… |
 | `get_recipe` | Read | gamedata | no | — | yes | Crafting recipe for an item (itemId) or a specific recipe (recipeId): craft type (Carpentry, Smithing, ... |
+| `get_recipe_tree` | Read | gamedata | no | — | yes | Everything needed to craft `quantity` of an item (itemId) or of one recipe (recipeId), expanded all the way down: every craftable ingredient is expanded into its own sub-recipe until only raw materials remain (maxDept… |
 | `get_sheet_row` | Read | gamedata | no | — | yes | Reads one row of any game Excel sheet by sheet name and row id and returns it as JSON: numbers/bools as values, text as plain strings, RowRef links as {rowId, sheet, name} (name is the linked row's Name/Singular when… |
+| `get_zone_info` | Read | gamedata | no | — | yes | Static details of one zone (territoryId, or zone = a name): name, region, internalName (the level path id such as s1f1), kind (city, field, inn, housing, duty, pvp, other) with the raw intendedUse id, expansion, the d… |
+| `list_roulettes` | Read | gamedata | no | — | yes | Every Duty Roulette in the game data (ContentRoulette): id, name, category, dutyType, description, requiredLevel, itemLevelRequired, itemLevelSync, partySize, rewardTomeA/B/C (the sheet's three tomestone reward amount… |
 | `list_sheets` | Read | gamedata | no | — | yes | Lists game Excel sheets that have typed column definitions (Lumina.Excel.Sheets), optionally filtered by nameContains, with row count, whether rows have subrows, and column names with types (string, uint8..int64, floa… |
 | `search_actions` | Read | gamedata | no | — | yes | Searches actions players can learn (weaponskills, spells, abilities, role actions, gathering abilities, PvP actions; from the Action sheet — crafting actions such as Basic Synthesis live in the CraftAction sheet, see… |
 | `search_duties` | Read | gamedata | no | — | yes | Searches duties from the Duty Finder data (ContentFinderCondition: dungeons, guildhests, trials, raids, alliance raids, PvP, deep dungeons, variant/criterion, etc.) by name (ranked exact > prefix > word > substring; n… |
@@ -402,6 +409,7 @@ Behaviour in game is unverified unless stated elsewhere.
 | `search_quests` | Read | gamedata | no | — | yes | Searches quests by name (ranked exact > prefix > word > substring; a numeric query matches the quest id). |
 | `search_recipes` | Read | gamedata | no | — | yes | Searches crafting recipes by the crafted item's name (ranked exact > prefix > word > substring; numeric query matches the recipe id), optionally filtered by craftType (crafter name like "Weaving"/"Weaver", abbreviatio… |
 | `search_sheet` | Read | gamedata | no | — | yes | Scans one column of any Excel sheet and returns matching rows as {rowId, subrowId, label, value}, where label is the row's Name/Singular when it has one. |
+| `search_zones` | Read | gamedata | no | — | yes | Searches zones (TerritoryType rows that have a place name) by name, ranked exact > prefix > word > substring; a numeric query matches the territory id. |
 | `find_owned_items` | Read | inventory | yes | — | — | Searches every loaded container (bags, equipped, armory, crystals, currency, key items, saddlebags if opened this session, and the currently/last opened retainer's inventory, equipment and market listings) for items b… |
 | `get_currencies` | Read | inventory | yes | — | — | The character's currency balances: gil; Grand Company seals for the current company with its cap; and a list of currencies with category (common: ventures, MGP; tomestone: every current tomestone with weeklyAcquired/w… |
 | `get_equipment` | Read | inventory | yes | — | — | The character's currently equipped gear: for each occupied slot (MainHand, OffHand, Head, Body, Hands, Legs, Feet, Ears, Neck, Wrists, RingRight, RingLeft, SoulCrystal) the item id, name, item level, equip level, HQ,… |
@@ -455,8 +463,12 @@ Resources and templates follow the Read tier and their category.
 | `ffxiv://chat/recent` | chat | no | The newest 100 captured chat lines (oldest first) in the same shape as read_chat, excluding private tells and battle-log lines. |
 | `ffxiv://events` | events | no | The newest buffered game events (same shape as get_events with no cursor). |
 | `ffxiv://events/{kind}` | events | no | The newest buffered events of one kind (zone, duty, combat, condition, party, inventory, level, job, session). |
+| `ffxiv://duty/{dutyId}` | gamedata | no | Game-data record for a duty (ContentFinderCondition id; same content as the get_duty tool). |
 | `ffxiv://item/{itemId}` | gamedata | no | Game-data record for an item id (same content as the get_item tool). |
+| `ffxiv://quest/{questId}` | gamedata | no | Game-data record for a quest id (same content as the get_quest tool). |
+| `ffxiv://recipe/{recipeId}` | gamedata | no | Game-data record for a recipe id (same content as the get_recipe tool with default depth and quantity). |
 | `ffxiv://sheet/{sheet}/{rowId}` | gamedata | no | One Excel sheet row as JSON (same content as get_sheet_row with default options). |
+| `ffxiv://zone/{territoryId}` | gamedata | no | Game-data record for a zone (TerritoryType id; same content as the get_zone_info tool with default paging). |
 | `ffxiv://inventory` | inventory | yes | Main inventory bags (4 pages) with per-container usage; updated notifications are sent when the inventory changes. |
 | `ffxiv://agents` | meta | no | JSON snapshot of the in-game agent board (same shape as list_status). |
 | `ffxiv://objectives` | objectives | no | Same JSON as list_objectives (with completed ones). |
@@ -473,7 +485,11 @@ Prompts only return instructions; every game interaction still goes through tool
 | `crafting_plan` | prompts | `item`, `quantity?` | Plan how to craft an item: full ingredient tree, what is already owned, what to gather or buy, and crafter level checks. |
 | `duty_prep` | prompts | `duty` | Prepare for a duty: requirements vs. my character, party composition, gear readiness and useful reminders. |
 | `gear_audit` | prompts | `job?` | Audit equipped gear for a job: item level outliers, missing materia or upgrades available in inventory or gearsets. |
+| `plan_daily_reset` | prompts | `minutes?` | What resets when (daily, weekly, Grand Company, leve allowances) and what is still worth doing today: roulettes, tribal quests, GC turn-ins, custom deliveries, currencies near cap. |
 | `situation_report` | prompts | — | What is going on around me right now: zone, Eorzea time, weather, active FATEs, duty and party state, recent chat. |
+| `weather_hunt` | prompts | `zone`, `weather`, `previousWeather?`, `eorzeaHours?` | Find the next real-time windows of a weather in a zone (optionally after another weather or during certain Eorzea hours) and pin the next one as an objective. |
+| `what_do_i_need_to_craft` | prompts | `item`, `quantity?` | Full shopping list for crafting an item: the whole ingredient tree, what is already owned, where each missing material comes from, and optionally market prices. |
+| `where_do_i_get` | prompts | `item` | Every known way to obtain an item (vendors with location, gathering nodes, recipes, currency exchanges, quest and achievement rewards) and the most practical one. |
 | `where_is` | prompts | `target` | Locate a nearby object, NPC, player or a place and explain how to get there, optionally flagging the map. |
 
 <!-- END GENERATED CATALOG -->
