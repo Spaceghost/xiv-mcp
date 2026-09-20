@@ -45,7 +45,10 @@ public sealed partial class MainWindow
         {
             ImGui.TableSetupColumn("##label", ImGuiTableColumnFlags.WidthFixed);
             ImGui.TableSetupColumn("##value", ImGuiTableColumnFlags.WidthStretch);
-            Row("Endpoint", host.Endpoint);
+            Row("Endpoint", string.Join("   ", host.Endpoints));
+            Row("Bind mode", BindModeLabel(config.BindMode) + (host.Plan.Notice is null ? "" : "  — " + host.Plan.Notice));
+            if (host.Plan.TailnetHost is { } tailnetHost)
+                Row("Tailnet", host.Plan.MagicDnsName is { } dns ? $"{tailnetHost}  ({dns})" : tailnetHost);
             Row("Enabled", config.Enabled ? "yes" : "no (server stays stopped on load)");
             Row("Uptime", host.StartedAt is { } started ? FormatAge(DateTimeOffset.UtcNow - started) : "—");
             Row("Sessions", status.ActiveSessions.ToString());
@@ -80,15 +83,31 @@ public sealed partial class MainWindow
         HelpMarker("The token stays hidden (shown and copied as <token>) until you reveal it. Regenerate it in Settings > Advanced if it leaks.");
 
         var display = revealToken ? TokenDisplay.Real : TokenDisplay.Placeholder;
+
+        // With the tailnet bound, the tailnet address is the one that works from this machine AND from
+        // the rest of the tailnet, so that is what the snippets use.
+        var endpoint = host.PreferredEndpoint;
+        if (host.Endpoints.Count > 1)
+            ImGui.TextDisabled($"Also reachable at {string.Join(", ", host.Endpoints.Where(e => e != endpoint))}.");
+
         ImGui.Spacing();
         ImGui.TextColored(ImGuiColors.DalamudViolet, "Claude Code");
-        Snippet("claude", ClientSnippets.ClaudeCode(config, display));
+        Snippet("claude", ClientSnippets.ClaudeCode(config, display, endpoint));
         ImGui.TextDisabled("To keep the token out of Claude's config, run tools/claude-mcp-add.sh from the xiv-mcp repository instead.");
 
         ImGui.Spacing();
         ImGui.TextColored(ImGuiColors.DalamudViolet, "Other clients (mcpServers JSON)");
-        Snippet("json", ClientSnippets.GenericJson(config, display));
+        Snippet("json", ClientSnippets.GenericJson(config, display, endpoint));
     }
+
+    private static string BindModeLabel(BindMode mode) => mode switch
+    {
+        BindMode.Loopback => "this machine only",
+        BindMode.LoopbackAndTailnet => "this machine + tailnet",
+        BindMode.TailnetOnly => "tailnet only",
+        BindMode.Custom => "custom address",
+        _ => mode.ToString(),
+    };
 
     private static void Row(string label, string value)
     {

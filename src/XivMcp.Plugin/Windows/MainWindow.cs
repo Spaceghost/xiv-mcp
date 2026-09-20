@@ -45,7 +45,14 @@ public sealed partial class MainWindow : Window
         BringToFront();
     }
 
-    public override void OnOpen() => ResetSettingsDraft();
+    public override void OnOpen()
+    {
+        ResetSettingsDraft();
+
+        // The tailnet address can change while the game runs (Tailscale restart, new node key), so look
+        // again every time the window opens rather than trusting what was found at load.
+        RequestTailnetRefresh();
+    }
 
     public override void Draw()
     {
@@ -102,8 +109,12 @@ public sealed partial class MainWindow : Window
         ImGui.SameLine();
         ImGui.TextDisabled($"  sessions {host.Status.ActiveSessions} · requests {host.Status.TotalRequests} · failed {host.Status.FailedRequests}");
 
-        if (!config.HostIsLoopback)
-            ImGui.TextColored(ImGuiColors.DalamudRed, $"WARNING: listening host {config.Host} is not loopback — other machines can reach this server.");
+        if (!host.Plan.LoopbackOnly)
+        {
+            ImGui.TextColored(
+                ImGuiColors.DalamudRed,
+                $"WARNING: listening on {Services.BindPlanner.Describe(host.Plan)} — other machines can reach this server. The bearer token is the only thing stopping them.");
+        }
 
         if (host.LastError is { } error)
             ImGui.TextColored(ImGuiColors.DalamudRed, error);

@@ -6,9 +6,29 @@ using Dalamud.Plugin;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using XivMcp.Core;
+using XivMcp.Core.Net;
 using XivMcp.Plugin.Services;
 
 namespace XivMcp.Plugin;
+
+/// <summary>
+/// Which addresses the MCP listener binds. Anything but <see cref="Loopback"/> exposes the game to other
+/// machines and forces the bearer token on.
+/// </summary>
+public enum BindMode
+{
+    /// <summary>127.0.0.1 only: nothing outside this machine can connect. The default.</summary>
+    Loopback = 0,
+
+    /// <summary>127.0.0.1 plus this machine's Tailscale address, so tailnet machines can connect too.</summary>
+    LoopbackAndTailnet = 1,
+
+    /// <summary>The Tailscale address only; local clients must use it as well.</summary>
+    TailnetOnly = 2,
+
+    /// <summary>An address typed by the owner.</summary>
+    Custom = 3,
+}
 
 /// <summary>What the plugin writes to the Dalamud log for each handled MCP request.</summary>
 public enum ActivityLogLevel
@@ -38,33 +58,151 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>
     /// 1: initial schema (also wrote the computed HostIsLoopback/EndpointUrl by mistake).
     /// 2: computed properties are no longer written; values unchanged.
+    /// 3: the single <see cref="Host"/> string became <see cref="BindMode"/> + <see cref="CustomHost"/>.
+    ///    <see cref="Host"/> is still read (and still written, so an older build keeps working).
     /// </summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public const string DefaultHost = "127.0.0.1";
 
     public const int DefaultPort = 41800;
 
+    public const string DefaultPath = "/mcp";
+
     public int Version { get; set; } = CurrentVersion;
+
+    // ---- provisioning ----------------------------------------------------------------------
+    //
+    // While a provision file is present its values win over everything saved here. The stored
+    // values below are still what gets written to XivMcp.json, so removing the file restores
+    // exactly what the owner had configured in the window.
+
+    private bool enabled = true;
+    private BindMode bindMode = BindMode.Loopback;
+    private string customHost = DefaultHost;
+    private int port = DefaultPort;
+    private string path = DefaultPath;
+    private string bearerToken = "";
+    private bool requireToken = true;
+    private List<string> allowedOrigins = [];
+    private int callTimeoutSeconds = 30;
+
+    /// <summary>
+    /// Settings handed down by an outside provisioning file, or null. Set by <see cref="Services.ProvisionStore"/>;
+    /// never serialized and never written back to the file it came from.
+    /// </summary>
+    [JsonIgnore]
+    public ProvisionDocument? Provision { get; set; }
+
+    /// <summary>True when <paramref name="field"/> currently comes from the provision file and the UI must not offer to change it.</summary>
+    public bool IsProvisioned(string field) => Provision?.Has(field) == true;
 
     // ---- server --------------------------------------------------------------------------
 
     /// <summary>Start the server when the plugin loads.</summary>
-    public bool Enabled { get; set; } = true;
+    [JsonIgnore]
+    public bool Enabled
+    {
+        get => Provision?.Enabled ?? enabled;
+        set => enabled = value;
+    }
 
+    /// <summary>Which addresses the listener binds. Replaces the bare <see cref="Host"/> string of schema 2.</summary>
+    [JsonIgnore]
+    public BindMode BindMode
+    {
+        get => Provision?.BindMode ?? bindMode;
+        set => bindMode = value;
+    }
+
+    /// <summary>The address typed by the owner; only used by <see cref="Plugin.BindMode.Custom"/>.</summary>
+    [JsonIgnore]
+    public string CustomHost
+    {
+        get => Provision?.CustomHost ?? customHost;
+        set => customHost = value;
+    }
+
+    /// <summary>
+    /// Schema 2's single listen address. Kept readable (and written) so a downgrade still starts, and so
+    /// the v2 → v3 migration can see what the owner had. <see cref="BindMode"/> is what actually binds.
+    /// </summary>
+    [JsonProperty("Host")]
     public string Host { get; set; } = DefaultHost;
 
-    public int Port { get; set; } = DefaultPort;
+    [JsonIgnore]
+    public int Port
+    {
+        get => Provision?.Port ?? port;
+        set => port = value;
+    }
+
+    /// <summary>Endpoint path, default <c>/mcp</c>.</summary>
+    [JsonIgnore]
+    public string Path
+    {
+        get => Provision?.Path ?? path;
+        set => path = value;
+    }
 
     /// <summary>256-bit url-safe random token, generated on first run. Never logged.</summary>
-    public string BearerToken { get; set; } = "";
+    [JsonIgnore]
+    public string BearerToken
+    {
+        get => Provision?.BearerToken ?? bearerToken;
+        set => bearerToken = value;
+    }
 
-    public bool RequireToken { get; set; } = true;
+    [JsonIgnore]
+    public bool RequireToken
+    {
+        get => Provision?.RequireToken ?? requireToken;
+        set => requireToken = value;
+    }
 
     /// <summary>Extra Origin values accepted (loopback origins are always accepted).</summary>
-    public List<string> AllowedOrigins { get; set; } = [];
+    [JsonIgnore]
+    public List<string> AllowedOrigins
+    {
+        get => Provision?.AllowedOrigins ?? allowedOrigins;
+        set => allowedOrigins = value;
+    }
 
-    public int CallTimeoutSeconds { get; set; } = 30;
+    [JsonIgnore]
+    public int CallTimeoutSeconds
+    {
+        get => Provision?.CallTimeoutSeconds ?? callTimeoutSeconds;
+        set => callTimeoutSeconds = value;
+    }
+
+    // Serialized members for the overlaid settings above. They hold the owner's own values, which is
+    // what must survive in XivMcp.json even while a provision file overrides them in memory.
+    [JsonProperty("Enabled")]
+    private bool StoredEnabled { get => enabled; set => enabled = value; }
+
+    [JsonProperty("BindMode")]
+    private BindMode StoredBindMode { get => bindMode; set => bindMode = value; }
+
+    [JsonProperty("CustomHost")]
+    private string StoredCustomHost { get => customHost; set => customHost = value ?? DefaultHost; }
+
+    [JsonProperty("Port")]
+    private int StoredPort { get => port; set => port = value; }
+
+    [JsonProperty("Path")]
+    private string StoredPath { get => path; set => path = value ?? DefaultPath; }
+
+    [JsonProperty("BearerToken")]
+    private string StoredBearerToken { get => bearerToken; set => bearerToken = value ?? ""; }
+
+    [JsonProperty("RequireToken")]
+    private bool StoredRequireToken { get => requireToken; set => requireToken = value; }
+
+    [JsonProperty("AllowedOrigins")]
+    private List<string> StoredAllowedOrigins { get => allowedOrigins; set => allowedOrigins = value ?? []; }
+
+    [JsonProperty("CallTimeoutSeconds")]
+    private int StoredCallTimeoutSeconds { get => callTimeoutSeconds; set => callTimeoutSeconds = value; }
 
     // ---- permissions -----------------------------------------------------------------------
 
@@ -80,7 +218,17 @@ public sealed class Configuration : IPluginConfiguration
     public bool ConfirmActions { get; set; } = true;
 
     /// <summary>Seconds a confirmation waits before it is denied automatically.</summary>
-    public int ConfirmTimeoutSeconds { get; set; } = 20;
+    [JsonIgnore]
+    public int ConfirmTimeoutSeconds
+    {
+        get => Provision?.ConfirmTimeoutSeconds ?? confirmTimeoutSeconds;
+        set => confirmTimeoutSeconds = value;
+    }
+
+    [JsonProperty("ConfirmTimeoutSeconds")]
+    private int StoredConfirmTimeoutSeconds { get => confirmTimeoutSeconds; set => confirmTimeoutSeconds = value; }
+
+    private int confirmTimeoutSeconds = 20;
 
     /// <summary>Length of an "allow everything from this client" approval session, 1-60 minutes. Sessions are never saved.</summary>
     public int ApprovalSessionMinutes { get; set; } = 5;
@@ -92,7 +240,17 @@ public sealed class Configuration : IPluginConfiguration
     public List<AutoApproveRule> AutoApproveRules { get; set; } = [];
 
     /// <summary>Provider categories switched off (everything else is on).</summary>
-    public List<string> DisabledCategories { get; set; } = [];
+    [JsonIgnore]
+    public List<string> DisabledCategories
+    {
+        get => Provision?.DisabledCategories ?? disabledCategories;
+        set => disabledCategories = value;
+    }
+
+    [JsonProperty("DisabledCategories")]
+    private List<string> StoredDisabledCategories { get => disabledCategories; set => disabledCategories = value ?? []; }
+
+    private List<string> disabledCategories = [];
 
     // ---- providers / UI ----------------------------------------------------------------------
 
@@ -198,28 +356,25 @@ public sealed class Configuration : IPluginConfiguration
 
     public static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
 
-    /// <summary>True when <see cref="Host"/> only accepts connections from this machine.</summary>
-    public static bool IsLoopbackHost(string host)
-    {
-        if (string.IsNullOrWhiteSpace(host))
-            return false;
-        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
-            return true;
-        return IPAddress.TryParse(host.Trim('[', ']'), out var ip) && IPAddress.IsLoopback(ip);
-    }
+    /// <summary>True when the address only accepts connections from this machine.</summary>
+    public static bool IsLoopbackHost(string host) => BindPlanner.IsLoopbackHost(host);
 
-    [JsonIgnore]
-    public bool HostIsLoopback => IsLoopbackHost(Host);
+    /// <summary>
+    /// The bind plan for the current mode. <paramref name="tailnet"/> is the detected tailnet address
+    /// (null when Tailscale is down or absent), which is why resolution lives outside this class.
+    /// </summary>
+    public BindPlan ResolveBindPlan(TailnetAddress? tailnet) => BindPlanner.Resolve(BindMode, CustomHost, tailnet);
 
+    /// <summary>True when the configured mode cannot reach past this machine, ignoring live detection.</summary>
     [JsonIgnore]
-    public string EndpointUrl
-    {
-        get
-        {
-            var host = Host.Contains(':') && !Host.StartsWith('[') ? $"[{Host}]" : Host;
-            return $"http://{host}:{Port}/mcp";
-        }
-    }
+    public bool HostIsLoopback => BindMode == BindMode.Loopback || (BindMode == BindMode.Custom && IsLoopbackHost(CustomHost));
+
+    /// <summary>The loopback endpoint. <see cref="Services.ServerHost.Endpoints"/> is the full, mode-aware list.</summary>
+    [JsonIgnore]
+    public string EndpointUrl => BindPlanner.Endpoint(
+        BindMode == BindMode.Custom ? BindPlanner.NormalizeCustomHost(CustomHost) : BindPlanner.Loopback,
+        Port,
+        Path);
 
     /// <summary>Returns a new 256-bit token encoded as unpadded base64url (43 chars).</summary>
     public static string GenerateToken()
@@ -331,27 +486,65 @@ public sealed class Configuration : IPluginConfiguration
             changed = true;
         }
 
-        if (string.IsNullOrWhiteSpace(BearerToken))
+        if (Version < 3)
         {
-            BearerToken = GenerateToken();
-            changed = true;
-        }
-        else if (BearerToken != BearerToken.Trim())
-        {
-            BearerToken = BearerToken.Trim();
-            changed = true;
-        }
-
-        var host = string.IsNullOrWhiteSpace(Host) ? DefaultHost : Host.Trim();
-        if (host != Host)
-        {
-            Host = host;
+            // v2 -> v3: the single Host string becomes a bind mode. Loopback keeps the default mode;
+            // anything else was a deliberate choice, so it is preserved verbatim as a custom address
+            // rather than guessed at (a hand-written tailnet address stays exactly that address).
+            var previous = string.IsNullOrWhiteSpace(Host) ? DefaultHost : Host.Trim();
+            bindMode = IsLoopbackHost(previous) ? BindMode.Loopback : BindMode.Custom;
+            customHost = previous;
+            Version = 3;
             changed = true;
         }
 
-        changed |= Clamp(Port, 1, 65535, v => Port = v);
-        changed |= Clamp(CallTimeoutSeconds, 5, 600, v => CallTimeoutSeconds = v);
-        changed |= Clamp(ConfirmTimeoutSeconds, 5, 300, v => ConfirmTimeoutSeconds = v);
+        if (string.IsNullOrWhiteSpace(bearerToken))
+        {
+            bearerToken = GenerateToken();
+            changed = true;
+        }
+        else if (bearerToken != bearerToken.Trim())
+        {
+            bearerToken = bearerToken.Trim();
+            changed = true;
+        }
+
+        if (!Enum.IsDefined(bindMode))
+        {
+            bindMode = BindMode.Loopback;
+            changed = true;
+        }
+
+        var custom = string.IsNullOrWhiteSpace(customHost) ? DefaultHost : customHost.Trim();
+        if (custom != customHost)
+        {
+            customHost = custom;
+            changed = true;
+        }
+
+        var normalizedPath = string.IsNullOrWhiteSpace(path) ? DefaultPath : path.Trim();
+        if (!normalizedPath.StartsWith('/'))
+            normalizedPath = "/" + normalizedPath;
+        if (normalizedPath.Length > 1)
+            normalizedPath = normalizedPath.TrimEnd('/');
+        if (normalizedPath != path)
+        {
+            path = normalizedPath;
+            changed = true;
+        }
+
+        // Keep the schema-2 field in step with the mode so an older build (or a reader that only knows
+        // "Host") still sees a sane address. It is never read again once Version is 3.
+        var legacyHost = bindMode == BindMode.Custom ? customHost : DefaultHost;
+        if (legacyHost != Host)
+        {
+            Host = legacyHost;
+            changed = true;
+        }
+
+        changed |= Clamp(port, 1, 65535, v => port = v);
+        changed |= Clamp(callTimeoutSeconds, 5, 600, v => callTimeoutSeconds = v);
+        changed |= Clamp(confirmTimeoutSeconds, 5, 300, v => confirmTimeoutSeconds = v);
         changed |= Clamp(ApprovalSessionMinutes, 1, 60, v => ApprovalSessionMinutes = v);
         changed |= Clamp(ChatBufferSize, 50, 5000, v => ChatBufferSize = v);
         changed |= Clamp(AgentBoardExpiryMinutes, 0, 7 * 24 * 60, v => AgentBoardExpiryMinutes = v);
@@ -362,8 +555,8 @@ public sealed class Configuration : IPluginConfiguration
             changed = true;
         }
 
-        changed |= CleanList(AllowedOrigins, v => AllowedOrigins = v);
-        changed |= CleanList(DisabledCategories, v => DisabledCategories = v);
+        changed |= CleanList(allowedOrigins, v => allowedOrigins = v);
+        changed |= CleanList(disabledCategories, v => disabledCategories = v);
 
         // Tokens with a bad name or hash can never authenticate; drop them (and duplicates) rather than guess.
         var tokens = (ClientTokens ?? [])

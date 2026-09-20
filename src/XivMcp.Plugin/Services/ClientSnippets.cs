@@ -15,19 +15,19 @@ public static class ClientSnippets
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     /// <summary>`claude mcp add` at user scope with the token as a static header.</summary>
-    public static string ClaudeCode(Configuration config, TokenDisplay display)
+    public static string ClaudeCode(Configuration config, TokenDisplay display, string? endpoint = null)
     {
         var header = config.RequireToken ? $" --header \"Authorization: Bearer {Token(config, display)}\"" : "";
-        return $"claude mcp add --scope user --transport http {ServerName} {config.EndpointUrl}{header}";
+        return $"claude mcp add --scope user --transport http {ServerName} {endpoint ?? config.EndpointUrl}{header}";
     }
 
     /// <summary>Generic mcpServers JSON (Claude Desktop-style / .mcp.json / most HTTP-capable clients).</summary>
-    public static string GenericJson(Configuration config, TokenDisplay display)
+    public static string GenericJson(Configuration config, TokenDisplay display, string? endpoint = null)
     {
         var server = new JsonObject
         {
             ["type"] = "http",
-            ["url"] = config.EndpointUrl,
+            ["url"] = endpoint ?? config.EndpointUrl,
         };
         if (config.RequireToken)
             server["headers"] = new JsonObject { ["Authorization"] = $"Bearer {Token(config, display)}" };

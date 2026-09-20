@@ -33,6 +33,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ObjectiveTracker objectives;
     private readonly ObjectiveChatCommand questCommand;
     private readonly ApprovalWiring approvalWiring;
+    private readonly ProvisionStore provision;
     private DateTime nextTick;
     private bool commandRegistered;
 
@@ -60,6 +61,14 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
             config = Configuration.Load(pluginInterface);
+
+            // An optional outside file can override the saved settings (config management, other
+            // machines). Read before anything uses the configuration so the first start already binds
+            // what it asks for. It is only ever read; its contents are never logged.
+            provision = new ProvisionStore(ProvisionFile.ResolvePath(), (message, ex) => log.Warning(ex, "XivMcp provisioning: {Message}", message));
+            provision.Poll(config, force: true);
+            if (provision.Path is { } provisionPath)
+                log.Information("XivMcp provisioning file: {Path} ({State})", provisionPath, provision.Current is null ? "absent" : "in force");
 
             var gameThread = new DalamudGameThread(framework);
             confirmations = Track(new ConfirmationService(config));
@@ -90,6 +99,7 @@ public sealed class Plugin : IDalamudPlugin
 
             mainWindow = new MainWindow(pluginInterface, config, host, board, confirmations);
             mainWindow.Approvals = approvalQueue;
+            mainWindow.Provision = provision;
             mainWindow.ApprovalSessions = approvalSessions;
             confirmWindow = new ConfirmWindow(confirmations);
             windowSystem.AddWindow(mainWindow);
@@ -150,6 +160,8 @@ public sealed class Plugin : IDalamudPlugin
         {
             host.Tick();
             approvalWiring.Tick();
+            if (provision.Poll(config))
+                _ = host.ApplyConfigAsync();
         }
         catch (Exception ex)
         {

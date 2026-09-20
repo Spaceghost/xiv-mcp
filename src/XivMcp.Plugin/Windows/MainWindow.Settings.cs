@@ -9,30 +9,49 @@ public sealed partial class MainWindow
 {
     private static readonly string[] LogLevelNames = Enum.GetNames<ActivityLogLevel>();
 
-    // Host, port and origins restart the server, so they are edited as a draft and applied explicitly.
-    private string draftHost = "";
+    // Bind mode, address, port, path and origins restart the server, so they are edited as a draft
+    // and applied explicitly. Applying restarts the listener in place: no plugin reload is needed.
+    private BindMode draftMode;
+    private string draftCustomHost = "";
+    private string draftPath = "";
     private int draftPort;
     private string draftOrigins = "";
     private bool regenerateArmed;
 
     private void ResetSettingsDraft()
     {
-        draftHost = config.Host;
+        draftMode = config.BindMode;
+        draftCustomHost = config.CustomHost;
+        draftPath = config.Path;
         draftPort = config.Port;
         draftOrigins = string.Join('\n', config.AllowedOrigins);
         regenerateArmed = false;
     }
 
     private bool EndpointDraftDirty =>
-        draftHost.Trim() != config.Host
+        draftMode != config.BindMode
+        || draftCustomHost.Trim() != config.CustomHost
+        || NormalizePath(draftPath) != config.Path
         || draftPort != config.Port
         || !ParseOrigins(draftOrigins).SequenceEqual(config.AllowedOrigins);
+
+    /// <summary>Same normalisation the configuration applies, so the draft is not "dirty" over a trailing slash.</summary>
+    private static string NormalizePath(string text)
+    {
+        var p = text.Trim();
+        if (p.Length == 0)
+            return Configuration.DefaultPath;
+        if (!p.StartsWith('/'))
+            p = "/" + p;
+        return p.Length > 1 ? p.TrimEnd('/') : p;
+    }
 
     private static List<string> ParseOrigins(string text) =>
         text.Split(['\n', ',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
     private void DrawSettingsTab()
     {
+        DrawProvisionBanner();
         DrawMainSettings();
         ImGui.Spacing();
         DrawCategorySettings();
@@ -50,7 +69,10 @@ public sealed partial class MainWindow
         ImGui.Separator();
 
         var enabled = config.Enabled;
-        if (ImGui.Checkbox("Enabled", ref enabled))
+        ImGui.BeginDisabled(config.IsProvisioned(nameof(Services.ProvisionDocument.Enabled)));
+        var enabledChanged = ImGui.Checkbox("Enabled", ref enabled);
+        ImGui.EndDisabled();
+        if (enabledChanged)
         {
             config.Enabled = enabled;
             SaveConfig(apply: false);
@@ -59,11 +81,8 @@ public sealed partial class MainWindow
 
         HelpMarker("Runs the MCP server now and whenever the plugin loads. Off stops it and keeps it stopped.");
 
-        ImGui.SetNextItemWidth(160);
-        ImGui.InputInt("Port", ref draftPort, 0, 0);
-        draftPort = Math.Clamp(draftPort, 1, 65535);
-        HelpMarker($"TCP port (1-65535, default {Configuration.DefaultPort}). Clients connect to http://{config.Host}:<port>/mcp.");
-        DrawEndpointApply("main");
+        ImGui.Spacing();
+        DrawBindSettings();
 
         ImGui.Spacing();
         ImGui.TextColored(ImGuiColors.DalamudViolet, "What clients may do");
@@ -83,7 +102,7 @@ public sealed partial class MainWindow
 
         HelpMarker("Each Action/Chat call waits for Allow / Deny / Allow this tool for 10 min in a game window.");
 
-        ImGui.BeginDisabled(!config.ConfirmActions);
+        ImGui.BeginDisabled(!config.ConfirmActions || config.IsProvisioned(nameof(Services.ProvisionDocument.ConfirmTimeoutSeconds)));
         var timeout = config.ConfirmTimeoutSeconds;
         ImGui.SetNextItemWidth(160);
         if (ImGui.InputInt("Deny automatically after (s)", ref timeout, 5, 30))
@@ -131,10 +150,18 @@ public sealed partial class MainWindow
             return;
         if (ImGui.Button($"{(host.IsRunning ? "Apply and restart server" : "Apply")}##apply-{id}"))
         {
-            var nextHost = draftHost.Trim();
-            config.Host = nextHost.Length == 0 ? Configuration.DefaultHost : nextHost;
+            config.BindMode = draftMode;
+            var nextHost = draftCustomHost.Trim();
+            config.CustomHost = nextHost.Length == 0 ? Configuration.DefaultHost : nextHost;
+            config.Path = NormalizePath(draftPath);
             config.Port = draftPort;
             config.AllowedOrigins = ParseOrigins(draftOrigins);
+
+            // A bind anything can reach is only allowed with the token on; force it rather than
+            // letting the start fail with an error the player has to go and find.
+            if (Services.BindPlanner.Resolve(draftMode, config.CustomHost, host.TailnetAddress).RequiresToken)
+                config.RequireToken = true;
+
             SaveConfig();
             ResetSettingsDraft();
         }
@@ -162,7 +189,10 @@ public sealed partial class MainWindow
         foreach (var category in categories)
         {
             var on = config.IsCategoryEnabled(category);
-            if (ImGui.Checkbox($"{category}##cat", ref on))
+            ImGui.BeginDisabled(config.IsProvisioned(nameof(Services.ProvisionDocument.DisabledCategories)));
+            var changed = ImGui.Checkbox($"{category}##cat", ref on);
+            ImGui.EndDisabled();
+            if (changed)
             {
                 config.SetCategoryEnabled(category, on);
                 SaveConfig();
@@ -177,34 +207,41 @@ public sealed partial class MainWindow
         if (!ImGui.CollapsingHeader("Advanced"))
             return;
 
-        ImGui.SetNextItemWidth(160);
-        ImGui.InputText("Listen host", ref draftHost, 64);
-        HelpMarker($"Default {Configuration.DefaultHost}: only this machine can connect. Under Wine, 127.0.0.1 in game is the host's loopback.");
-        if (!Configuration.IsLoopbackHost(draftHost.Trim()))
-        {
-            ImGui.PushTextWrapPos();
-            ImGui.TextColored(ImGuiColors.DalamudRed, "NOT LOOPBACK: other devices on your network could control your game through this server. The server refuses to start this way unless the bearer token is required.");
-            ImGui.PopTextWrapPos();
-        }
+        ImGui.TextDisabled("The listen address, port and endpoint path are under Server, above.");
 
         ImGui.TextUnformatted("Allowed browser origins (one per line)");
-        HelpMarker("Only for requests with an Origin header (browsers). Loopback origins are always accepted. Leave empty unless a web client needs access.");
+        HelpMarker("Only for requests with an Origin header (browsers). Loopback origins are always accepted — a tailnet origin is not, so list it here if a browser on another tailnet machine needs access.");
+        ImGui.BeginDisabled(config.IsProvisioned(nameof(Services.ProvisionDocument.AllowedOrigins)));
         ImGui.InputTextMultiline("##origins", ref draftOrigins, 2048, new System.Numerics.Vector2(-1, ImGui.GetTextLineHeightWithSpacing() * 3.5f));
+        ImGui.EndDisabled();
         DrawEndpointApply("advanced");
 
         ImGui.Spacing();
         var requireToken = config.RequireToken;
-        if (ImGui.Checkbox("Require bearer token", ref requireToken))
+
+        // Off loopback the token is not optional: the checkbox is held on rather than allowed to
+        // produce a bind that then refuses to start.
+        var tokenForced = !host.Plan.LoopbackOnly;
+        ImGui.BeginDisabled(tokenForced || config.IsProvisioned(nameof(Services.ProvisionDocument.RequireToken)));
+        var requireChanged = ImGui.Checkbox("Require bearer token", ref requireToken);
+        ImGui.EndDisabled();
+        if (requireChanged)
         {
             config.RequireToken = requireToken;
             SaveConfig();
         }
 
         HelpMarker("Default on. Changing it restarts a running server.");
+        if (tokenForced)
+            ImGui.TextDisabled("  required: the server listens beyond this machine");
         if (!config.RequireToken)
             ImGui.TextColored(ImGuiColors.DalamudOrange, "Without a token, any local program can call every enabled tool.");
 
-        if (!regenerateArmed)
+        if (config.IsProvisioned(nameof(Services.ProvisionDocument.BearerToken)))
+        {
+            ImGui.TextDisabled("The bearer token comes from the provisioning file.");
+        }
+        else if (!regenerateArmed)
         {
             if (ImGui.Button("Regenerate token…"))
                 regenerateArmed = true;
@@ -227,10 +264,12 @@ public sealed partial class MainWindow
         ImGui.Spacing();
         var callTimeout = config.CallTimeoutSeconds;
         ImGui.SetNextItemWidth(160);
+        ImGui.BeginDisabled(config.IsProvisioned(nameof(Services.ProvisionDocument.CallTimeoutSeconds)));
         if (ImGui.InputInt("Call timeout (s)", ref callTimeout, 5, 30))
             config.CallTimeoutSeconds = Math.Clamp(callTimeout, 5, 600);
         if (ImGui.IsItemDeactivatedAfterEdit())
             SaveConfig();
+        ImGui.EndDisabled();
         HelpMarker("5-600, default 30. Upper bound for one tool/resource/prompt call; for Action/Chat it starts after your approval. Applies immediately.");
 
         var chatBuffer = config.ChatBufferSize;

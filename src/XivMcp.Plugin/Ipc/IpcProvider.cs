@@ -103,12 +103,13 @@ public sealed class IpcProvider : IDisposable
 
     internal string StatusJson() => IpcJson.Status(
         host.IsRunning,
-        host.Endpoint,
+        host.PreferredEndpoint,
         host.Status,
         host.LastError,
         host.HostState,
         board.Count,
-        config.ConfirmActions);
+        config.ConfirmActions,
+        host.Endpoints);
 
     internal string ActivityJson(int max) => IpcJson.Activity(host.GetActivity(Math.Clamp(max, 1, 500)));
 

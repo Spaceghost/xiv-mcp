@@ -18,7 +18,7 @@ internal sealed class HttpServer
     private readonly ConcurrentDictionary<long, HttpConnection> _connections = new();
     private readonly ConcurrentDictionary<long, Task> _connectionTasks = new();
     private readonly CancellationTokenSource _stopCts = new();
-    private TcpListener? _listener;
+    private TcpListener[] _listeners = [];
     private Task? _acceptTask;
     private long _nextId;
 
@@ -33,20 +33,96 @@ internal sealed class HttpServer
 
     public int ConnectionCount => _connections.Count;
 
-    public void Start(IPAddress address, int port)
+    public void Start(IPAddress address, int port) => Start([address], port);
+
+    /// <summary>
+    /// Binds one listener per address, all on the same port, and runs one accept loop each. With
+    /// <paramref name="port"/> 0 the first bind chooses the port and the rest follow it. If any bind
+    /// fails, every listener opened by this call is closed again and the exception is rethrown, so a
+    /// partial bind can never leave the server listening on some of the addresses.
+    /// </summary>
+    public void Start(IReadOnlyList<IPAddress> addresses, int port)
     {
-        var listener = new TcpListener(address, port);
-        if (!OperatingSystem.IsWindows())
+        if (addresses.Count == 0)
+            throw new ArgumentException("At least one address is required.", nameof(addresses));
+
+        var listeners = new List<TcpListener>(addresses.Count);
+        try
         {
-            // Linux: allow rebinding while old connections sit in TIME_WAIT (does not allow two listeners).
-            // Not set on Windows/Wine, where SO_REUSEADDR has port-sharing semantics.
-            listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            foreach (var address in addresses)
+            {
+                var listener = new TcpListener(address, port);
+                if (!OperatingSystem.IsWindows())
+                {
+                    // Linux: allow rebinding while old connections sit in TIME_WAIT (does not allow two listeners).
+                    // Not set on Windows/Wine, where SO_REUSEADDR has port-sharing semantics.
+                    listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                }
+
+                if (address.AddressFamily == AddressFamily.InterNetworkV6 && !address.Equals(IPAddress.IPv6Any))
+                {
+                    // A specific IPv6 address must not also claim the IPv4 wildcard, or a second
+                    // IPv4 listener on the same port cannot bind.
+                    try
+                    {
+                        listener.Server.DualMode = false;
+                    }
+                    catch (Exception)
+                    {
+                        // Not supported on this stack; the bind below still tells us whether it worked.
+                    }
+                }
+
+                listener.Start(64);
+                listeners.Add(listener);
+                if (port == 0)
+                    port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            }
+        }
+        catch (Exception)
+        {
+            foreach (var opened in listeners)
+            {
+                try
+                {
+                    opened.Stop();
+                    opened.Dispose();
+                }
+                catch (Exception)
+                {
+                    // Best effort cleanup of a failed bind.
+                }
+            }
+
+            throw;
         }
 
-        listener.Start(64);
-        _listener = listener;
-        Port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        _acceptTask = AcceptLoopAsync(listener);
+        _listeners = listeners.ToArray();
+        Port = port;
+        _acceptTask = Task.WhenAll(_listeners.Select(AcceptLoopAsync));
+    }
+
+    /// <summary>The endpoints actually bound. Empty once stopped.</summary>
+    public IReadOnlyList<IPEndPoint> BoundEndpoints
+    {
+        get
+        {
+            var listeners = _listeners;
+            var result = new List<IPEndPoint>(listeners.Length);
+            foreach (var listener in listeners)
+            {
+                try
+                {
+                    result.Add((IPEndPoint)listener.LocalEndpoint);
+                }
+                catch (Exception)
+                {
+                    // A listener already stopped; skip it.
+                }
+            }
+
+            return result;
+        }
     }
 
     private async Task AcceptLoopAsync(TcpListener listener)
@@ -215,15 +291,17 @@ internal sealed class HttpServer
         {
         }
 
-        var listener = Interlocked.Exchange(ref _listener, null);
-        try
+        foreach (var listener in Interlocked.Exchange(ref _listeners, []))
         {
-            listener?.Stop();
-            listener?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            _log("listener stop failed", ex);
+            try
+            {
+                listener.Stop();
+                listener.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _log("listener stop failed", ex);
+            }
         }
     }
 
