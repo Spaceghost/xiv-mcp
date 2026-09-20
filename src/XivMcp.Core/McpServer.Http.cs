@@ -11,7 +11,7 @@ namespace XivMcp.Core;
 
 public sealed partial class McpServer
 {
-    private static readonly JsonDocumentOptions DocumentOptions = new() { MaxDepth = 64, AllowTrailingCommas = false, CommentHandling = JsonCommentHandling.Disallow };
+    private static readonly JsonDocumentOptions DocumentOptions = new() { MaxDepth = 64, AllowTrailingCommas = false, CommentHandling = JsonCommentHandling.Disallow, AllowDuplicateProperties = false };
 
     private static readonly HashSet<string> ModernMethods = new(StringComparer.Ordinal)
     {
@@ -228,6 +228,20 @@ public sealed partial class McpServer
             return true;
         }
 
+        // JsonNode reads strings lazily, so a malformed byte would only surface later, as a 500
+        if (!System.Text.Unicode.Utf8.IsValid(request.Body))
+        {
+            await SendJsonErrorAsync(connection, request, 400, null, JsonRpcCodes.ParseError, "Parse error: the body is not valid UTF-8", headers).ConfigureAwait(false);
+            return true;
+        }
+
+        // before the parse: with duplicate keys refused the parser unescapes names, and would report this less clearly
+        if (!HasWellFormedStrings(request.Body))
+        {
+            await SendJsonErrorAsync(connection, request, 400, null, JsonRpcCodes.ParseError, "Parse error: a string contains an unpaired UTF-16 surrogate escape", headers).ConfigureAwait(false);
+            return true;
+        }
+
         JsonNode? body;
         try
         {
@@ -236,12 +250,6 @@ public sealed partial class McpServer
         catch (JsonException ex)
         {
             await SendJsonErrorAsync(connection, request, 400, null, JsonRpcCodes.ParseError, "Parse error: " + ex.Message, headers).ConfigureAwait(false);
-            return true;
-        }
-
-        if (!HasWellFormedStrings(request.Body))
-        {
-            await SendJsonErrorAsync(connection, request, 400, null, JsonRpcCodes.ParseError, "Parse error: a string contains an unpaired UTF-16 surrogate escape", headers).ConfigureAwait(false);
             return true;
         }
 
@@ -590,7 +598,7 @@ public sealed partial class McpServer
         }
         catch (JsonException)
         {
-            return false;
+            return true; // malformed JSON is the parse's to report, with its position
         }
     }
 
