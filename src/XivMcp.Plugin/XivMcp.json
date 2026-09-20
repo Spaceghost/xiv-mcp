@@ -2,7 +2,7 @@
   "Author": "Johnneylee Jack Rollins",
   "Name": "XivMcp",
   "InternalName": "XivMcp",
-  "AssemblyVersion": "0.1.0.3",
+  "AssemblyVersion": "0.1.0.4",
   "Punchline": "Model Context Protocol server for FINAL FANTASY XIV.",
   "Description": "Exposes game state, game data and opt-in actions to MCP clients over loopback Streamable HTTP. Optional Umbra toolbar widget.",
   "ApplicableVersion": "any",

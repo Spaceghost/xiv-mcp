@@ -13,9 +13,9 @@ Statuses mean exactly what they mean in the What's new view in game:
 * **BETA** — merged, but not yet verified in game.
 * **SOON** — still being built.
 
-## [Unreleased] — In the workshop
+## [0.1.0] — Released 2026-09-20
 
-Everything here is merged into master. BETA means exactly that and no more: merged, and not yet seen working in the game.
+BETA entries are in this release but have not been verified in game yet; they become NEW or FIX once they have been seen working.
 
 * One checkbox now decides whether you are asked: Settings opens with "Ask me before anything changes". Ticked (the default), every tool that changes something — targets, gearsets, teleport, slash commands, chat, the map flag, terminal and desktop panels — waits for Allow / Deny or a ticket, and the prompt says in one sentence what will happen, with chat text shown verbatim. Unticked, those tools run at once. Allow sessions, 10-minute grants and auto-approve rules are shortcuts under that switch.
 * An action log records every state-changing call that ran — what, which client and token, when, and whether you were being asked — in the Approvals tab and in actions.log. With approval off, a call that sent chat or changed gear still shows a notification.
