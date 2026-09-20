@@ -116,6 +116,9 @@ Actually run:
   `tests/XivMcp.Plugin.Tests` **345 passed, 0 failed**, `dotnet build
   XivMcp.slnx -c Release` clean with **0 warnings** under the quality gate, and
   `tools/package.sh` wrote `latest.zip` and `pluginmaster.json`.
+* The same run with no Umbra assemblies reachable: both test projects still pass,
+  and the build leaves `src/XivMcp.Umbra` out with a message instead of failing —
+  Umbra ships as a Dalamud plugin, so a hosted runner cannot fetch it.
 * `tools/check-manifest.py` exits 0.
 
 Not verified:
