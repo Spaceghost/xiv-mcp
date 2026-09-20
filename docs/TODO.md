@@ -1,17 +1,16 @@
-# TODO: the MCP expansion that did not land
+# TODO: what is still open
 
-> Written 2026-09-20 when the work was paused. Nothing anywhere in this file has been verified inside the
-> running game. "Tested" means host-side tests only. Branches below are **local branches** of the owner's
-> checkout (not pushed); the same commits are in the bundle `xivmcp-more-branches.bundle` kept with the
-> owner's archive for that date (`git fetch <bundle> 'refs/heads/more/*:refs/heads/more/*'`).
+> Rewritten 2026-09-20, after the four parked branches were landed on `master`. Nothing anywhere in this
+> file has been verified inside the running game. "Tested" means host-side tests only.
 > The rules for all of it are in [HARD-LINES.md](HARD-LINES.md) and [PROVIDERS.md](PROVIDERS.md).
 
-Picking any branch up: rebase it on `master`, build the plugin with warnings as errors, run
-`tests/XivMcp.Plugin.Tests` (`ToolContractTests` is the gate check), then regenerate the catalogue with
-`dotnet run --project tools/catalog -c Release -- all --write .` (CI fails while `docs/tools.json`,
-`docs/TOOLS.md` or the README table is stale), add a `beta` line to `changelog.json`, run `tools/changelog.py`.
+Adding a tool: build the plugin with warnings as errors, run the tests (`ToolContractTests` is the gate
+check), regenerate the catalogue with `dotnet run --project tools/catalog -c Release -- all --write .`
+(CI fails while `docs/tools.json`, `docs/TOOLS.md` or the README table is stale), add a `beta` line to
+`changelog.json` and run `tools/changelog.py`. Regenerate the catalogue **before** running the tests:
+`tests/XivMcp.Standalone.Tests` compares what the standalone host serves against `docs/tools.json`.
 
-## Landed on master (for orientation)
+## Landed on master
 
 | Feature | State |
 | --- | --- |
@@ -19,19 +18,44 @@ Picking any branch up: rebase it on `master`, build the plugin with warnings as 
 | Core: error codes, per-client rate limit, data sources / availability / approval metadata, external tools, control routes, catalogue export | tested |
 | Standalone pre-game host `xiv-mcp-standalone`, hand-off by yielding the port | tested between native processes only. **Next:** run it once against a real game install (Lumina.Excel from NuGet is 7.5.0, Dalamud ships 7.5.1), and try the hand-off with the real plugin under Wine — does a bind from inside Wine fail against the native listener? |
 | Generated `docs/tools.json`, `docs/TOOLS.md`, README table, CI check | tested |
-| Front 1, gated game tools: `open_game_window`, `write_macro`, `clear_macro`, `target_party_member` | tested. **Next:** in game, check each agent "open" call, that a written macro persists to MACRO.DAT, and the party-list row order. Open points: the `item` detail window has no open API (left out); `write_macro` rejects `lines` over 500 characters of JSON because the approval sentence truncates there (raise the cap in `McpServer.RenderApprovalSummary` for that case); named linkshell/CWLS chat channels not added (slot mapping could not be confirmed). |
+| Gated game tools: `open_game_window`, `write_macro`, `clear_macro`, `target_party_member` | tested. **Next:** in game, check each agent "open" call, that a written macro persists to MACRO.DAT, and the party-list row order. Open points: the `item` detail window has no open API (left out); `write_macro` rejects `lines` over 500 characters of JSON because the approval sentence truncates there (raise the cap in `McpServer.RenderApprovalSummary` for that case); named linkshell/CWLS chat channels not added (slot mapping could not be confirmed). |
+| The mod-family bridges (Ghostty, XivDesktop, Almanac), category `bridges` | tested. **Next:** no sibling gate has ever been called for real. The tools written against IPC the siblings do not have yet answer `unavailable` until those ship; see below. |
+| Static game-data tools and their templates and prompts | tested. **Next:** check these guesses against real data: the Grand Company supply slot to ClassJob mapping, the meaning of MapMarker DataType 4, roulette matching by English name, and that `get_recipe` output is unchanged after its move onto the shared `RecipeTree` code. Monster drops and quest hand-ins are not in the sheets and are not covered. |
+| Live read-only game state: `get_quest_journal`, `list_hotbars`, `get_duty_unlocks`, `list_social_groups`, `get_enmity_list`, `get_character_sheet`, `get_zone_live`, resource `ffxiv://zone/current` | tested. **Next:** every ClientStructs member these read is unverified in game. |
+| Dalamud tools (read and gated) | tested. **Next:** see the section below. |
+
+## Dalamud internals
+
+`set_plugin_enabled`, `reload_plugin`, `list_plugin_repositories`, `add_plugin_repository`, the update
+flags in `list_plugins` and `get_plugin_stats` reach Dalamud members that have no public API. All of it
+goes through `Providers/Dalamud/DalamudInternals.cs` and nowhere else:
+
+* every reflected name is in `DalamudInternals.Names`, and `DalamudInternalsTests` checks that table —
+  and the shapes the code assumes — against the `Dalamud.dll` the build references, so a Dalamud release
+  that renames or reshapes one fails CI instead of turning into a silent "unavailable" in game. It passed
+  against Dalamud 15.0.3.5 on 2026-09-20;
+* at run time each feature calls `FirstMissing(...)` first and returns null when this build lacks
+  anything it needs, and the tool then answers `unavailable` naming what is missing. Property reads and
+  the `Service<T>` lookup swallow reflection failures rather than propagating them, so nothing here
+  throws into a game frame. A failure *inside* a Dalamud call that does exist (a plugin throwing while it
+  loads) is deliberately surfaced as the tool's error, because that is the answer the caller wants.
+
+**Next:** none of this has run against a live Dalamud. When it is first tried in game, check
+`set_plugin_enabled` against a plugin in a non-default collection and `reload_plugin` on a dev plugin.
 
 ## Not landed
 
-| Group | Branch | State | What is there | Next concrete step |
-| --- | --- | --- | --- | --- |
-| Front 1, live read-only game state | `more/game` (6 commits) | tested by its author (plugin build clean, 76 selected tests incl. `ToolContractTests` passed); not integrated, full suite not run on it | `get_quest_journal`, `list_hotbars`, `get_duty_unlocks`, `list_social_groups` (names only), `get_enmity_list`, `get_character_sheet`, `get_zone_live` + resource `ffxiv://zone/current` | Rebase, full test run, regenerate catalogue, merge. Every ClientStructs member it reads is unverified in game. |
-| Front 1, static game data (also served pre-game) | `more/static` (1 WIP commit `275df0a`) | coded; plugin **and** standalone build clean; its tests were never observed finishing = untested | `get_recipe_tree`, `get_item_sources`, `get_item_uses`, `search_zones`, `get_zone_info`, `find_weather_windows`, `get_duty_unlock`, `list_roulettes`; templates `ffxiv://quest/{questId}`, `ffxiv://recipe/{recipeId}`, `ffxiv://duty/{dutyId}`, `ffxiv://zone/{territoryId}`; prompts `plan_daily_reset`, `what_do_i_need_to_craft`, `where_do_i_get`, `weather_hunt` | Run `RecipeTreeTests`, `WeatherWindowsTests`, `StaticDataToolsTests`, `ToolContractTests`; fix; split the commit; then the standalone test `ServedToolsMatchThePluginCatalogueExactly` needs the regenerated catalogue. Check these guesses against real data: GC supply slot to ClassJob mapping, MapMarker DataType 4 meaning, roulette matching by English name, that `get_recipe` output is unchanged after its refactor. Monster drops and quest hand-ins are not in the sheets and are not covered. |
-| Front 2, Dalamud | `more/dalamud` (WIP `91e0b92` + test fix `8385bf5`) | coded; build clean; 133 of 134 selected tests passed, the one failure was a wrong expectation, fixed but **not re-run** | Read: richer `list_plugins` / `get_dalamud_info`, `read_plugin_log` (scrubbed tail/search), `get_troubleshooting_summary`, `list_plugin_repositories`, `get_plugin_stats`, `get_ui_info`. Gated: `open_plugin_ui`, `open_dalamud_window`, `set_plugin_enabled`, `reload_plugin`, `add_plugin_repository` (assisted only: opens Settings and copies the URL; never writes Dalamud's configuration). Refuses to disable or reload XivMcp itself; nothing installs or updates. | Re-run the full plugin tests, split commits, merge. Risk to review first: `set_plugin_enabled`, `reload_plugin`, repositories, update flags and stats go through **non-public Dalamud internals** by reflection (names in `DalamudInternals.Names`, checked against the reference `Dalamud.dll` by a test); decide whether to ship those or only the public-API tools. |
-| Front 3, the mod family (Ghostty, XivDesktop, Almanac) | `more/mods` (WIP commit `03db6f8`, whose subject wrongly says "never built", plus an empty note commit `59580cd`) | coded; plugin build clean; 86 selected tests passed (`BridgeFamilyTests`, `ToolContractTests`) as reported by its author; full suite not run, not integrated | 37 tools, category `bridges`. Over IPC that exists today: `list_terminal_panels`, `get_terminal_layout` (reconstructed; Ghostty has no layout.get), `get_terminal_status`, `get_terminal_request`, `open_terminal` (approval shows the command verbatim), place / focus (never flies the character) / close / hide / order panel, screenshot, clip, theme and selftest through the fire-and-forget `Post` gate; `list_desktop_apps`, `list_desktop_windows`, `search_desktop_palette`, `get_desktop_status`, `launch_desktop_app`, `desktop_window_action`, `switch_desktop_workspace`, `ask_npc_assistant`; `get_almanac_status`, `ask_almanac`. The rest are clients for IPC the siblings do not have yet and answer `unavailable` until they do; the exact gates are in `Bridges/SiblingIpcProposals.cs`. Deliberately absent: typing text into a terminal, a benchmark submit verb. | Rebase, full test run, re-split the WIP commit, regenerate the catalogue (check the generator accepts `ipc:Gate#verb` source labels), add the almanac bridge and the "needs sibling IPC" tools to the docs, merge. No sibling gate has ever been called for real. |
-| Sibling-mod IPC additions (nothing to do in this repo until they exist) | — | designed | **Ghostty** `GhosttyDalamud.v1.Call` verbs: `api.version`, `layout.get` / `layout.set`, `theme.list` / `theme.set`, `capture.shot` {target, clean} returning {path, width, height}, `capture.clip`, `capture.status`, `selftest.run` / `selftest.report`, `leakwatch.report`, `gallery.share`. Today shot, clip, theme, selftest, leakwatch and share are chat-only, reachable only through the fire-and-forget `Post` gate with no result; there is no layout get/set at all. **XivDesktop**: `XivDesktop.v1.ApiVersion`, `.Panels` (read), `.Rescan`. **Almanac**: a JSON `Almanac.v1.Call` gate with `threads.list`, `threads.get`, `thread.new`, `ask` returning {accepted, threadId, turn}, `turn.status` (so the answer can be read), `bench.run` {mode: mock or live}, `bench.status`, `bench.result`, `bench.list`, `model.status`, `backends.status`; deliberately no verb that submits results to the leaderboard. Today Almanac exposes only `Almanac.ApiVersion` and `Almanac.Ask` (accepted true/false). | Add the gates in each sibling repo, then finish `more/mods` against them. |
-| Settings: rate limit | master has the setting (`RateLimitPerMinute`), no UI control | designed | — | Add an input under Advanced in `MainWindow.Settings.cs`. |
-| Minisite | — | nothing to change in data (it lists no tools) | — | The plugin description there says changes are "approved in game first"; with the checkbox that is "approved in game first unless you switch approval off". |
+| Group | State | Next concrete step |
+| --- | --- | --- |
+| Sibling-mod IPC additions | designed, and patches written for each sibling repo (not applied, not built, not run): see the owner's `xivmcp-sibling-ipc-2026-09-20` working directory. **Ghostty** `GhosttyDalamud.v1.Call`: `api.version`, `theme.list` / `theme.set`, `capture.shot` / `capture.clip` / `capture.status`, `selftest.run` / `selftest.report`, `leakwatch.report`, `gallery.share`. `layout.get` / `layout.set` were **not** written: `/term pin` has no absolute-world-position form, so a saved anchor cannot be written back as arguments that reproduce it — that is a feature to design, not a gate to wire up. **XivDesktop**: `XivDesktop.v1.ApiVersion`, `.Panels`, `.Rescan`. **Almanac**: the `Almanac.v1.Call` gate with all twelve verbs, and deliberately no verb that submits results to a leaderboard. | Apply each patch in its own repo, build it there, then try the bridge tools against it. `get_terminal_layouts` and `apply_terminal_layout` stay `unavailable` until Ghostty grows a way to reproduce a placement. |
+| Settings: rate limit | master has the setting (`RateLimitPerMinute`), no UI control | Add an input under Advanced in `MainWindow.Settings.cs`. |
+| Minisite | nothing to change in data (it lists no tools) | The plugin description there says changes are "approved in game first"; with the checkbox that is "approved in game first unless you switch approval off". |
+
+## Known flake
+
+`XivMcp.Core.Tests.LegacyProtocolTests.StandaloneStreamResumesWithLastEventId` timed out waiting for an
+SSE event once on a loaded build machine on 2026-09-20 and passed on every other run that day. If it
+recurs, the timeout in `tests/XivMcp.Core.Tests/Infrastructure/TestServer.cs` is the thing to look at.
 
 ## Deliberately not built, and not to be picked up
 
