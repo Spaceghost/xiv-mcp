@@ -17,7 +17,7 @@
     "api",
     "utility"
   ],
-  "RepoUrl": "https://github.com/Spaceghost/xiv-mcp",
+  "RepoUrl": "https://github.com/Spaceghost/xivmcp-dalamud",
   "LoadRequiredState": 0,
   "LoadSync": false,
   "LoadPriority": 0,
