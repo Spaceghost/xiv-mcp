@@ -301,7 +301,7 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-138 tools (33 change something and go through the approval switch; 26 also work before the game starts), 18 resources and templates, 10 prompts.
+145 tools (33 change something and go through the approval switch; 26 also work before the game starts), 19 resources and templates, 10 prompts.
 Catalogue version 2; the machine-readable listing is [docs/tools.json](docs/tools.json) and the full reference (arguments, data sources, approval text) is [docs/TOOLS.md](docs/TOOLS.md).
 Tier and category are the in-game switches; *Login* means the call fails at the title screen; *Approval* means the call waits for you in game
 while *Ask me before anything changes* is ticked; *Pre-game* means the standalone host serves it while the game is closed.
@@ -312,6 +312,7 @@ Behaviour in game is unverified unless stated elsewhere.
 | Tool | Tier | Category | Login | Approval | Pre-game | What it does |
 | --- | --- | --- | --- | --- | --- | --- |
 | `list_gearsets` | Read | actions | yes | — | — | Lists the character's saved gear sets. |
+| `list_hotbars` | Read | actions | yes | — | — | What is on the player's hotbars for the current job, as the HUD shows them. bars: standard (hotbars 1-10, 12 slots), cross (cross hotbar sets 1-8, 16 slots), pet, petCross, or all; number picks one standard/cross bar. |
 | `list_macros` | Read | actions | yes | — | — | Lists the user's macros from the in-game User Macros window: set individual (this character) or shared (all characters on the account), 100 slots each. |
 | `clear_macro` | Action | actions | yes | yes | — | Empties one User Macros slot (set individual or shared, index 0-99): title, icon and lines are removed, as with Delete in the User Macros window. |
 | `clear_target` | Action | actions | yes | yes | — | Clears the user's current target (like pressing Escape on a target). |
@@ -372,7 +373,9 @@ Behaviour in game is unverified unless stated elsewhere.
 | `share_terminal_capture` | Action | bridges | yes | yes | — | Uploads one screenshot or clip from GhosttyDalamud's capture folder to its online gallery and returns the link (result.url). path is a file path from get_terminal_capture_status, or "last" for the most recent capture. |
 | `switch_desktop_workspace` | Action | bridges | no | yes | — | Switches XivDesktop's current workspace (1-9): window panels assigned to other workspaces are hidden, this one's are shown. |
 | `get_attributes` | Read | character | yes | — | — | Every attribute the client tracks for the logged-in character, as {baseParamId, name, value} — including the crafter and gatherer stats an agent needs before planning a craft: craftsmanship, control, CP, gathering, pe… |
+| `get_character_sheet` | Read | character | yes | — | — | One condensed snapshot for 'summarise my character': identity (name, home world and data center, title, grand company and rank, free company tag), job (abbreviation, name, role, level, synced level, max HP/MP), attrib… |
 | `get_conditions` | Read | character | no | — | — | The game's condition flags (what state the client is in). |
+| `get_enmity_list` | Read | character | yes | — | — | The HUD's enmity information, as a one-off snapshot. enemies: the on-screen enemy list in display order {position, name, entityId, enmityPercent (the player's own enmity on that enemy; 100 = it is attacking the player… |
 | `get_job_gauge` | Read | character | yes | — | — | The current job's gauge (the job-specific resource UI: e.g. PLD oath, WAR beast gauge, BLM astral fire/umbral ice and polyglot, SAM sen/kenki, VPR rattling coils/serpent offerings, PCT palette/canvas/motifs). |
 | `get_job_levels` | Read | character | yes | — | — | Every combat class/job, crafter and gatherer with the logged-in character's level and experience. |
 | `get_player` | Read | character | yes | — | — | Snapshot of the logged-in player character. |
@@ -384,6 +387,7 @@ Behaviour in game is unverified unless stated elsewhere.
 | `get_dalamud_info` | Read | dalamud | no | — | — | Returns environment facts about this game client: dalamudVersion, dalamudApiLevel, dalamudScmVersion/gitHash/betaTrack when known, gameVersion (ffxiv) and expansionVersions, clientLanguage (game data language), dalamu… |
 | `list_plugins` | Read | dalamud | no | — | — | Lists the Dalamud plugins installed in this game client. |
 | `get_duty_state` | Read | duty | yes | — | — | Instanced-content status. |
+| `get_duty_unlocks` | Read | duty | yes | — | — | Which Duty Finder duties this character has unlocked and cleared, as far as the client knows. |
 | `get_roulette_status` | Read | duty | yes | — | — | Which Duty Finder roulettes have already given their daily completion bonus this reset. |
 | `get_events` | Read | events | no | — | — | Polls the plugin's bounded stream of game events and returns them oldest first. |
 | `list_event_kinds` | Read | events | no | — | — | The event kinds currently in the buffer with how many of each, plus the current cursor and the buffer size. |
@@ -430,8 +434,10 @@ Behaviour in game is unverified unless stated elsewhere.
 | `post_objective` | Ui | objectives | no | — | — | Creates or replaces (same id) a custom objective that the player sees in game like a tracked quest: title and current step under the Duty List, live 'ready now' / 'next window in N min' state, click to place the map f… |
 | `update_objective` | Ui | objectives | no | — | — | Reports progress on an objective posted with post_objective or loaded from a pack: advance=true marks the current step done (after the last step the objective completes), step=N makes step N (0-based) current with eve… |
 | `get_party` | Read | party | yes | — | — | The player's party. mode is solo \| party \| crossRealmParty \| alliance. members (the 8-slot party list; empty when solo) each have index, name, contentId (string), entityId, homeWorld, job {abbreviation, name, role}, l… |
+| `list_social_groups` | Read | party | yes | — | — | Names of the groups the logged-in character belongs to, and nothing else: freeCompany {loaded, member, name, tag, rank (the company's rank 1-30), grandCompany}, linkshells and crossWorldLinkshells {loaded, count, grou… |
 | `get_achievements` | Read | progress | yes | — | — | The character's achievement progress: totalInGame, completed, pointsEarned and pointsAvailable, then a filtered, paged list of {id, name, description, category, points, completed}. |
 | `get_collection_progress` | Read | progress | yes | — | — | Unlock progress for one collection kind: mounts, minions, orchestrion (orchestrion rolls), emotes, fashionAccessories (also accepted as ornaments), triadCards (Triple Triad cards), bardings (chocobo barding), glasses… |
+| `get_quest_journal` | Read | progress | yes | — | — | The quests the character has accepted, as the Journal lists them: questId (Quest sheet row id), name, sequence (the client's step counter; 255 = all steps done, readyToComplete=true), objectives (the journal to-do tex… |
 | `get_quest_status` | Read | progress | yes | — | — | For each quest id (Quest sheet row id; short ids below 65536 are accepted): whether the character has completed it, whether it is currently accepted (in the journal) and its current sequence step, plus name and whethe… |
 | `get_addon_text` | Read | ui | yes | — | — | Reads every text string shown in one game UI window (addon), including text inside nested components such as lists, buttons and tabs, in reading order (top-to-bottom, left-to-right by screen position). |
 | `get_dialogue` | Read | ui | yes | — | — | Returns whatever conversation or prompt windows are currently visible, read-only: talk (NPC speaker + dialogue text of the current Talk box), subtitle (cutscene subtitle), selectString / selectIconString (the option l… |
@@ -446,6 +452,7 @@ Behaviour in game is unverified unless stated elsewhere.
 | `get_location` | Read | world | yes | — | — | Where the player is. |
 | `get_time` | Read | world | no | — | yes | Current Eorzea time and the real-world reset schedule. |
 | `get_weather_forecast` | Read | world | no | — | yes | Weather forecast for a zone computed with the game's own deterministic weather algorithm (weather changes every 8 Eorzea hours = 23m20s real time, at ET 00:00, 08:00 and 16:00). |
+| `get_zone_live` | Read | world | yes | — | — | What is going on in the zone the player is standing in, right now, in one call: territoryId, zone and region names, intendedUse (Town, Overworld, Dungeon, HousingOutdoor, ...), map, area/subArea place names, instance… |
 | `list_aetherytes` | Read | world | yes | — | — | The player's teleport list (the in-game Teleport window): every attuned aetheryte plus housing destinations (own/FC house, shared estates, apartments). |
 | `list_fates` | Read | world | yes | — | — | FATEs currently known in the player's zone, nearest first. |
 | `list_nearby_objects` | Read | world | yes | — | — | Game objects loaded around the player (the client only knows objects within roughly 100 yalms, fewer in crowded areas), sorted nearest first; the local player is excluded. |
@@ -474,6 +481,7 @@ Resources and templates follow the Read tier and their category.
 | `ffxiv://objectives` | objectives | no | Same JSON as list_objectives (with completed ones). |
 | `ffxiv://party` | party | yes | Same JSON as get_party. |
 | `ffxiv://location` | world | yes | Same JSON as get_location. |
+| `ffxiv://zone/current` | world | yes | Same JSON as get_zone_live with the five nearest FATEs. |
 
 ### Prompts
 

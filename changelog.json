@@ -10,6 +10,10 @@
       "items": [
         {
           "status": "beta",
+          "text": "Seven read-only tools for what is happening right now: get_quest_journal (your accepted quests and their current steps), list_hotbars (what is actually on your bars), get_duty_unlocks (which duties this character has unlocked), list_social_groups (the names of your free company, linkshells and cross-world linkshells), get_enmity_list (who currently has hate on what you are fighting), get_character_sheet and get_zone_live, plus a resource ffxiv://zone/current that updates as you travel. None of them prompts and none of them acts. Every one reads the game client's own memory through ClientStructs, and none of those reads has been checked against a running game yet."
+        },
+        {
+          "status": "beta",
           "text": "Eight tools that answer from the game's own data files, so they work before the game has started as well as inside it: get_recipe_tree walks a whole crafting tree and pools what you actually need, get_item_sources and get_item_uses say where an item comes from and what it goes into, search_zones and get_zone_info cover the map, find_weather_windows finds the next real-world times a zone has the weather you want (optionally right after another weather, and only during given Eorzea hours), and get_duty_unlock and list_roulettes cover duties. With them come four resource templates (quest, recipe, duty, zone) and four prompts: plan_daily_reset, what_do_i_need_to_craft, where_do_i_get and weather_hunt. All read-only. Monster drops and quest hand-ins are not in the data files and are not covered."
         },
         {

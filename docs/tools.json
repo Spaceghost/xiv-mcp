@@ -3135,6 +3135,319 @@
       }
     },
     {
+      "name": "get_character_sheet",
+      "title": "Get character sheet",
+      "category": "character",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:IObjectTable",
+        "dalamud:IClientState",
+        "client:PlayerState",
+        "client:InventoryManager",
+        "client:CurrencyManager",
+        "client:RetainerManager",
+        "lumina:Item",
+        "lumina:Materia",
+        "lumina:BaseParam"
+      ],
+      "description": "One condensed snapshot for 'summarise my character': identity (name, home world and data center, title, grand company and rank, free company tag), job (abbreviation, name, role, level, synced level, max HP/MP), attributes (non-zero stats relevant to the current job as {name, value}), gear (averageItemLevel computed with the character window's rule, lowest item level slot, lowest condition %, melded materia count, and each piece with slot, itemId, name, itemLevel, hq, condition % and materia names with their stat bonus), currencies (gil, grand company seals, and the first topCurrencies non-zero balances with caps and weekly tomestone progress) and retainers (count, total gil, completed ventures; loaded=false until a summoning bell has been used this session). A section that cannot be read is omitted and explained under unavailable instead of failing the call. For full detail use get_player, get_attributes, get_equipment, get_currencies, get_retainers, get_job_levels.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "topCurrencies": {
+            "description": "How many non-zero currencies to include (0-50).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50,
+            "default": 12
+          },
+          "includeRetainers": {
+            "description": "Include the retainer summary.",
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "identity": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "homeWorld": {
+                "type": "string"
+              },
+              "dataCenter": {
+                "type": "string"
+              },
+              "currentWorld": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "grandCompany": {
+                "type": "string"
+              },
+              "grandCompanyRank": {
+                "type": "string"
+              },
+              "freeCompanyTag": {
+                "type": "string"
+              }
+            }
+          },
+          "job": {
+            "type": "object",
+            "properties": {
+              "abbreviation": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "level": {
+                "type": "integer"
+              },
+              "syncedLevel": {
+                "type": "integer"
+              },
+              "maxHp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "maxMp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            },
+            "required": [
+              "level",
+              "maxHp"
+            ]
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value"
+              ]
+            }
+          },
+          "gear": {
+            "type": "object",
+            "properties": {
+              "averageItemLevel": {
+                "type": "integer"
+              },
+              "averageItemLevelNote": {
+                "type": "string"
+              },
+              "lowestItemLevel": {
+                "type": "integer"
+              },
+              "lowestItemLevelSlot": {
+                "type": "string"
+              },
+              "lowestConditionPercent": {
+                "type": "number"
+              },
+              "materiaMelded": {
+                "type": "integer"
+              },
+              "pieces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "string"
+                    },
+                    "itemId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "itemLevel": {
+                      "type": "integer"
+                    },
+                    "hq": {
+                      "type": "boolean"
+                    },
+                    "conditionPercent": {
+                      "type": "number"
+                    },
+                    "materia": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "itemId",
+                    "itemLevel"
+                  ]
+                }
+              },
+              "emptySlots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "averageItemLevel",
+              "materiaMelded"
+            ]
+          },
+          "currencies": {
+            "type": "object",
+            "properties": {
+              "gil": {
+                "type": "integer"
+              },
+              "grandCompanySeals": {
+                "type": "string"
+              },
+              "nonZero": {
+                "type": "integer"
+              },
+              "top": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "max": {
+                      "type": "integer"
+                    },
+                    "weeklyAcquired": {
+                      "type": "integer"
+                    },
+                    "weeklyLimit": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "count"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "gil",
+              "nonZero"
+            ]
+          },
+          "retainers": {
+            "type": "object",
+            "properties": {
+              "loaded": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "totalGil": {
+                "type": "integer"
+              },
+              "venturesComplete": {
+                "type": "integer"
+              },
+              "retainers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "classJob": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "gil": {
+                      "type": "integer"
+                    },
+                    "marketItems": {
+                      "type": "integer"
+                    },
+                    "venture": {
+                      "type": "string"
+                    },
+                    "ventureComplete": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "level",
+                    "gil",
+                    "marketItems"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "loaded",
+              "count",
+              "totalGil",
+              "venturesComplete"
+            ]
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
       "name": "get_collection_progress",
       "title": "Get collection progress",
       "category": "progress",
@@ -4471,6 +4784,295 @@
           "levelSync",
           "itemLevelSync",
           "inDutyFinder"
+        ]
+      }
+    },
+    {
+      "name": "get_duty_unlocks",
+      "title": "Get duty unlocks and clears",
+      "category": "duty",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:UIState",
+        "lumina:ContentFinderCondition",
+        "lumina:ContentType"
+      ],
+      "description": "Which Duty Finder duties this character has unlocked and cleared, as far as the client knows. Each duty: dutyId (ContentFinderCondition row id, the id search_duties and get_duty use), name, contentType (Dungeons, Trials, Raids, ...), level (required level), itemLevel (required average item level), unlocked, completed (cleared at least once), contentKind (instanceContent|publicContent|other) and contentId. unlocked/completed are omitted for content kinds the client keeps no flag for. Filters: contentType (name substring or ContentType id), minLevel/maxLevel, nameContains, onlyLocked (still locked), onlyIncomplete (unlocked but never cleared). Also returns unlocked/completed counts per content type for the filtered scope. Sorted by level; paged with limit/offset. Use for 'what have I not unlocked/cleared'; use get_duty for how a duty is unlocked, and get_roulette_status for today's roulette bonuses.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "description": "Content type name (partial ok, e.g. \"Dungeon\", \"Trial\", \"Raid\") or ContentType id.",
+            "type": "string"
+          },
+          "minLevel": {
+            "description": "Lowest required level to include.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "default": 0
+          },
+          "maxLevel": {
+            "description": "Highest required level to include; 0 = no upper bound.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "default": 0
+          },
+          "onlyLocked": {
+            "description": "Only duties that are still locked.",
+            "type": "boolean",
+            "default": false
+          },
+          "onlyIncomplete": {
+            "description": "Only duties that are unlocked but have never been cleared.",
+            "type": "boolean",
+            "default": false
+          },
+          "nameContains": {
+            "description": "Case-insensitive duty name substring filter.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum duties (1-500).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "offset": {
+            "description": "Duties to skip for paging.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "returned": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "known": {
+            "type": "integer"
+          },
+          "unlocked": {
+            "type": "integer"
+          },
+          "completed": {
+            "type": "integer"
+          },
+          "byContentType": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "contentType": {
+                  "type": "string"
+                },
+                "known": {
+                  "type": "integer"
+                },
+                "unlocked": {
+                  "type": "integer"
+                },
+                "completed": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "known",
+                "unlocked",
+                "completed"
+              ]
+            }
+          },
+          "duties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dutyId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "itemLevel": {
+                  "type": "integer"
+                },
+                "unlocked": {
+                  "type": "boolean"
+                },
+                "completed": {
+                  "type": "boolean"
+                },
+                "contentKind": {
+                  "type": "string"
+                },
+                "contentId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              },
+              "required": [
+                "dutyId",
+                "level",
+                "contentId"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "returned",
+          "truncated",
+          "known",
+          "unlocked",
+          "completed"
+        ]
+      }
+    },
+    {
+      "name": "get_enmity_list",
+      "title": "Get enemy list and target enmity",
+      "category": "character",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:UIState",
+        "dalamud:IObjectTable",
+        "dalamud:ITargetManager"
+      ],
+      "description": "The HUD's enmity information, as a one-off snapshot. enemies: the on-screen enemy list in display order {position, name, entityId, enmityPercent (the player's own enmity on that enemy; 100 = it is attacking the player), isCurrentTarget}. targetEnmity: for the current target, who is on its enmity table {rank, name, entityId, enmity, percentOfTop, isPlayer} highest first, which is what the party list enmity bars show. Both are empty out of combat. Use for 'who has aggro' or 'what is attacking me'; use get_target for the target's HP, cast bar and statuses, and get_party for party members.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "enemyCount": {
+            "type": "integer"
+          },
+          "enemies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "entityId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "enmityPercent": {
+                  "type": "integer"
+                },
+                "isCurrentTarget": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "position",
+                "entityId",
+                "enmityPercent"
+              ]
+            }
+          },
+          "targetEntityId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "targetName": {
+            "type": "string"
+          },
+          "targetEnmity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rank": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "entityId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "enmity": {
+                  "type": "integer"
+                },
+                "percentOfTop": {
+                  "type": "number"
+                },
+                "isPlayer": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "rank",
+                "entityId",
+                "enmity",
+                "percentOfTop"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enemyCount"
         ]
       }
     },
@@ -8829,6 +9431,193 @@
           "id",
           "level",
           "isRepeatable"
+        ]
+      }
+    },
+    {
+      "name": "get_quest_journal",
+      "title": "Get the quest journal",
+      "category": "progress",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:QuestManager",
+        "lumina:Quest",
+        "lumina:JournalGenre"
+      ],
+      "description": "The quests the character has accepted, as the Journal lists them: questId (Quest sheet row id), name, sequence (the client's step counter; 255 = all steps done, readyToComplete=true), objectives (the journal to-do text for the current step, looked up in game data; objectiveResolved=false when it could not be matched, then rely on sequence), level, genre and category (journal headings), priority (marked as priority in the journal), tracked (shown in the duty list on screen), daily/dailyCompleted for tribal dailies, repeatable and acceptedAs (the job it was accepted on). Priority and tracked quests sort first. allowances has accepted quest count out of 30, tribal (beast tribe) daily allowances remaining out of 12, accepted levequests and leve allowances with the next allowance time. Paged with limit/offset. Use this for 'what am I in the middle of'; use get_quest_status to test specific quest ids (including completed ones) and get_quest for static quest data such as rewards and prerequisites.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "trackedOnly": {
+            "description": "Only quests tracked on screen (the duty list).",
+            "type": "boolean",
+            "default": false
+          },
+          "includeHidden": {
+            "description": "Include quests the player has hidden in the journal.",
+            "type": "boolean",
+            "default": true
+          },
+          "nameContains": {
+            "description": "Case-insensitive quest name substring filter.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum quests (1-500).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "offset": {
+            "description": "Quests to skip for paging.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "returned": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "allowances": {
+            "type": "object",
+            "properties": {
+              "acceptedQuests": {
+                "type": "integer"
+              },
+              "acceptedQuestLimit": {
+                "type": "integer"
+              },
+              "acceptedDailyQuests": {
+                "type": "integer"
+              },
+              "beastTribeAllowancesRemaining": {
+                "type": "integer"
+              },
+              "beastTribeAllowancesPerDay": {
+                "type": "integer"
+              },
+              "acceptedLeves": {
+                "type": "integer"
+              },
+              "leveAllowances": {
+                "type": "integer"
+              },
+              "nextLeveAllowancesUtc": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "acceptedQuests",
+              "acceptedQuestLimit",
+              "acceptedDailyQuests",
+              "beastTribeAllowancesRemaining",
+              "beastTribeAllowancesPerDay",
+              "acceptedLeves",
+              "leveAllowances"
+            ]
+          },
+          "quests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "questId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "sequence": {
+                  "type": "integer"
+                },
+                "readyToComplete": {
+                  "type": "boolean"
+                },
+                "objectives": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "objectiveResolved": {
+                  "type": "boolean"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "genre": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "boolean"
+                },
+                "tracked": {
+                  "type": "boolean"
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "daily": {
+                  "type": "boolean"
+                },
+                "dailyCompleted": {
+                  "type": "boolean"
+                },
+                "repeatable": {
+                  "type": "boolean"
+                },
+                "acceptedAs": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "questId",
+                "sequence",
+                "readyToComplete",
+                "objectiveResolved",
+                "priority",
+                "tracked"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "returned",
+          "truncated"
         ]
       }
     },
@@ -13294,6 +14083,311 @@
       }
     },
     {
+      "name": "get_zone_live",
+      "title": "Get live zone summary",
+      "category": "world",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "dalamud:IClientState",
+        "dalamud:IFateTable",
+        "dalamud:IAetheryteList",
+        "client:AgentMap",
+        "client:TerritoryInfo",
+        "client:WeatherManager",
+        "client:HousingManager",
+        "lumina:TerritoryType"
+      ],
+      "description": "What is going on in the zone the player is standing in, right now, in one call: territoryId, zone and region names, intendedUse (Town, Overworld, Dungeon, HousingOutdoor, ...), map, area/subArea place names, instance (the instance number when the zone is split into instances; omitted otherwise), current weather, the player's map coordinates, inSanctuary, inDuty + duty, inHousingDistrict + housing {area, ward, plot, room, inside}, isPvp, canFly, fates {active count, currentFateId, nearest topFates with level, state, progressPercent, timeRemainingSeconds, hasBonus, mapCoordinates, distance}, and the attuned aetherytes in this zone with teleport cost, plus the nearest aetheryte. A part that cannot be read is listed under unavailable instead of failing the call. This is the digest; use get_location, list_fates, list_aetherytes, get_weather_forecast or get_duty_state for the full detail of one part. Also served as resource ffxiv://zone/current.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "topFates": {
+            "description": "How many of the nearest active FATEs to include (0-25).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 25,
+            "default": 5
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "territoryId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "zone": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "intendedUse": {
+            "type": "string"
+          },
+          "map": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "area": {
+            "type": "string"
+          },
+          "subArea": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "isInstancedZone": {
+            "type": "boolean"
+          },
+          "weather": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "playerMapCoordinates": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "z": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          },
+          "inSanctuary": {
+            "type": "boolean"
+          },
+          "inDuty": {
+            "type": "boolean"
+          },
+          "duty": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "inHousingDistrict": {
+            "type": "boolean"
+          },
+          "housing": {
+            "type": "object",
+            "properties": {
+              "area": {
+                "type": "string"
+              },
+              "ward": {
+                "type": "integer"
+              },
+              "plot": {
+                "type": "integer"
+              },
+              "room": {
+                "type": "integer"
+              },
+              "inside": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "inside"
+            ]
+          },
+          "isPvp": {
+            "type": "boolean"
+          },
+          "canFly": {
+            "type": "boolean"
+          },
+          "fates": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "integer"
+              },
+              "currentFateId": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "nearest": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "progressPercent": {
+                      "type": "integer"
+                    },
+                    "timeRemainingSeconds": {
+                      "type": "integer"
+                    },
+                    "hasBonus": {
+                      "type": "boolean"
+                    },
+                    "mapCoordinates": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "z": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ]
+                    },
+                    "distance": {
+                      "type": "number"
+                    },
+                    "playerIsIn": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "level",
+                    "progressPercent",
+                    "distance"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "active"
+            ]
+          },
+          "attunedAetherytesHere": {
+            "type": "integer"
+          },
+          "aetherytes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "aetheryteId": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "name": {
+                  "type": "string"
+                },
+                "gilCost": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "isHomePoint": {
+                  "type": "boolean"
+                },
+                "isFavourite": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "aetheryteId",
+                "gilCost"
+              ]
+            }
+          },
+          "nearestAetheryte": {
+            "type": "string"
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "territoryId",
+          "isInstancedZone",
+          "inSanctuary",
+          "inDuty",
+          "inHousingDistrict",
+          "isPvp",
+          "canFly",
+          "attunedAetherytesHere"
+        ]
+      }
+    },
+    {
       "name": "ghostty_command",
       "title": "Command the in-game terminal bridge",
       "category": "bridges",
@@ -14515,6 +15609,159 @@
       }
     },
     {
+      "name": "list_hotbars",
+      "title": "List hotbar contents",
+      "category": "actions",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:RaptureHotbarModule",
+        "client:RaptureMacroModule",
+        "client:RaptureGearsetModule",
+        "lumina:Action",
+        "lumina:Item",
+        "lumina:GeneralAction",
+        "lumina:Emote"
+      ],
+      "description": "What is on the player's hotbars for the current job, as the HUD shows them. bars: standard (hotbars 1-10, 12 slots), cross (cross hotbar sets 1-8, 16 slots), pet, petCross, or all; number picks one standard/cross bar. Each bar: kind, number, sharedAcrossJobs, slotCount, used, and slots {slot (1-based), kind (action, item, macro, gearset, emote, generalAction, craftAction, petAction, buddyAction, mainCommand, extraCommand, mount, companion, marker, fieldMarker, recipe, ...), id, name (resolved from game data; macro title or gear set name for those kinds), keybind (the hint drawn on the slot, e.g. '1' or 'c2'), iconId, shownAs* when the slot currently displays a different action than the one assigned, macroSet + macroIndex for macros (match list_macros)}. Empty slots are skipped unless includeEmpty=true. Strictly a listing: no tool presses a hotbar slot. Use for 'what is on my bars', 'where did I put Sprint', hotbar layout advice.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bars": {
+            "description": "Which bars to list.",
+            "type": "string",
+            "enum": [
+              "standard",
+              "cross",
+              "pet",
+              "petCross",
+              "all"
+            ],
+            "default": "standard"
+          },
+          "number": {
+            "description": "One bar number: 1-10 for standard, 1-8 for cross. Omit for every bar of that kind.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "includeEmpty": {
+            "description": "Include empty slots.",
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "string"
+          },
+          "pvpHotbarsActive": {
+            "type": "boolean"
+          },
+          "bars": {
+            "type": "integer"
+          },
+          "hotbars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "number": {
+                  "type": "integer"
+                },
+                "sharedAcrossJobs": {
+                  "type": "boolean"
+                },
+                "slotCount": {
+                  "type": "integer"
+                },
+                "used": {
+                  "type": "integer"
+                },
+                "slots": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slot": {
+                        "type": "integer"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "keybind": {
+                        "type": "string"
+                      },
+                      "iconId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "shownAsKind": {
+                        "type": "string"
+                      },
+                      "shownAsId": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      },
+                      "shownAsName": {
+                        "type": "string"
+                      },
+                      "macroSet": {
+                        "type": "string"
+                      },
+                      "macroIndex": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "slot",
+                      "id"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "number",
+                "slotCount",
+                "used"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pvpHotbarsActive",
+          "bars"
+        ]
+      }
+    },
+    {
       "name": "list_macros",
       "title": "List user macros",
       "category": "actions",
@@ -15425,6 +16672,147 @@
           "returned",
           "truncated"
         ]
+      }
+    },
+    {
+      "name": "list_social_groups",
+      "title": "List the character's social groups",
+      "category": "party",
+      "permission": "read",
+      "availability": "live",
+      "requiresLogin": true,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "client:InfoProxyFreeCompany",
+        "client:InfoProxyLinkshell",
+        "client:InfoProxyCrossWorldLinkshell",
+        "dalamud:IObjectTable",
+        "lumina:GrandCompany"
+      ],
+      "description": "Names of the groups the logged-in character belongs to, and nothing else: freeCompany {loaded, member, name, tag, rank (the company's rank 1-30), grandCompany}, linkshells and crossWorldLinkshells {loaded, count, groups [{slot 1-8, name}]}. No member lists and no data about other players. loaded=false means the client has not loaded that information yet (free company details load when the Free Company window is opened; the tag is still reported from the nameplate); it is not an error. notExposed lists what cannot be read (PvP team, fellowships, the character's own rank title). Use for 'which linkshell number is X' before suggesting a /linkshellN message, or 'what FC am I in'. Use get_party for the current party.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "freeCompany": {
+            "type": "object",
+            "properties": {
+              "loaded": {
+                "type": "boolean"
+              },
+              "member": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "rank": {
+                "type": "integer"
+              },
+              "grandCompany": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "loaded",
+              "member"
+            ]
+          },
+          "linkshells": {
+            "type": "object",
+            "properties": {
+              "loaded": {
+                "type": "boolean"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "slot"
+                  ]
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "loaded",
+              "count"
+            ]
+          },
+          "crossWorldLinkshells": {
+            "type": "object",
+            "properties": {
+              "loaded": {
+                "type": "boolean"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "slot"
+                  ]
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "loaded",
+              "count"
+            ]
+          },
+          "notExposed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        }
       }
     },
     {
@@ -19644,6 +21032,14 @@
       "mimeType": "application/json",
       "requiresLogin": false,
       "description": "Your approval tickets (same shape as list_tickets with state all). Subscribe for notifications/resources/updated on every change."
+    },
+    {
+      "uri": "ffxiv://zone/current",
+      "name": "Current zone (live)",
+      "category": "world",
+      "mimeType": "application/json",
+      "requiresLogin": true,
+      "description": "Same JSON as get_zone_live with the five nearest FATEs. Subscribers are notified when the territory changes."
     }
   ],
   "resourceTemplates": [
