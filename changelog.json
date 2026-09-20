@@ -1,7 +1,7 @@
 {
   "_comment": "The changelog. tools/changelog.py renders CHANGELOG.md from this file, and the plugin shows the same entries in game in the What's new tab (the file is embedded in XivMcp.Core). Every user-visible change edits this file in the same commit. Statuses: new/fix (in a release, seen working in game), beta (merged, not yet verified in game), next (still being built, not merged).",
   "project": "XivMcp",
-  "intro": "Every change to XivMcp a user can see, newest first.\n\nXivMcp has not had a release, and the plugin has not yet been observed running in the game: nothing below about in-game behaviour has been seen working. Treat it as the design, not as a result — the README says the same thing.",
+  "intro": "Every change to XivMcp a user can see, newest first.\n\nXivMcp's releases are built and tested without the game, and the plugin has not yet been observed running in the game: nothing below about in-game behaviour has been seen working. Treat it as the design, not as a result — the README says the same thing.",
   "releases": [
     {
       "version": "next",
