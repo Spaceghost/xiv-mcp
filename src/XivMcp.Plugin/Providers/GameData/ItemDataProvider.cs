@@ -18,9 +18,14 @@ public sealed class ItemDataProvider
         ["MainHand", "OffHand", "Head", "Body", "Gloves", "Waist", "Legs", "Feet", "Ears", "Neck", "Wrists", "FingerL", "FingerR", "SoulCrystal"];
 
     private readonly GameDataIndex index;
+    private readonly ItemSources sources;
     private readonly ConcurrentDictionary<uint, (string? Label, string[] Slots)> slotCache = new();
 
-    public ItemDataProvider(IGameDataSource data) => index = GameDataIndex.For(data);
+    public ItemDataProvider(IGameDataSource data)
+    {
+        index = GameDataIndex.For(data);
+        sources = new ItemSources(index);
+    }
 
     [McpTool("search_items",
         Availability = ToolAvailability.Static,
@@ -122,11 +127,11 @@ public sealed class ItemDataProvider
         var isEquipment = row.EquipSlotCategory.RowId != 0;
         var slots = isEquipment ? SlotsOf(row.EquipSlotCategory.RowId) : default;
 
-        var (vendors, vendorTotal) = Vendors(row);
-        var (exchanges, exchangeTotal) = Exchanges(itemId);
-        var craftedBy = CraftedBy(itemId);
-        var (usedIn, usedInTotal) = UsedIn(itemId);
-        var gathering = GatheringSources(itemId);
+        var (vendors, vendorTotal) = sources.Vendors(row, 0, MaxVendors);
+        var (exchanges, exchangeTotal) = sources.Exchanges(itemId, 0, MaxExchanges);
+        var craftedBy = sources.CraftedBy(itemId);
+        var (usedIn, usedInTotal) = sources.UsedIn(itemId, 0, MaxUsedIn);
+        var gathering = sources.Gathering(itemId, MaxGatheringPoints);
 
         return new ItemDetail(
             itemId,
@@ -308,178 +313,4 @@ public sealed class ItemDataProvider
 
     private string ParamName(uint id) =>
         index.Row<Sheets.BaseParam>(id) is { } p && SheetJson.Text(p.Name) is { Length: > 0 } n ? n : $"BaseParam #{id}";
-
-    private (List<VendorSource>, int) Vendors(Sheets.Item row)
-    {
-        if (!index.GilShopsByItem.TryGetValue(row.RowId, out var shops)) return ([], 0);
-        var pairs = new List<(uint Shop, uint Npc)>();
-        var seenNpcs = new HashSet<uint>();
-        foreach (var shopId in shops)
-        {
-            if (!index.NpcsByShop.TryGetValue(shopId, out var npcs) || npcs.Length == 0)
-            {
-                pairs.Add((shopId, 0));
-                continue;
-            }
-
-            foreach (var npc in npcs)
-            {
-                if (seenNpcs.Add(npc)) pairs.Add((shopId, npc));
-            }
-        }
-
-        // Vendors with a known map location first, then by NPC id; build DTOs only for the returned slice.
-        var located = pairs
-            .Select(p => (p.Shop, p.Npc, Location: p.Npc != 0 ? index.NpcLocation(p.Npc) : null))
-            .OrderBy(p => p.Location == null)
-            .ThenBy(p => p.Npc == 0)
-            .ThenBy(p => p.Npc)
-            .Take(MaxVendors);
-        var list = located.Select(p => new VendorSource(
-                p.Npc != 0 ? index.NpcName(p.Npc) : "(no resolvable NPC)",
-                p.Npc,
-                index.Row<Sheets.GilShop>(p.Shop) is { } shop ? GameDataIndex.NullIfEmpty(SheetJson.Text(shop.Name)) : null,
-                p.Shop,
-                row.PriceMid,
-                p.Location))
-            .ToList();
-        return (list, pairs.Count);
-    }
-
-    private (List<ExchangeSource>, int) Exchanges(uint itemId)
-    {
-        var list = new List<ExchangeSource>();
-        if (!index.SpecialShopsByItem.TryGetValue(itemId, out var shops)) return (list, 0);
-        var total = 0;
-        foreach (var shopId in shops)
-        {
-            if (index.Row<Sheets.SpecialShop>(shopId) is not { } shop) continue;
-            var npcs = index.NpcsByShop.TryGetValue(shopId, out var ids)
-                ? ids.Take(3).Select(n => index.NpcLocation(n) is { Zone: { } zone } loc ? $"{index.NpcName(n)} ({zone} {loc.X:0.0}, {loc.Y:0.0})" : index.NpcName(n)).ToList()
-                : [];
-            foreach (var entry in shop.Item)
-            {
-                uint receiveCount = 0;
-                var match = false;
-                foreach (var receive in entry.ReceiveItems)
-                {
-                    if (receive.Item.RowId != itemId) continue;
-                    match = true;
-                    receiveCount = receive.ReceiveCount;
-                    break;
-                }
-
-                if (!match) continue;
-                total++;
-                if (list.Count >= MaxExchanges) continue;
-                var costs = new List<ExchangeCost>();
-                foreach (var cost in entry.ItemCosts)
-                {
-                    if (cost.ItemCost.RowId == 0 || cost.CurrencyCost == 0) continue;
-                    var (costItem, costName) = ResolveCurrency(cost.ItemCost.RowId, shop.UseCurrencyType);
-                    costs.Add(new ExchangeCost(costItem, costName, cost.CurrencyCost));
-                }
-
-                list.Add(new ExchangeSource(GameDataIndex.NullIfEmpty(SheetJson.Text(shop.Name)), shopId, receiveCount, costs, npcs));
-            }
-        }
-
-        return (list, total);
-    }
-
-    /// <summary>
-    /// SpecialShop cost ids below 10 are currency slots rather than item ids. For UseCurrencyType 2 and 4 they index
-    /// TomestonesItem.Tomestones (1 = Poetics, 3 = the weekly-capped tomestone, ...; verified against the Poetics and
-    /// Mnemonics exchanges). For UseCurrencyType 16 they are special-currency ids (scrips) that only the running client
-    /// maps to items, so they are reported unresolved (itemId 0).
-    /// </summary>
-    private (uint ItemId, string Name) ResolveCurrency(uint id, byte useCurrencyType)
-    {
-        if (id >= 10) return (id, index.ItemName(id));
-        if (useCurrencyType is 2 or 4)
-        {
-            foreach (var t in index.Sheet<Sheets.TomestonesItem>())
-            {
-                if (t.Tomestones.RowId == id && t.Item.RowId != 0) return (t.Item.RowId, index.ItemName(t.Item.RowId));
-            }
-        }
-
-        if (useCurrencyType == 16) return (0, $"Special currency #{id} (scrip-type currency; not resolvable from game data)");
-        return (id, index.ItemName(id));
-    }
-
-    private List<RecipeRef> CraftedBy(uint itemId)
-    {
-        var list = new List<RecipeRef>();
-        if (!index.Recipes.ByResult.TryGetValue(itemId, out var recipeIds)) return list;
-        foreach (var id in recipeIds)
-        {
-            if (index.Row<Sheets.Recipe>(id) is not { } recipe) continue;
-            var level = recipe.RecipeLevelTable.ValueNullable;
-            list.Add(new RecipeRef(id, itemId, index.ItemName(itemId), index.CraftTypeName(recipe.CraftType.RowId),
-                level?.ClassJobLevel ?? 0, StarsOrNull(level?.Stars), null, YieldOrNull(recipe.AmountResult)));
-        }
-
-        return list;
-    }
-
-    internal static int? StarsOrNull(byte? stars) => stars is > 0 ? stars : null;
-
-    internal static int? YieldOrNull(byte amount) => amount > 1 ? amount : null;
-
-    private (List<RecipeRef>, int) UsedIn(uint itemId)
-    {
-        var list = new List<RecipeRef>();
-        if (!index.Recipes.ByIngredient.TryGetValue(itemId, out var uses)) return (list, 0);
-        foreach (var (recipeId, amount) in uses.Take(MaxUsedIn))
-        {
-            if (index.Row<Sheets.Recipe>(recipeId) is not { } recipe) continue;
-            var level = recipe.RecipeLevelTable.ValueNullable;
-            list.Add(new RecipeRef(recipeId, recipe.ItemResult.RowId, index.ItemName(recipe.ItemResult.RowId),
-                index.CraftTypeName(recipe.CraftType.RowId), level?.ClassJobLevel ?? 0, StarsOrNull(level?.Stars), amount, YieldOrNull(recipe.AmountResult)));
-        }
-
-        return (list, uses.Length);
-    }
-
-    private List<GatheringSource> GatheringSources(uint itemId)
-    {
-        var list = new List<GatheringSource>();
-        if (!index.Gathering.ByItem.TryGetValue(itemId, out var gatheringItems)) return list;
-        foreach (var gid in gatheringItems)
-        {
-            if (index.Row<Sheets.GatheringItem>(gid) is not { } gi) continue;
-            var levelRow = gi.GatheringItemLevel.ValueNullable;
-            var points = new List<GatheringPointRef>();
-            var seen = new HashSet<(uint, uint)>();
-            var totalPoints = 0;
-            if (index.Gathering.BasesByGatheringItem.TryGetValue(gid, out var bases))
-            {
-                foreach (var baseId in bases)
-                {
-                    if (index.Row<Sheets.GatheringPointBase>(baseId) is not { } pointBase) continue;
-                    var type = GameDataIndex.NullIfEmpty(SheetJson.Text(pointBase.GatheringType.ValueNullable?.Name ?? default));
-                    if (!index.Gathering.PointsByBase.TryGetValue(baseId, out var pointIds)) continue;
-                    foreach (var pid in pointIds)
-                    {
-                        if (index.Row<Sheets.GatheringPoint>(pid) is not { } point) continue;
-                        if (point.TerritoryType.RowId == 0) continue;
-                        if (!seen.Add((point.TerritoryType.RowId, point.PlaceName.RowId))) continue;
-                        totalPoints++;
-                        if (points.Count >= MaxGatheringPoints) continue;
-                        points.Add(new GatheringPointRef(
-                            index.TerritoryName(point.TerritoryType.RowId),
-                            GameDataIndex.NullIfEmpty(SheetJson.Text(point.PlaceName.ValueNullable?.Name ?? default)),
-                            pointBase.GatheringLevel,
-                            type,
-                            point.TerritoryType.RowId));
-                    }
-                }
-            }
-
-            list.Add(new GatheringSource(gid, levelRow?.GatheringItemLevel ?? 0, levelRow?.Stars ?? 0, gi.IsHidden, gi.PerceptionReq, totalPoints, points));
-        }
-
-        return list;
-    }
 }

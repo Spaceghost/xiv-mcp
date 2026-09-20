@@ -11,7 +11,7 @@ namespace XivMcp.Plugin.Providers.GameData;
 public sealed partial class DutyDataProvider
 {
     /// <summary>ContentFinderCondition bool columns that mark roulette membership.</summary>
-    private static readonly PropertyInfo[] RouletteColumns = typeof(Sheets.ContentFinderCondition)
+    internal static readonly PropertyInfo[] RouletteColumns = typeof(Sheets.ContentFinderCondition)
         .GetProperties(BindingFlags.Public | BindingFlags.Instance)
         .Where(p => p.PropertyType == typeof(bool) && (p.Name.EndsWith("Roulette", StringComparison.Ordinal) || p.Name == "DailyFrontlineChallenge"))
         .ToArray();
@@ -124,7 +124,14 @@ public sealed partial class DutyDataProvider
             roulettes);
     }
 
-    private NamedRef? UnlockQuest(Sheets.ContentFinderCondition row)
+    [McpResourceTemplate("ffxiv://duty/{dutyId}",
+        Name = "Duty",
+        Description = "Game-data record for a duty (ContentFinderCondition id; same content as the get_duty tool).",
+        GameThread = false,
+        RequiresLogin = false)]
+    public DutyDetail DutyResource(uint dutyId) => GetDuty(dutyId);
+
+    internal NamedRef? UnlockQuest(Sheets.ContentFinderCondition row)
     {
         foreach (var criteria in new[] { row.UnlockCriteria, row.UnlockCriteria2 })
         {
@@ -167,7 +174,7 @@ public sealed partial class DutyDataProvider
         return exact.Count > 0 ? exact : partial;
     }
 
-    private static string Humanize(string column)
+    internal static string Humanize(string column)
     {
         var name = column.EndsWith("Roulette", StringComparison.Ordinal) ? column[..^"Roulette".Length] : column;
         return CamelBoundary().Replace(name, " $1").Trim();
