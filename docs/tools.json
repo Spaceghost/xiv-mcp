@@ -15025,6 +15025,78 @@
       }
     },
     {
+      "name": "laya_query",
+      "title": "Ask local Laya",
+      "category": "ai",
+      "permission": "read",
+      "availability": "static",
+      "requiresLogin": false,
+      "needsApproval": false,
+      "approvalSummary": null,
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "dataSources": [
+        "http:local-laya"
+      ],
+      "description": "Ask the local Laya typed-decision model one or more typed questions about supplied state. Read-only: the result is advisory and never executes a game action.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "description": "State/context Laya should reason over.",
+            "type": "string"
+          },
+          "questions": {
+            "description": "JSON object of JEV/Laya questions, e.g. {\"safe\":{\"type\":\"noul\",\"instructions\":\"Is this safe?\"}}.",
+            "type": "string"
+          },
+          "endpoint": {
+            "description": "Optional Laya /v1/systemone endpoint. Loopback is the default.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "questions"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Any JSON value.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "result"
+        ]
+      }
+    },
+    {
       "name": "list_addons",
       "title": "List game UI windows",
       "category": "ui",
