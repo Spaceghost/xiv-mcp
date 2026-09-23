@@ -218,6 +218,75 @@ public sealed class DalamudLogTests : IDisposable
         Assert.Empty(DalamudLogLocator.Candidates(null, "", "  "));
     }
 
+    [Fact]
+    public void XlCoreKeepsTheLogInItsLogsFolder()
+    {
+        // XIVLauncher.Core: ~/.xlcore/pluginConfigs/<Plugin>/ and ~/.xlcore/logs/dalamud.log. Seen in game on
+        // v0.1.1-test.1, where only ~/.xlcore/dalamud.log was looked for.
+        var logs = Path.Combine(root, "logs");
+        Directory.CreateDirectory(logs);
+        var candidates = DalamudLogLocator.Candidates(
+            Path.Combine(root, "pluginConfigs", "XivMcp"),
+            Path.Combine(root, "pluginConfigs", "XivMcp.json"),
+            Path.Combine(root, "dalamudAssets", "dev"));
+        Assert.Equal([Path.Combine(root, "dalamud.log"), Path.Combine(logs, "dalamud.log")], candidates.Take(2));
+
+        File.WriteAllText(Path.Combine(logs, "dalamud.log"), "");
+        Assert.Equal(Path.Combine(logs, "dalamud.log"), DalamudLogLocator.FindExisting(candidates));
+
+        // Where both exist, the launcher root's own file is taken first, as on Windows.
+        File.WriteAllText(LogPath, "");
+        Assert.Equal(LogPath, DalamudLogLocator.FindExisting(candidates));
+    }
+
+    [Fact]
+    public void WinePathsGiveWinePathsOnAnyHost()
+    {
+        // Under Wine the plugin sees Z:\ paths, whatever OS the tests run on.
+        var candidates = DalamudLogLocator.Candidates(
+            @"Z:\home\me\.xlcore\pluginConfigs\XivMcp",
+            @"Z:\home\me\.xlcore\pluginConfigs\XivMcp.json",
+            @"Z:\home\me\.xlcore\dalamudAssets\dev");
+        Assert.Equal(
+            [
+                @"Z:\home\me\.xlcore\dalamud.log",
+                @"Z:\home\me\.xlcore\logs\dalamud.log",
+                @"Z:\home\me\.xlcore\dalamudAssets\dalamud.log",
+                @"Z:\home\me\.xlcore\dalamudAssets\logs\dalamud.log",
+            ],
+            candidates);
+    }
+
+    [Fact]
+    public void WindowsXivLauncherKeepsTheLogInItsRoot()
+    {
+        var candidates = DalamudLogLocator.Candidates(
+            @"C:\Users\me\AppData\Roaming\XIVLauncher\pluginConfigs\XivMcp\",
+            @"C:\Users\me\AppData\Roaming\XIVLauncher\pluginConfigs\XivMcp.json",
+            null);
+        Assert.Equal(
+            [
+                @"C:\Users\me\AppData\Roaming\XIVLauncher\dalamud.log",
+                @"C:\Users\me\AppData\Roaming\XIVLauncher\logs\dalamud.log",
+            ],
+            candidates);
+    }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/pluginConfigs")]
+    [InlineData(@"C:\")]
+    [InlineData(@"C:\pluginConfigs")]
+    [InlineData("Z:")]
+    public void NothingIsLookedForAboveTheRoot(string configDirectory) =>
+        Assert.Empty(DalamudLogLocator.Candidates(configDirectory, null, null));
+
+    [Fact]
+    public void AForwardSlashWinePathIsReadAsAWindowsPath() =>
+        Assert.Equal(
+            [@"Z:\home\me\.xlcore\dalamud.log", @"Z:\home\me\.xlcore\logs\dalamud.log"],
+            DalamudLogLocator.Candidates("Z:/home/me/.xlcore/pluginConfigs/XivMcp", null, null));
+
     private DalamudLogProvider Provider() => new(
         FakeProxy.Create<IDalamudPluginInterface>(new()
         {

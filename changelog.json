@@ -10,6 +10,10 @@
       "items": [
         {
           "status": "beta",
+          "text": "read_plugin_log and get_troubleshooting_summary now find dalamud.log on XIVLauncher.Core (Linux and macOS), which keeps it in ~/.xlcore/logs/ rather than next to pluginConfigs; XIVLauncher on Windows (%AppData%\\XIVLauncher\\dalamud.log) is still looked for first. Seen failing in game on 0.1.1-test.1; fixed in host tests, not yet verified in game."
+        },
+        {
+          "status": "beta",
           "text": "When one plugin is installed twice under the same name (a disabled dev copy next to the installed one), XivMcp now looks at the copy that is loaded. The XivDesktop, Ghostty and Almanac tools no longer say \"installed but not loaded\" while the plugin is running, get_troubleshooting_summary no longer lists it as not loaded, list_plugins shows each copy its own state, and open_plugin_ui opens the loaded copy instead of calling the name ambiguous. Enabling, disabling or reloading such a plugin is still refused and left to the plugin installer. Seen failing in game on 0.1.1-test.1 with XivDesktop; fixed in host tests, not yet verified in game."
         },
         {

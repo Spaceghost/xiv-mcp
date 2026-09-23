@@ -230,20 +230,29 @@ public static class DalamudLogTailReader
 }
 
 /// <summary>
-/// Finds dalamud.log from paths the plugin interface hands out. XIVLauncher keeps the log in its roaming root
-/// (<c>~/.xlcore</c>, <c>%AppData%\XIVLauncher</c>) next to <c>pluginConfigs/</c> and <c>dalamudAssets/</c>; nothing here
-/// names a home directory.
+/// Finds dalamud.log from paths the plugin interface hands out; nothing here names a home directory. The launcher's
+/// root holds <c>pluginConfigs/</c> and <c>dalamudAssets/</c>, and the log sits either in that root (XIVLauncher on
+/// Windows: <c>%AppData%\XIVLauncher\dalamud.log</c>) or in its <c>logs/</c> folder (XIVLauncher.Core on Linux and
+/// macOS: <c>~/.xlcore/logs/dalamud.log</c>).
 /// </summary>
+/// <remarks>
+/// Pure string work, no <see cref="Path.GetFullPath(string)"/>: under Wine the plugin sees Windows paths
+/// (<c>Z:\home\me\.xlcore\pluginConfigs\XivMcp</c>), and the candidates must come out the same on whatever host
+/// runs the tests. A path with a drive letter or a backslash is split on both separators and joined with a
+/// backslash; any other path is split and joined on <c>/</c>.
+/// </remarks>
 public static class DalamudLogLocator
 {
     public const string FileName = "dalamud.log";
+    public const string LogsFolder = "logs";
 
     /// <param name="pluginConfigDirectory"><c>&lt;root&gt;/pluginConfigs/&lt;InternalName&gt;</c></param>
     /// <param name="pluginConfigFile"><c>&lt;root&gt;/pluginConfigs/&lt;InternalName&gt;.json</c></param>
     /// <param name="assetDirectory"><c>&lt;root&gt;/dalamudAssets/&lt;version&gt;</c></param>
+    /// <returns>Each root's <c>dalamud.log</c>, then its <c>logs/dalamud.log</c>, without duplicates, most likely root first.</returns>
     public static IReadOnlyList<string> Candidates(string? pluginConfigDirectory, string? pluginConfigFile, string? assetDirectory)
     {
-        var roots = new List<string?>
+        var roots = new List<(string Path, char Separator)?>
         {
             Up(pluginConfigDirectory, 2),
             Up(pluginConfigFile, 2),
@@ -254,11 +263,14 @@ public static class DalamudLogLocator
         var result = new List<string>();
         foreach (var root in roots)
         {
-            if (string.IsNullOrEmpty(root))
+            if (root is not { } r || string.IsNullOrEmpty(r.Path))
                 continue;
-            var candidate = Path.Combine(root, FileName);
-            if (!result.Contains(candidate, StringComparer.Ordinal))
-                result.Add(candidate);
+            var baseDir = r.Path.EndsWith(r.Separator) ? r.Path : r.Path + r.Separator;
+            foreach (var candidate in new[] { baseDir + FileName, baseDir + LogsFolder + r.Separator + FileName })
+            {
+                if (!result.Contains(candidate, StringComparer.Ordinal))
+                    result.Add(candidate);
+            }
         }
 
         return result;
@@ -266,20 +278,53 @@ public static class DalamudLogLocator
 
     public static string? FindExisting(IEnumerable<string> candidates) => candidates.FirstOrDefault(File.Exists);
 
-    private static string? Up(string? path, int levels)
+    /// <summary><paramref name="path"/> without its last <paramref name="levels"/> segments, and the separator it uses; null at or above the root.</summary>
+    private static (string Path, char Separator)? Up(string? path, int levels)
     {
         if (string.IsNullOrWhiteSpace(path))
             return null;
-        try
+
+        var text = path.Trim();
+        var windows = text.Contains('\\') || (text.Length >= 2 && char.IsAsciiLetter(text[0]) && text[1] == ':');
+        var separator = windows ? '\\' : '/';
+        if (windows)
+            text = text.Replace('/', '\\');
+
+        // The root ("/", "C:\", "\\server\share\") is never cut into.
+        var rootLength = RootLength(text, windows);
+        var current = text.Length > rootLength ? text.TrimEnd(separator) : text;
+        if (current.Length < rootLength)
+            current = text[..rootLength];
+
+        for (var i = 0; i < levels; i++)
         {
-            var current = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-            for (var i = 0; i < levels && current is not null; i++)
-                current = Path.GetDirectoryName(current);
-            return current;
+            if (current.Length <= rootLength)
+                return null;
+            var cut = current.LastIndexOf(separator);
+            if (cut < 0)
+                return null;
+            current = cut < rootLength ? current[..rootLength] : current[..cut];
         }
-        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+
+        return current.Length == 0 ? null : (current, separator);
+    }
+
+    private static int RootLength(string path, bool windows)
+    {
+        if (!windows)
+            return path.StartsWith('/') ? 1 : 0;
+        if (path.Length >= 2 && char.IsAsciiLetter(path[0]) && path[1] == ':')
+            return path.Length >= 3 && path[2] == '\\' ? 3 : 2;
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
         {
-            return null;
+            // \\server\share\ is the root of a UNC path.
+            var server = path.IndexOf('\\', 2);
+            if (server < 0)
+                return path.Length;
+            var share = path.IndexOf('\\', server + 1);
+            return share < 0 ? path.Length : share + 1;
         }
+
+        return path.StartsWith('\\') ? 1 : 0;
     }
 }
