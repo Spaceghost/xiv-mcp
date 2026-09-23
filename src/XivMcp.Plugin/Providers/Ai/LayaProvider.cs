@@ -15,7 +15,7 @@ public sealed class LayaProvider
     private const string DefaultEndpoint = "http://127.0.0.1:8080/v1/systemone";
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
 
-    [McpTool("laya_decide",
+    [McpTool("laya_query",
         Title = "Ask local Laya",
         Description = "Ask the local Laya typed-decision model one or more typed questions about supplied state. Read-only: the result is advisory and never executes a game action.",
         GameThread = false,

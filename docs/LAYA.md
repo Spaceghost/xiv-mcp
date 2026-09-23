@@ -4,7 +4,7 @@ XivMcp can expose a local Laya typed-decision model as an ordinary MCP tool.
 
 ## Tool
 
-`laya_decide` accepts:
+`laya_query` accepts:
 
 - `state`: text/context to classify.
 - `questions`: a JSON object using Laya/JEV question definitions.
