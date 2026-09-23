@@ -2,9 +2,12 @@
 # Both jobs run the same thing, tools/ci/run.sh: the workflow only sets up the
 # .NET SDK, restores the NuGet cache and calls it.
 #
-# The hosted job's runner comes from the repository variable CI_RUNS_ON (a JSON
-# string or label array), default GitHub's ubuntu-latest. The self-hosted job
-# only exists when the repository variable CI_SELF_HOSTED is "true".
+# Runs the repository owner starts (pushes, this repository's branches' pull
+# requests, manual runs) go to the self-hosted job on the fedora build host; a fork's pull request,
+# a run anyone else starts, or a run inside a fork, goes to the hosted job. Setting the repository variable
+# CI_SELF_HOSTED to "false" sends everything to the hosted job again. The hosted
+# job's runner comes from CI_RUNS_ON (a JSON string or label array), default
+# GitHub's ubuntu-latest.
 #
 # Neither job has a game installation, so tools/fetch-dalamud.sh pulls the public
 # Dalamud reference assemblies into ./.dalamud first and DALAMUD_LIB_PATH points at
@@ -31,6 +34,13 @@ concurrency:
 
 jobs:
   hosted:
+    if: >-
+      ${{ vars.CI_SELF_HOSTED == 'false'
+          || github.actor != github.repository_owner
+          || github.triggering_actor != github.repository_owner
+          || github.event.repository.fork
+          || (github.event_name == 'pull_request'
+              && github.event.pull_request.head.repo.full_name != github.repository) }}
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 45
     steps:
@@ -82,15 +92,24 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # The same stages on the owner's runner, which can carry the Dalamud reference
-  # assemblies. A self-hosted runner executes whatever a workflow asks for, so a
-  # pull request from a fork must never reach it: the `if` below runs the job
-  # only for events from this repository, and only while CI_SELF_HOSTED is
-  # "true" (an offline runner then just queues nothing). The xiv-mcp label keeps
-  # other repositories' jobs off it. No environment or secret is involved.
+  # The same stages on the owner's fedora build host: ci-dispatchd boots a
+  # one-shot container from the ci-runner-dalamud image (the .NET 10 SDK and the
+  # Dalamud reference assemblies already in it) for exactly this job. A
+  # self-hosted runner executes whatever a workflow asks for, so a pull request
+  # from a fork must never reach it: the `if` below runs the job only for events
+  # from this repository, never in a fork, and not while CI_SELF_HOSTED is
+  # "false". The dispatcher refuses fork pull requests on its own as well. No
+  # environment or secret is involved. CI_SELF_HOSTED_RUNS_ON (a JSON label
+  # array) overrides the labels.
   self-hosted:
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_SELF_HOSTED == 'true' }}
-    runs-on: [self-hosted, Linux, X64, xiv-mcp]
+    if: >-
+      ${{ vars.CI_SELF_HOSTED != 'false'
+          && github.actor == github.repository_owner
+          && github.triggering_actor == github.repository_owner
+          && !github.event.repository.fork
+          && (github.event_name != 'pull_request'
+              || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ${{ fromJSON(vars.CI_SELF_HOSTED_RUNS_ON || '["self-hosted","xivmcp-dalamud","fedora-dalamud"]') }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -125,6 +144,11 @@ jobs:
       - name: Check the plugin manifest
         run: tools/check-manifest.py
 
+      # The runner image carries the current Dalamud release; dalamud-seed copies
+      # it into .dalamud only while it is still the live one, else does nothing.
+      - name: Seed the Dalamud reference assemblies from the runner image
+        run: if command -v dalamud-seed >/dev/null; then dalamud-seed "$PWD/.dalamud"; fi
+
       - name: Fetch the Dalamud reference assemblies
         run: tools/fetch-dalamud.sh
 
@@ -136,7 +160,7 @@ jobs:
       - name: Upload build output
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: xiv-mcp-self-hosted-${{ github.sha }}
+          name: xiv-mcp-${{ github.sha }}
           path: artifacts
           if-no-files-found: error
           retention-days: 14
