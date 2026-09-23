@@ -22,7 +22,7 @@
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <RootNamespace>Umbra.XivMcp</RootNamespace>
     <AssemblyName>Umbra.XivMcp</AssemblyName>
-    <Version>0.1.1.2</Version>
+    <Version>0.1.1.3</Version>
     <Authors>Johnneylee Jack Rollins</Authors>
     <Description>Umbra toolbar widgets for the XivMcp Model Context Protocol server (talks to it over Dalamud IPC).</Description>
     <IsPackable>false</IsPackable>
