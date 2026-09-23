@@ -15029,7 +15029,7 @@
       "title": "Ask local Laya",
       "category": "ai",
       "permission": "read",
-      "availability": "static",
+      "availability": "live",
       "requiresLogin": false,
       "needsApproval": false,
       "approvalSummary": null,
