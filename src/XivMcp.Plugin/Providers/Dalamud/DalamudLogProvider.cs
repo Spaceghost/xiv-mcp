@@ -181,7 +181,7 @@ public sealed class DalamudLogProvider
             pluginInterface.ConfigFile?.FullName,
             pluginInterface.DalamudAssetDirectory?.FullName);
         var path = DalamudLogLocator.FindExisting(candidates)
-            ?? throw McpToolException.WithCode(McpErrorCodes.Unavailable, "dalamud.log was not found next to Dalamud's pluginConfigs folder. This launcher keeps its log somewhere else; the player can open it from the launcher or with /xllog in game.");
+            ?? throw McpToolException.WithCode(McpErrorCodes.Unavailable, "dalamud.log was not found in the launcher folder that holds Dalamud's pluginConfigs, nor in its logs folder. This launcher keeps its log somewhere else; the player can open it from the launcher or with /xllog in game.");
         try
         {
             return DalamudLogTailReader.ReadTail(path, maxBytes);
