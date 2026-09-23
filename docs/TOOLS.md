@@ -171,7 +171,7 @@ Writes one slot of the User Macros window, replacing whatever is in it: set indi
 
 ### `laya_query`
 
-Read tier · hints: readOnly, idempotent · login not required · pre-game: yes
+Read tier · hints: readOnly, idempotent · login not required · pre-game: no
 
 **Sources:** `http:local-laya`
 

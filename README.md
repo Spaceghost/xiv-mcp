@@ -301,7 +301,7 @@ do not edit the block by hand.
 
 <!-- BEGIN GENERATED CATALOG: dotnet run --project tools/catalog -- readme --write README.md -->
 
-156 tools (38 change something and go through the approval switch; 27 also work before the game starts), 19 resources and templates, 10 prompts.
+156 tools (38 change something and go through the approval switch; 26 also work before the game starts), 19 resources and templates, 10 prompts.
 Catalogue version 2; the machine-readable listing is [docs/tools.json](docs/tools.json) and the full reference (arguments, data sources, approval text) is [docs/TOOLS.md](docs/TOOLS.md).
 Tier and category are the in-game switches; *Login* means the call fails at the title screen; *Approval* means the call waits for you in game
 while *Ask me before anything changes* is ticked; *Pre-game* means the standalone host serves it while the game is closed.
@@ -322,7 +322,7 @@ Behaviour in game is unverified unless stated elsewhere.
 | `target_party_member` | Action | actions | yes | yes | — | Targets one member of the user's own party, like clicking their row in the party list. |
 | `teleport` | Action | actions | yes | yes | — | Starts the Teleport spell to one of the character's attuned aetherytes (or free-company/private estate and apartment entries), exactly like choosing it in the Teleport window. |
 | `write_macro` | Action | actions | yes | yes | — | Writes one slot of the User Macros window, replacing whatever is in it: set individual (this character) or shared (all characters), index 0-99 as in list_macros, title (at most 20 characters), optional iconId (an icon… |
-| `laya_query` | Read | ai | no | — | yes | Ask the local Laya typed-decision model one or more typed questions about supplied state. |
+| `laya_query` | Read | ai | no | — | — | Ask the local Laya typed-decision model one or more typed questions about supplied state. |
 | `get_ticket` | Read | approvals | no | — | — | Returns one of your approval tickets: state (pending, approved, executed, failed, denied, cancelled, expired), who decided, your resumeToken, and once it ran the tool result (result, same shape as a tools/call result)… |
 | `list_tickets` | Read | approvals | no | — | — | Lists your approval tickets, oldest first. state filters: open (pending or approved, the default), pending, final, all. |
 | `cancel_ticket` | Ui | approvals | no | — | — | Withdraws one of your pending tickets so the player is no longer asked about it. |

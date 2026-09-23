@@ -20,7 +20,6 @@ public sealed class LayaProvider
         Description = "Ask the local Laya typed-decision model one or more typed questions about supplied state. Read-only: the result is advisory and never executes a game action.",
         GameThread = false,
         RequiresLogin = false,
-        Availability = ToolAvailability.Static,
         Sources = ["http:local-laya"])]
     public async Task<object> Decide(
         [McpParam("State/context Laya should reason over.")] string state,
