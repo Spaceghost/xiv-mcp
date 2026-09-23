@@ -130,7 +130,7 @@ public sealed class DalamudLogProvider
             plugins.Count(static p => p.IsThirdParty),
             plugins.Count(static p => p.IsDev),
             plugins.Count(static p => p.IsTesting),
-            Names(plugins.Where(static p => !p.IsLoaded)),
+            Names(PluginInstances.NotLoaded(plugins, static p => p.InternalName, static p => p.IsLoaded)),
             internals is null ? null : Distinct(internals.Where(static p => p.State is "LoadError" or "DependencyResolutionFailed").Select(static p => p.InternalName)),
             Names(plugins.Where(static p => p.IsOutdated)),
             Names(plugins.Where(static p => p.IsOrphaned)),

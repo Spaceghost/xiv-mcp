@@ -46,9 +46,7 @@ public sealed unsafe class DalamudProvider
     {
         limit = Math.Clamp(limit, 1, 500);
         var all = new List<PluginInfo>();
-        var states = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in DalamudInternals.GetPlugins() ?? [])
-            states[p.InternalName] = states.TryGetValue(p.InternalName, out var other) && other == "Loaded" ? other : p.State;
+        var internals = DalamudInternals.GetPlugins() ?? [];
         var updatable = DalamudInternals.GetUpdatableInternalNames();
         foreach (var plugin in pluginInterface.InstalledPlugins)
         {
@@ -92,7 +90,7 @@ public sealed unsafe class DalamudProvider
                 apiLevel,
                 CleanUrl(installedFrom),
                 CleanUrl(projectUrl),
-                states.GetValueOrDefault(plugin.InternalName),
+                PluginInstances.Find(internals, plugin.InternalName, plugin.IsDev, static p => p.InternalName, static p => p.IsDev, static p => p.IsLoaded)?.State,
                 updatable is null ? null : updatable.Contains(plugin.InternalName)));
         }
 
