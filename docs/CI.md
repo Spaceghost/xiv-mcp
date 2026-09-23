@@ -8,8 +8,8 @@ the .NET SDK, restores the NuGet cache and calls it.
 
 | Trigger | Job | Runs | Output |
 | --- | --- | --- | --- |
-| push to any branch, pull request, manual | `hosted` in `.github/workflows/ci.yml` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` = `artifacts/` (kept 14 days) |
-| the same, but only for events from this repository and only while `CI_SELF_HOSTED` is `true` | `self-hosted` in the same workflow, `runs-on: [self-hosted, Linux, X64, xiv-mcp]` | `tools/ci/run.sh test build` | artifact `xiv-mcp-self-hosted-<sha>` |
+| push to any branch, pull request from a branch of this repository, manual | `self-hosted` in `.github/workflows/ci.yml`, `runs-on: [self-hosted, xivmcp-dalamud, fedora-dalamud]` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` = `artifacts/` (kept 14 days) |
+| pull request from a fork, any run inside a fork, or anything while `CI_SELF_HOSTED` is `false` | `hosted` in the same workflow, GitHub's `ubuntu-latest` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` |
 | by hand, on your machine or in the Incus build container | `tools/ci/local.sh [stage...]` | the same stages | `artifacts/` where it ran |
 
 Changes that touch only Markdown or `docs/` do not start CI. A newer push to the
@@ -17,14 +17,28 @@ same branch or pull request cancels the older run. `permissions: contents: read`
 no secrets, and every third-party action is pinned by commit SHA. Nothing uses
 `pull_request_target`.
 
-A fork pull request cannot reach the self-hosted runner: the job's `if` requires
-`github.event.pull_request.head.repo.full_name == github.repository`, so a fork's
-event never starts it, and the `xiv-mcp` label keeps other repositories' jobs off
-the machine. That is the whole guard — there is no deployment environment to
-approve.
+A fork pull request cannot reach the self-hosted runner. Three independent
+guards keep it off:
 
-**Neither runner has a game installation**, so the Dalamud reference assemblies
-are missing there and `tools/ci/run.sh` says so and skips
+1. The job's `if` requires
+   `github.event.pull_request.head.repo.full_name == github.repository` and
+   `!github.event.repository.fork`, so a fork's event never starts it; the
+   `hosted` job runs it on GitHub's runner instead.
+2. The runner is minted by `ci-dispatchd` on the fedora build host for one queued
+   job and destroyed after it. The dispatcher refuses any pull request run whose
+   head repository is not this one, whatever the workflow file says, and the
+   container sits on an isolated bridge with no route to the LAN, the tailnet or
+   the host.
+3. Settings → Actions → General → *Approval for running fork pull request
+   workflows* is **require approval for all external contributors**.
+
+There is no deployment environment to approve and no secret on the runner.
+
+**Neither runner has a game installation.** Both jobs run
+`tools/fetch-dalamud.sh` for the public reference assemblies; the self-hosted
+runner's image (`ci-runner-dalamud`) already carries the current release, and
+`dalamud-seed` copies it into `.dalamud` only while it is still the live one.
+Without them the Dalamud reference assemblies are missing and `tools/ci/run.sh` says so and skips
 `tests/XivMcp.Plugin.Tests`, `src/XivMcp.Plugin` and `src/XivMcp.Umbra` instead
 of failing. Give a runner `DALAMUD_LIB_PATH` (XIVLauncher's
 `~/.xlcore/dalamud/Hooks/dev`) to cover them.
@@ -67,21 +81,24 @@ Variables); no YAML change is needed:
 
 | Variable | Effect |
 | --- | --- |
+| `CI_SELF_HOSTED` unset or anything but `false` | this repository's own runs use the `self-hosted` job; fork pull requests use `hosted` |
+| `CI_SELF_HOSTED` = `false` | every run uses the `hosted` job (the build host is down, say) |
+| `CI_SELF_HOSTED_RUNS_ON` | the `self-hosted` job's labels as a JSON array, default `["self-hosted","xivmcp-dalamud","fedora-dalamud"]` |
 | `CI_RUNS_ON` unset | the `hosted` job runs on GitHub's `ubuntu-latest` |
 | `CI_RUNS_ON` = `"ubuntu-24.04"` | a specific GitHub-hosted image |
-| `CI_RUNS_ON` = `["self-hosted","Linux","X64","xiv-mcp"]` | the `hosted` job also lands on your own runner |
-| `CI_SELF_HOSTED` = `true` | additionally runs the `self-hosted` job (labels `self-hosted, Linux, X64, xiv-mcp`) |
-| `CI_SELF_HOSTED` unset or anything else | that job does not exist for the run |
 
 ```sh
-gh variable set CI_SELF_HOSTED --body true
-gh variable set CI_RUNS_ON --body '"ubuntu-latest"'
-gh variable delete CI_RUNS_ON     # back to the default
+gh variable set CI_SELF_HOSTED --body false   # GitHub-hosted only
+gh variable delete CI_SELF_HOSTED             # back to the build host
+gh variable set CI_RUNS_ON --body '"ubuntu-24.04"'
 ```
 
 A self-hosted runner executes whatever a workflow in this repository asks for.
-Register it with the label `xiv-mcp`, ideally ephemeral, and keep
-`CI_SELF_HOSTED` unset while it is not wanted.
+The labels are the build host's: `xivmcp-dalamud` is this repository's
+registration with `ci-dispatchd`, and `fedora-dalamud` picks the
+`ci-runner-dalamud` image. A job only waits for a runner while its labels match
+a registration, so without one the job queues; set `CI_SELF_HOSTED` to `false`
+then.
 
 ## Running it locally
 
