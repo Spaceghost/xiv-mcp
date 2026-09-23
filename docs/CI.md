@@ -8,8 +8,8 @@ the .NET SDK, restores the NuGet cache and calls it.
 
 | Trigger | Job | Runs | Output |
 | --- | --- | --- | --- |
-| push to any branch, pull request from a branch of this repository, manual | `self-hosted` in `.github/workflows/ci.yml`, `runs-on: [self-hosted, xivmcp-dalamud, fedora-dalamud]` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` = `artifacts/` (kept 14 days) |
-| pull request from a fork, any run inside a fork, or anything while `CI_SELF_HOSTED` is `false` | `hosted` in the same workflow, GitHub's `ubuntu-latest` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` |
+| push to any branch, pull request from a branch of this repository, manual, started by the repository owner | `self-hosted` in `.github/workflows/ci.yml`, `runs-on: [self-hosted, xivmcp-dalamud, fedora-dalamud]` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` = `artifacts/` (kept 14 days) |
+| a run anyone else starts (collaborators, Dependabot), pull request from a fork, any run inside a fork, or anything while `CI_SELF_HOSTED` is `false` | `hosted` in the same workflow, GitHub's `ubuntu-latest` | `tools/ci/run.sh test build` | artifact `xiv-mcp-<sha>` |
 | by hand, on your machine or in the Incus build container | `tools/ci/local.sh [stage...]` | the same stages | `artifacts/` where it ran |
 
 Changes that touch only Markdown or `docs/` do not start CI. A newer push to the

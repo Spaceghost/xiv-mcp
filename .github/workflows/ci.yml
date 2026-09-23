@@ -2,9 +2,9 @@
 # Both jobs run the same thing, tools/ci/run.sh: the workflow only sets up the
 # .NET SDK, restores the NuGet cache and calls it.
 #
-# Runs from this repository (pushes, its own branches' pull requests, manual
-# runs) go to the self-hosted job on the fedora build host; a fork's pull request,
-# or a run inside a fork, goes to the hosted job. Setting the repository variable
+# Runs the repository owner starts (pushes, this repository's branches' pull
+# requests, manual runs) go to the self-hosted job on the fedora build host; a fork's pull request,
+# a run anyone else starts, or a run inside a fork, goes to the hosted job. Setting the repository variable
 # CI_SELF_HOSTED to "false" sends everything to the hosted job again. The hosted
 # job's runner comes from CI_RUNS_ON (a JSON string or label array), default
 # GitHub's ubuntu-latest.
@@ -36,6 +36,8 @@ jobs:
   hosted:
     if: >-
       ${{ vars.CI_SELF_HOSTED == 'false'
+          || github.actor != github.repository_owner
+          || github.triggering_actor != github.repository_owner
           || github.event.repository.fork
           || (github.event_name == 'pull_request'
               && github.event.pull_request.head.repo.full_name != github.repository) }}
@@ -102,6 +104,8 @@ jobs:
   self-hosted:
     if: >-
       ${{ vars.CI_SELF_HOSTED != 'false'
+          && github.actor == github.repository_owner
+          && github.triggering_actor == github.repository_owner
           && !github.event.repository.fork
           && (github.event_name != 'pull_request'
               || github.event.pull_request.head.repo.full_name == github.repository) }}
