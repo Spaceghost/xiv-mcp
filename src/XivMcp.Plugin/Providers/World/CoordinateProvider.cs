@@ -137,17 +137,34 @@ public sealed class CoordinateProvider
             "coordinates, distanceOnMap (in map units, not yalms) and isAethernetShard (city aethernet shards cannot be teleported to " +
             "from outside). This is game data: it lists every aetheryte in the zone whether or not the character has attuned to it. " +
             "Use list_aetherytes for what the player can actually teleport to and what it costs, then teleport.")]
-    public NearestAetherytesDto FindNearestAetheryte(
+    public async Task<NearestAetherytesDto> FindNearestAetheryte(
         [McpParam("Map X of the point. Use with y.")] double? x = null,
         [McpParam("Map Y of the point. Use with x.")] double? y = null,
         [McpParam("World X of the point. Use with worldZ.")] double? worldX = null,
         [McpParam("World Z of the point. Use with worldX.")] double? worldZ = null,
         [McpParam("TerritoryType row id; default is the player's current zone.", Minimum = 0)] uint? territoryId = null,
         [McpParam("Maximum entries (1-50).", Minimum = 1, Maximum = 50)] int limit = 5,
-        [McpParam("Leave out city aethernet shards.")] bool excludeAethernet = false)
+        [McpParam("Leave out city aethernet shards.")] bool excludeAethernet = false,
+        ToolContext? ctx = null)
     {
         limit = Math.Clamp(limit, 1, 50);
-        var (territory, map) = ResolveMap(territoryId, null);
+        var hasPoint = (x.HasValue && y.HasValue) || (worldX.HasValue && worldZ.HasValue);
+
+        // The object table only answers on the framework thread ("Not on main thread!" otherwise), so the player's
+        // position and zone are read there, together, and only when no point was given. The game-data work below
+        // stays off the framework thread.
+        PlayerSpot? here = null;
+        if (!hasPoint)
+        {
+            if (ctx is null)
+            {
+                throw new McpToolException("Tool context unavailable.");
+            }
+
+            here = await ctx.Game.InvokeAsync(ReadPlayerSpot, ctx.CancellationToken).ConfigureAwait(false);
+        }
+
+        var (territory, map) = ResolveMap(territoryId ?? (here is { TerritoryId: not 0 } spot ? spot.TerritoryId : (uint?)null), null);
         var sizeFactor = map.SizeFactor == 0 ? (ushort)100 : map.SizeFactor;
 
         double fromX, fromY;
@@ -162,9 +179,12 @@ public sealed class CoordinateProvider
         }
         else
         {
-            var position = objects.LocalPlayer?.Position
-                           ?? throw new McpToolException("No point given and no character is logged in. Pass x/y or worldX/worldZ.");
-            if (clientState.TerritoryType != territory)
+            if (here is not { Position: { } position } player)
+            {
+                throw new McpToolException("No point given and no character is logged in. Pass x/y or worldX/worldZ.");
+            }
+
+            if (player.TerritoryId != territory)
             {
                 throw new McpToolException($"The player is not in territory {territory}; pass x/y or worldX/worldZ for that zone.");
             }
@@ -220,6 +240,11 @@ public sealed class CoordinateProvider
             ordered,
             "Distances are straight lines on the map, ignoring walls, height and travel routes.");
     }
+
+    /// <summary>Where the player is, read in one go on the framework thread.</summary>
+    private sealed record PlayerSpot(uint TerritoryId, System.Numerics.Vector3? Position);
+
+    private PlayerSpot ReadPlayerSpot() => new(clientState.TerritoryType, objects.LocalPlayer?.Position);
 
     private (uint TerritoryId, Sheets.Map Map) ResolveMap(uint? territoryId, uint? mapId)
     {
