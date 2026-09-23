@@ -210,7 +210,7 @@ public sealed class DalamudControlProvider
     private IExposedPlugin ResolvePublic(string plugin)
     {
         var installed = pluginInterface.InstalledPlugins.ToList();
-        var index = PluginNameResolver.Resolve(installed.Select(static p => (p.InternalName, p.Name)).ToList(), plugin);
+        var index = PluginNameResolver.Resolve(installed.Select(static p => (p.InternalName, p.Name, p.IsLoaded)).ToList(), plugin);
         return installed[index];
     }
 
@@ -249,8 +249,9 @@ public sealed class DalamudControlProvider
 
     private PluginStateResult After(IExposedPlugin target, bool enabled, bool changed)
     {
-        var now = DalamudInternals.GetPlugins()?.FirstOrDefault(p => string.Equals(p.InternalName, target.InternalName, StringComparison.OrdinalIgnoreCase));
-        var loaded = now?.IsLoaded ?? pluginInterface.InstalledPlugins.FirstOrDefault(p => p.InternalName == target.InternalName)?.IsLoaded ?? false;
+        var internals = DalamudInternals.GetPlugins();
+        var now = internals is null ? null : PluginInstances.Find(internals, target.InternalName, static p => p.InternalName, static p => p.IsLoaded);
+        var loaded = now?.IsLoaded ?? PluginInstances.Find(pluginInterface.InstalledPlugins, target.InternalName, static p => p.InternalName, static p => p.IsLoaded)?.IsLoaded ?? false;
         return new PluginStateResult(target.InternalName, target.Name, enabled, changed, now?.State ?? (loaded ? "Loaded" : "Unloaded"), loaded);
     }
 

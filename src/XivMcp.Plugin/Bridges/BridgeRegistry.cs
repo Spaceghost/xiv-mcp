@@ -1,6 +1,7 @@
 using System.Globalization;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using XivMcp.Plugin.Providers.DalamudInfo;
 
 namespace XivMcp.Plugin.Bridges;
 
@@ -189,15 +190,17 @@ public sealed class BridgeRegistry
     {
         try
         {
-            foreach (var plugin in pluginInterface.InstalledPlugins)
+            // One plugin can be installed more than once (a disabled dev copy next to the repository copy, under the
+            // same internal name). The loaded one is the one IPC talks to, so it decides, not list order.
+            var matches = pluginInterface.InstalledPlugins
+                .Where(plugin => definition.InternalNames.Any(n =>
+                    n.Equals(plugin.InternalName, StringComparison.OrdinalIgnoreCase) ||
+                    n.Equals(plugin.Name, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            var index = PluginInstances.PreferLoaded(matches, static p => p.IsLoaded);
+            if (index >= 0)
             {
-                if (!definition.InternalNames.Any(n =>
-                        n.Equals(plugin.InternalName, StringComparison.OrdinalIgnoreCase) ||
-                        n.Equals(plugin.Name, StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-
+                var plugin = matches[index];
                 return (true, plugin.IsLoaded, plugin.Version?.ToString());
             }
         }

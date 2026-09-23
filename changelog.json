@@ -10,6 +10,10 @@
       "items": [
         {
           "status": "beta",
+          "text": "When one plugin is installed twice under the same name (a disabled dev copy next to the installed one), XivMcp now looks at the copy that is loaded. The XivDesktop, Ghostty and Almanac tools no longer say \"installed but not loaded\" while the plugin is running, get_troubleshooting_summary no longer lists it as not loaded, list_plugins shows each copy its own state, and open_plugin_ui opens the loaded copy instead of calling the name ambiguous. Enabling, disabling or reloading such a plugin is still refused and left to the plugin installer. Seen failing in game on 0.1.1-test.1 with XivDesktop; fixed in host tests, not yet verified in game."
+        },
+        {
+          "status": "beta",
           "text": "Twelve tools for Dalamud itself. Reading: a richer list_plugins and get_dalamud_info, read_plugin_log (tail or search, with paths and personal details scrubbed out), get_troubleshooting_summary, list_plugin_repositories, get_plugin_stats and get_ui_info. Behind the approval checkbox: open_plugin_ui, open_dalamud_window, set_plugin_enabled, reload_plugin, and add_plugin_repository, which only opens Dalamud's settings with the URL copied for you. Nothing here installs, updates or removes a plugin, and nothing writes Dalamud's configuration: the installer is opened on a search and you click. It refuses to disable or reload XivMcp itself. Several of these read Dalamud internals that have no public API; each one checks first that this Dalamud build still has what it needs and answers \"unavailable\" with the reason when it does not, and a build-time test fails the moment a Dalamud release renames one."
         },
         {

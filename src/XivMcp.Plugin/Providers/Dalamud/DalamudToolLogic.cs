@@ -2,12 +2,76 @@ using XivMcp.Core;
 
 namespace XivMcp.Plugin.Providers.DalamudInfo;
 
+/// <summary>
+/// Picks one plugin out of several installs that share an internal name. Dalamud lists every install: a dev copy of
+/// a plugin sits next to the repository copy under the same internal name, and usually only one of them is loaded.
+/// Anything that asks "is X there, is it loaded, which version" has to look at the loaded one, not whichever
+/// Dalamud happened to list first. Pure.
+/// </summary>
+public static class PluginInstances
+{
+    /// <summary>
+    /// Index of the instance to use: the first loaded one, else the first one; -1 when <paramref name="plugins"/> is empty.
+    /// </summary>
+    public static int PreferLoaded<T>(IReadOnlyList<T> plugins, Func<T, bool> isLoaded)
+    {
+        ArgumentNullException.ThrowIfNull(plugins);
+        ArgumentNullException.ThrowIfNull(isLoaded);
+        for (var i = 0; i < plugins.Count; i++)
+        {
+            if (isLoaded(plugins[i]))
+                return i;
+        }
+
+        return plugins.Count > 0 ? 0 : -1;
+    }
+
+    /// <summary>The loaded instance among <paramref name="plugins"/> whose internal name is <paramref name="internalName"/>, else the first such; null when there is none.</summary>
+    public static T? Find<T>(IEnumerable<T> plugins, string internalName, Func<T, string> nameOf, Func<T, bool> isLoaded)
+        where T : class
+    {
+        var matches = plugins.Where(p => string.Equals(nameOf(p), internalName, StringComparison.OrdinalIgnoreCase)).ToList();
+        var index = PreferLoaded(matches, isLoaded);
+        return index < 0 ? null : matches[index];
+    }
+
+    /// <summary>The installs that are not loaded and have no loaded copy under the same internal name.</summary>
+    public static IEnumerable<T> NotLoaded<T>(IReadOnlyList<T> plugins, Func<T, string> nameOf, Func<T, bool> isLoaded)
+    {
+        var loaded = new HashSet<string>(plugins.Where(isLoaded).Select(nameOf), StringComparer.OrdinalIgnoreCase);
+        return plugins.Where(p => !isLoaded(p) && !loaded.Contains(nameOf(p)));
+    }
+
+    /// <summary>
+    /// Like <see cref="Find{T}(IEnumerable{T}, string, Func{T, string}, Func{T, bool})"/>, for pairing one install with
+    /// its entry in another list: an install of the same kind (dev or not) is taken over the other kind.
+    /// </summary>
+    public static T? Find<T>(IEnumerable<T> plugins, string internalName, bool isDev, Func<T, string> nameOf, Func<T, bool> isDevOf, Func<T, bool> isLoaded)
+        where T : class
+    {
+        var matches = plugins.Where(p => string.Equals(nameOf(p), internalName, StringComparison.OrdinalIgnoreCase)).ToList();
+        var sameKind = matches.Where(p => isDevOf(p) == isDev).ToList();
+        var pool = sameKind.Count > 0 ? sameKind : matches;
+        var index = PreferLoaded(pool, isLoaded);
+        return index < 0 ? null : pool[index];
+    }
+}
+
 /// <summary>Resolves what a caller typed to exactly one installed plugin: internal name first, then display name. Pure.</summary>
 public static class PluginNameResolver
 {
+    /// <summary>Resolves by name alone; two installs sharing a name are always ambiguous.</summary>
+    public static int Resolve(IReadOnlyList<(string InternalName, string Name)> plugins, string? wanted) =>
+        Resolve(plugins.Select(static p => (p.InternalName, p.Name, false)).ToList(), wanted);
+
     /// <returns>Index into <paramref name="plugins"/>.</returns>
+    /// <remarks>
+    /// When every match is an install of one plugin (same internal name: a dev copy next to the repository copy)
+    /// and exactly one of them is loaded, that one is the answer. Different plugins that share a display name, or
+    /// copies of which none or several are loaded, stay ambiguous.
+    /// </remarks>
     /// <exception cref="McpToolException"><c>invalid_arguments</c> for an empty or ambiguous name, <c>not_found</c> otherwise.</exception>
-    public static int Resolve(IReadOnlyList<(string InternalName, string Name)> plugins, string? wanted)
+    public static int Resolve(IReadOnlyList<(string InternalName, string Name, bool IsLoaded)> plugins, string? wanted)
     {
         var text = wanted?.Trim();
         if (string.IsNullOrEmpty(text))
@@ -22,6 +86,11 @@ public static class PluginNameResolver
             return byInternal[0];
         if (byInternal.Count > 1)
         {
+            var sameInternalName = byInternal.All(i => string.Equals(plugins[i].InternalName, plugins[byInternal[0]].InternalName, StringComparison.OrdinalIgnoreCase));
+            var loaded = byInternal.Where(i => plugins[i].IsLoaded).ToList();
+            if (sameInternalName && loaded.Count == 1)
+                return loaded[0];
+
             // Two installs of one plugin (a dev copy next to the repository copy) share both names.
             throw McpToolException.WithCode(McpErrorCodes.InvalidArguments,
                 $"'{text}' matches {byInternal.Count} installed plugins ({string.Join(", ", byInternal.Select(i => plugins[i].InternalName))}). Pass the internal name; when one plugin is installed twice (a dev copy next to the repository copy) act on it in the plugin installer instead.");
@@ -35,7 +104,7 @@ public static class PluginNameResolver
             $"No installed plugin is named '{text}'.{hint} This server never installs plugins: open_dalamud_window can put the installer in front of the player on a search.");
     }
 
-    private static List<int> Matches(IReadOnlyList<(string InternalName, string Name)> plugins, Func<(string InternalName, string Name), bool> predicate)
+    private static List<int> Matches(IReadOnlyList<(string InternalName, string Name, bool IsLoaded)> plugins, Func<(string InternalName, string Name, bool IsLoaded), bool> predicate)
     {
         var result = new List<int>();
         for (var i = 0; i < plugins.Count; i++)
