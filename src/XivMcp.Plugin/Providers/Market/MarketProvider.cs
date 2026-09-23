@@ -199,16 +199,24 @@ public sealed class MarketProvider : IDisposable
             "Every public world in the game with its data centre and region, from game data (no network call). Flags the character's " +
             "current and home world when logged in. Use it to pick a valid scope for get_market_prices, or to check which data centre a " +
             "world belongs to. Filter with nameContains (matches world, data centre or region) and page with limit/offset.")]
-    public WorldsResultDto ListWorlds(
+    public async Task<WorldsResultDto> ListWorlds(
         [McpParam("Case-insensitive substring matched against world, data-centre or region name.")] string? nameContains = null,
         [McpParam("Maximum entries (1-500). Default 100.", Minimum = 1, Maximum = 500)] int limit = 100,
-        [McpParam("Entries to skip for paging.", Minimum = 0)] int offset = 0)
+        [McpParam("Entries to skip for paging.", Minimum = 0)] int offset = 0,
+        ToolContext? ctx = null)
     {
         limit = Math.Clamp(limit, 1, 500);
         offset = Math.Max(0, offset);
 
-        var current = SafeWorldName(() => objects.LocalPlayer?.CurrentWorld.RowId);
-        var home = SafeWorldName(() => objects.LocalPlayer?.HomeWorld.RowId);
+        // The object table only answers on the framework thread; off it, LocalPlayer throws and the two flags were
+        // silently always empty. Read both there, in one go, and do the sheet work here.
+        (string? Current, string? Home) worlds = ctx is null
+            ? (null, null)
+            : await ctx.Game.InvokeAsync(
+                    () => (SafeWorldName(() => objects.LocalPlayer?.CurrentWorld.RowId), SafeWorldName(() => objects.LocalPlayer?.HomeWorld.RowId)),
+                    ctx.CancellationToken)
+                .ConfigureAwait(false);
+        var (current, home) = worlds;
 
         var all = new List<WorldDto>();
         string? currentDc = null;

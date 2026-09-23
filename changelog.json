@@ -10,6 +10,10 @@
       "items": [
         {
           "status": "beta",
+          "text": "find_nearest_aetheryte with no point no longer fails with \"Not on main thread!\": it now reads your position and zone on the game's own thread, like get_player does. list_worlds had the same mistake and quietly never flagged your current and home world; it reads them the same way now. Seen failing in game on 0.1.1-test.1; fixed in host tests, not yet verified in game."
+        },
+        {
+          "status": "beta",
           "text": "read_plugin_log and get_troubleshooting_summary now find dalamud.log on XIVLauncher.Core (Linux and macOS), which keeps it in ~/.xlcore/logs/ rather than next to pluginConfigs; XIVLauncher on Windows (%AppData%\\XIVLauncher\\dalamud.log) is still looked for first. Seen failing in game on 0.1.1-test.1; fixed in host tests, not yet verified in game."
         },
         {
