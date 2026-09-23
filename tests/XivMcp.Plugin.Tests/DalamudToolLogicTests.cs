@@ -40,6 +40,86 @@ public class DalamudToolLogicTests
         Assert.Contains("matches 2", ex.Message, StringComparison.Ordinal);
     }
 
+    private static readonly (string InternalName, string Name, bool IsLoaded)[] InstalledTwice =
+    [
+        ("XivDesktop", "XivDesktop", false), // the disabled dev copy, listed first
+        ("XivDesktop", "XivDesktop", true),
+        ("TwinA", "Twin", true),
+        ("TwinB", "Twin", false),
+        ("Both", "Both (repo)", true),
+        ("Both", "Both (dev)", true),
+        ("Neither", "Neither (repo)", false),
+        ("Neither", "Neither (dev)", false),
+    ];
+
+    [Theory]
+    [InlineData("XivDesktop", 1)]
+    [InlineData("xivdesktop", 1)]
+    public void OnePluginInstalledTwiceResolvesToTheLoadedCopy(string wanted, int expected) =>
+        Assert.Equal(expected, PluginNameResolver.Resolve(InstalledTwice, wanted));
+
+    [Theory]
+    [InlineData("Twin")] // two different plugins with one display name: never guessed, loaded or not
+    [InlineData("Both")] // both copies loaded
+    [InlineData("Neither")] // no copy loaded
+    public void CopiesStayAmbiguousUnlessExactlyOneIsLoaded(string wanted) =>
+        Assert.Equal(McpErrorCodes.InvalidArguments, Code(() => PluginNameResolver.Resolve(InstalledTwice, wanted)));
+
+    private sealed record Install(string InternalName, bool IsLoaded, bool IsDev, string State);
+
+    [Fact]
+    public void PreferLoadedTakesTheFirstLoadedElseTheFirst()
+    {
+        bool[] secondLoaded = [false, true, true];
+        bool[] noneLoaded = [false, false];
+        Assert.Equal(1, PluginInstances.PreferLoaded(secondLoaded, static l => l));
+        Assert.Equal(0, PluginInstances.PreferLoaded(noneLoaded, static l => l));
+        Assert.Equal(-1, PluginInstances.PreferLoaded(Array.Empty<bool>(), static l => l));
+    }
+
+    [Fact]
+    public void FindTakesTheLoadedInstallOfThatName()
+    {
+        Install[] installs =
+        [
+            new("Other", true, false, "Loaded"),
+            new("XivDesktop", false, true, "Unloaded"),
+            new("XIVDESKTOP", true, false, "Loaded"),
+        ];
+
+        Assert.Same(installs[2], PluginInstances.Find(installs, "XivDesktop", static p => p.InternalName, static p => p.IsLoaded));
+        Assert.Same(installs[1], PluginInstances.Find(installs.Take(2), "XivDesktop", static p => p.InternalName, static p => p.IsLoaded));
+        Assert.Null(PluginInstances.Find(installs, "Missing", static p => p.InternalName, static p => p.IsLoaded));
+    }
+
+    [Fact]
+    public void FindByKindPairsADevCopyWithItsOwnState()
+    {
+        Install[] installs =
+        [
+            new("XivDesktop", false, true, "Unloaded"),
+            new("XivDesktop", true, false, "Loaded"),
+        ];
+
+        Assert.Equal("Unloaded", PluginInstances.Find(installs, "XivDesktop", isDev: true, static p => p.InternalName, static p => p.IsDev, static p => p.IsLoaded)!.State);
+        Assert.Equal("Loaded", PluginInstances.Find(installs, "XivDesktop", isDev: false, static p => p.InternalName, static p => p.IsDev, static p => p.IsLoaded)!.State);
+        // With no install of that kind, the loaded one of the other kind.
+        Assert.Equal("Loaded", PluginInstances.Find(installs[1..], "XivDesktop", isDev: true, static p => p.InternalName, static p => p.IsDev, static p => p.IsLoaded)!.State);
+    }
+
+    [Fact]
+    public void NotLoadedLeavesOutNamesThatHaveALoadedCopy()
+    {
+        Install[] installs =
+        [
+            new("XivDesktop", false, true, "Unloaded"),
+            new("XivDesktop", true, false, "Loaded"),
+            new("Sleeping", false, false, "Unloaded"),
+        ];
+
+        Assert.Equal(["Sleeping"], PluginInstances.NotLoaded(installs, static p => p.InternalName, static p => p.IsLoaded).Select(static p => p.InternalName));
+    }
+
     [Fact]
     public void UnknownNamesAreNotFoundWithSuggestionsAndNoInstallOffer()
     {
