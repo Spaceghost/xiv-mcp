@@ -13,9 +13,9 @@ Statuses mean exactly what they mean in the What's new view in game:
 * **BETA** — merged, but not yet verified in game.
 * **SOON** — still being built.
 
-## [Unreleased] — In the workshop
+## [0.1.1] — Released 2026-09-23
 
-Everything here is merged into master. BETA means exactly that and no more: merged, and not yet seen working in the game.
+BETA entries are in this release but have not been verified in game yet; they become NEW or FIX once they have been seen working.
 
 * find_nearest_aetheryte with no point no longer fails with "Not on main thread!": it now reads your position and zone on the game's own thread, like get_player does. list_worlds had the same mistake and quietly never flagged your current and home world; it reads them the same way now. Seen failing in game on 0.1.1-test.1; fixed in host tests, not yet verified in game.
 * read_plugin_log and get_troubleshooting_summary now find dalamud.log on XIVLauncher.Core (Linux and macOS), which keeps it in ~/.xlcore/logs/ rather than next to pluginConfigs; XIVLauncher on Windows (%AppData%\XIVLauncher\dalamud.log) is still looked for first. Seen failing in game on 0.1.1-test.1; fixed in host tests, not yet verified in game.
