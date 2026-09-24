@@ -10,6 +10,8 @@
 
 <img src="images/icon.png" width="96" height="96" align="right" alt="XivMcp icon">
 
+**[Site](https://spacegho.st/mods/ffxiv/xivmcp/) · [Install](https://spacegho.st/mods/ffxiv/plugins/) · [Vote on what's next](https://spacegho.st/mods/ffxiv/xivmcp/vote/) · [Screenshots](https://spacegho.st/mods/ffxiv/term/gallery/?mod=xivmcp) · [Changelog](CHANGELOG.md)**
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server that runs **inside FINAL FANTASY XIV** as a
 Dalamud plugin. MCP clients such as Claude Code connect to it over Streamable HTTP on loopback
 (`http://127.0.0.1:41800/mcp`) and get tools, resources and prompts for game state, game data, the
